@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0B0B16">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Forge Training</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body { background: #0B0B16; color: #EEF0FF; -webkit-tap-highlight-color: transparent; }
+    #root { height: 100%; overflow: hidden; }
+    select, input, textarea { font-family: inherit; color: inherit; }
+    ::-webkit-scrollbar { display: none; }
+    #loading {
+      position: fixed; inset: 0; background: #0B0B16; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    }
+    #loading-title {
+      font-family: 'Bebas Neue', cursive; font-size: 36px; letter-spacing: 6px; color: #10D4A0;
+    }
+    #loading-bar-wrap { width: 180px; height: 4px; background: #262640; border-radius: 2px; overflow: hidden; }
+    #loading-bar {
+      height: 100%; width: 0%; background: #10D4A0; border-radius: 2px;
+      animation: loadprog 1.2s ease-in-out forwards;
+    }
+    @keyframes loadprog { 0%{width:0%} 70%{width:85%} 100%{width:100%} }
+    #loading-sub { font-size: 12px; color: #4A5080; letter-spacing: 2px; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+
+  <div id="loading">
+    <div id="loading-title">FORGE TRAINING</div>
+    <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+    <div id="loading-sub">Starting up...</div>
+  </div>
+
+  <div id="root"></div>
+
+  <script src="react.min.js"></script>
+  <script src="react-dom.min.js"></script>
+  <!-- PropTypes polyfill required by Recharts -->
+  <script>
+    window.PropTypes = {
+      any: function(){}, array: function(){}, bool: function(){},
+      func: function(){}, number: function(){}, object: function(){},
+      string: function(){}, symbol: function(){}, node: function(){},
+      element: function(){}, elementType: function(){},
+      arrayOf:    function(){ return function(){}; },
+      instanceOf: function(){ return function(){}; },
+      objectOf:   function(){ return function(){}; },
+      oneOf:      function(){ return function(){}; },
+      oneOfType:  function(){ return function(){}; },
+      shape:      function(){ return function(){}; },
+      exact:      function(){ return function(){}; },
+      checkPropTypes: function(){},
+      resetWarningCache: function(){}
+    };
+    window.PropTypes.isRequired = window.PropTypes;
+  </script>
+  <script src="recharts.min.js"></script>
+  <script src="app.js"></script>
+
+  <script>
+    // Hide loading screen once app has mounted
+    var l = document.getElementById('loading');
+    if (l) {
+      l.style.transition = 'opacity 0.3s';
+      l.style.opacity = '0';
+      setTimeout(function(){ l.remove(); }, 350);
+    }
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    }
+  </script>
+
+</body>
+</html>
