@@ -1,10 +1,11 @@
-const CACHE = 'forge-v1';
+ const CACHE = 'forge-v1';
 const FILES = [
   '/',
   '/index.html',
   '/app.js',
   '/react.min.js',
   '/react-dom.min.js',
+  '/prop-types.min.js',
   '/recharts.min.js',
   '/manifest.json',
   '/icon-192.png',
@@ -32,3 +33,4 @@ self.addEventListener('fetch', e => {
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );
 });
+
