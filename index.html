@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -46,7 +46,25 @@
 
   <script src="react.min.js"></script>
   <script src="react-dom.min.js"></script>
-  <script src="prop-types.min.js"></script>
+  <!-- PropTypes polyfill required by Recharts -->
+  <script>
+    window.PropTypes = {
+      any: function(){}, array: function(){}, bool: function(){},
+      func: function(){}, number: function(){}, object: function(){},
+      string: function(){}, symbol: function(){}, node: function(){},
+      element: function(){}, elementType: function(){},
+      arrayOf:    function(){ return function(){}; },
+      instanceOf: function(){ return function(){}; },
+      objectOf:   function(){ return function(){}; },
+      oneOf:      function(){ return function(){}; },
+      oneOfType:  function(){ return function(){}; },
+      shape:      function(){ return function(){}; },
+      exact:      function(){ return function(){}; },
+      checkPropTypes: function(){},
+      resetWarningCache: function(){}
+    };
+    window.PropTypes.isRequired = window.PropTypes;
+  </script>
   <script src="recharts.min.js"></script>
   <script src="app.js"></script>
 
