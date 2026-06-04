@@ -270,6 +270,7 @@ const INIT_CLIENTS = [{
     exercises: SEED_EX,
     sessions: SEED_SESSIONS
   }],
+  archived: false,
   activeProgramId: "p1"
 }, {
   id: "c2",
@@ -277,6 +278,7 @@ const INIT_CLIENTS = [{
   bw: null,
   height: null,
   email: "",
+  archived: false,
   programs: [],
   activeProgramId: null
 }, {
@@ -285,6 +287,7 @@ const INIT_CLIENTS = [{
   bw: null,
   height: null,
   email: "",
+  archived: false,
   programs: [],
   activeProgramId: null
 }, {
@@ -293,6 +296,7 @@ const INIT_CLIENTS = [{
   bw: null,
   height: null,
   email: "",
+  archived: false,
   programs: [],
   activeProgramId: null
 }, {
@@ -301,6 +305,7 @@ const INIT_CLIENTS = [{
   bw: null,
   height: null,
   email: "",
+  archived: false,
   programs: [],
   activeProgramId: null
 }, {
@@ -309,6 +314,7 @@ const INIT_CLIENTS = [{
   bw: null,
   height: null,
   email: "",
+  archived: false,
   programs: [],
   activeProgramId: null
 }, {
@@ -317,6 +323,7 @@ const INIT_CLIENTS = [{
   bw: null,
   height: null,
   email: "",
+  archived: false,
   programs: [],
   activeProgramId: null
 }];
@@ -882,6 +889,571 @@ function ExRowEdit({
   }, "SAVE")));
 }
 
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function parseSessionDate(dateStr) {
+  if (!dateStr) return null;
+  const parts = dateStr.trim().split(/\s+/);
+  const day = parseInt(parts[0]);
+  const month = MONTHS_SHORT.indexOf(parts[1]);
+  const year = parts[2] ? parseInt(parts[2]) : new Date().getFullYear();
+  if (isNaN(day) || month === -1) return null;
+  return new Date(year, month, day);
+}
+
+// ─── Edit Client Modal ────────────────────────────────────────────────────────
+
+function EditClientModal({
+  client,
+  onSave,
+  onClose
+}) {
+  const [form, setForm] = useState({
+    name: client.name,
+    bw: client.bw || "",
+    height: client.height || "",
+    email: client.email || ""
+  });
+  const upd = (k, v) => setForm(f => ({
+    ...f,
+    [k]: v
+  }));
+  const submit = () => {
+    if (!form.name.trim()) return;
+    onSave({
+      ...client,
+      name: form.name.trim(),
+      bw: form.bw ? +form.bw : null,
+      height: form.height ? +form.height : null,
+      email: form.email
+    });
+    onClose();
+  };
+  return /*#__PURE__*/React.createElement(Sheet, {
+    title: "EDIT PROFILE",
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Full name"
+  }), /*#__PURE__*/React.createElement("input", {
+    value: form.name,
+    onChange: e => upd("name", e.target.value),
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Bodyweight (kg)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: form.bw,
+    onChange: e => upd("bw", e.target.value),
+    placeholder: "75",
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Height (m)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    step: "0.01",
+    value: form.height,
+    onChange: e => upd("height", e.target.value),
+    placeholder: "1.70",
+    style: ss
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 22
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Email"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    value: form.email,
+    onChange: e => upd("email", e.target.value),
+    placeholder: "client@email.com",
+    style: ss
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 10,
+      padding: "14px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      letterSpacing: 2,
+      cursor: "pointer"
+    }
+  }, "SAVE CHANGES"));
+}
+
+// ─── Calendar Tab ─────────────────────────────────────────────────────────────
+
+function CalendarTab({
+  client
+}) {
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
+  const [selDay, setSelDay] = useState(null);
+  const allSessions = useMemo(() => {
+    if (!client) return [];
+    return (client.programs || []).flatMap(p => p.sessions.map(s => ({
+      ...s,
+      programName: p.name,
+      programId: p.id
+    })));
+  }, [client]);
+
+  // Map "YYYY-M-D" → sessions
+  const sessionMap = useMemo(() => {
+    const map = {};
+    allSessions.forEach(s => {
+      const d = parseSessionDate(s.date);
+      if (!d) return;
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(s);
+    });
+    return map;
+  }, [allSessions]);
+  const prevMonth = () => {
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear(y => y - 1);
+    } else setViewMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear(y => y + 1);
+    } else setViewMonth(m => m + 1);
+  };
+
+  // Build calendar grid (Monday-first)
+  const grid = useMemo(() => {
+    const first = new Date(viewYear, viewMonth, 1);
+    const total = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const start = (first.getDay() + 6) % 7; // 0=Mon
+    const cells = [];
+    for (let i = 0; i < start; i++) cells.push(null);
+    for (let d = 1; d <= total; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [viewYear, viewMonth]);
+  const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+  const selKey = selDay ? `${viewYear}-${viewMonth}-${selDay}` : null;
+  const selSessions = selKey ? sessionMap[selKey] || [] : [];
+  if (!client) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "48px 24px",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 42,
+      marginBottom: 14
+    }
+  }, "\uD83D\uDCC5"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.sub,
+      fontSize: 14
+    }
+  }, "No client selected."));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "16px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: prevMonth,
+    style: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "8px 14px",
+      color: C.text,
+      cursor: "pointer",
+      fontSize: 16
+    }
+  }, "\u2039"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 22,
+      letterSpacing: 2,
+      color: C.text
+    }
+  }, MONTHS_FULL[viewMonth], " ", viewYear), /*#__PURE__*/React.createElement("button", {
+    onClick: nextMonth,
+    style: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "8px 14px",
+      color: C.text,
+      cursor: "pointer",
+      fontSize: 16
+    }
+  }, "\u203A")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(7,1fr)",
+      marginBottom: 6
+    }
+  }, ["M", "T", "W", "T", "F", "S", "S"].map((d, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: C.muted,
+      fontWeight: 700,
+      padding: "4px 0",
+      letterSpacing: 1
+    }
+  }, d))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(7,1fr)",
+      gap: 3,
+      marginBottom: 16
+    }
+  }, grid.map((day, i) => {
+    if (!day) return /*#__PURE__*/React.createElement("div", {
+      key: i
+    });
+    const key = `${viewYear}-${viewMonth}-${day}`;
+    const hasSes = !!sessionMap[key];
+    const isToday = key === todayKey;
+    const isSel = day === selDay;
+    return /*#__PURE__*/React.createElement("button", {
+      key: i,
+      onClick: () => setSelDay(isSel ? null : day),
+      style: {
+        aspectRatio: "1",
+        borderRadius: 8,
+        border: `1.5px solid ${isSel ? C.accent : hasSes ? C.accent + "44" : C.border}`,
+        background: isSel ? C.accent : hasSes ? C.accent + "18" : isToday ? C.card2 : "transparent",
+        color: isSel ? "#001A12" : isToday ? C.accent : C.text,
+        fontWeight: hasSes || isToday ? 700 : 400,
+        fontSize: 13,
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 2
+      }
+    }, day, hasSes && !isSel && /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 5,
+        height: 5,
+        borderRadius: "50%",
+        background: isSel ? "#001A12" : C.accent,
+        display: "block"
+      }
+    }));
+  })), selDay && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(SecLabel, {
+    text: `${selDay} ${MONTHS_FULL[viewMonth]} ${viewYear}`
+  }), selSessions.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 12,
+      padding: "20px",
+      textAlign: "center",
+      border: `1px solid ${C.border}`,
+      color: C.sub,
+      fontSize: 13
+    }
+  }, "No training session on this day.") : selSessions.map((s, si) => /*#__PURE__*/React.createElement("div", {
+    key: si,
+    style: {
+      background: C.card,
+      borderRadius: 12,
+      padding: "14px",
+      border: `1px solid ${C.border}`,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, s.programName), /*#__PURE__*/React.createElement(Tag, {
+    text: `${s.entries.length} sets`,
+    color: C.blue
+  })), Object.entries(s.entries.reduce((acc, e) => {
+    if (!acc[e.ex]) acc[e.ex] = [];
+    acc[e.ex].push(e);
+    return acc;
+  }, {})).map(([exName, entries]) => /*#__PURE__*/React.createElement("div", {
+    key: exName,
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, exName), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 5
+    }
+  }, entries.map((e, ei) => /*#__PURE__*/React.createElement("span", {
+    key: ei,
+    style: {
+      background: C.card2,
+      borderRadius: 6,
+      padding: "4px 10px",
+      fontSize: 12,
+      border: `1px solid ${C.border}`
+    }
+  }, "Set ", e.set, ": ", e.reps, "\xD7", e.load, "kg", e.power ? ` · ${e.power}W` : "")))))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 12,
+      padding: "12px 16px",
+      border: `1px solid ${C.border}`,
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      marginBottom: 6,
+      fontWeight: 700
+    }
+  }, "This month"), (() => {
+    const count = Object.keys(sessionMap).filter(k => {
+      const [y, m] = k.split("-").map(Number);
+      return y === viewYear && m === viewMonth;
+    }).length;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: 28,
+        color: C.accent
+      }
+    }, count, " ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 14,
+        opacity: 0.7
+      }
+    }, "session", count !== 1 ? "s" : "", " logged"));
+  })()));
+}
+
+// ─── Data Sync Sheet ──────────────────────────────────────────────────────────
+
+function DataSyncSheet({
+  clients,
+  customData,
+  onImport,
+  onClose
+}) {
+  const [imported, setImported] = useState(false);
+  const [error, setError] = useState("");
+  const exportData = () => {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      clients,
+      customData
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `forge-backup-${new Date().toLocaleDateString("en-ZA").replace(/\//g, "-")}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  const handleFile = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.clients || !Array.isArray(data.clients)) throw new Error("Invalid file");
+        onImport(data);
+        setImported(true);
+        setError("");
+      } catch {
+        setError("Invalid backup file. Please use a file exported from Forge Training.");
+      }
+    };
+    reader.readAsText(file);
+  };
+  return /*#__PURE__*/React.createElement(Sheet, {
+    title: "DATA & SYNC",
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: C.sub,
+      marginBottom: 20,
+      lineHeight: 1.6
+    }
+  }, "To sync between your phone and tablet: export on one device, transfer the file, then import on the other."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 12,
+      padding: "16px",
+      marginBottom: 12,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      marginBottom: 4
+    }
+  }, "\uD83D\uDCE4 Export Backup"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      marginBottom: 12
+    }
+  }, "Downloads all your clients, programs and session data as a JSON file."), /*#__PURE__*/React.createElement("button", {
+    onClick: exportData,
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 10,
+      padding: "13px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 18,
+      letterSpacing: 2,
+      cursor: "pointer"
+    }
+  }, "EXPORT DATA")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 12,
+      padding: "16px",
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      marginBottom: 4
+    }
+  }, "\uD83D\uDCE5 Import Backup"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      marginBottom: 12
+    }
+  }, "Loads a previously exported backup file. This will replace all current data."), imported ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.accent + "22",
+      border: `1px solid ${C.accent}44`,
+      borderRadius: 8,
+      padding: "12px",
+      textAlign: "center",
+      color: C.accent,
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, "\u2713 Data imported successfully!") : /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "block",
+      width: "100%",
+      background: C.card,
+      border: `1.5px dashed ${C.border}`,
+      borderRadius: 10,
+      padding: "14px",
+      textAlign: "center",
+      cursor: "pointer",
+      color: C.sub,
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "\uD83D\uDCC1 Choose backup file", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".json",
+    onChange: handleFile,
+    style: {
+      display: "none"
+    }
+  })), error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.warn,
+      fontSize: 12,
+      marginTop: 8,
+      textAlign: "center"
+    }
+  }, error)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16,
+      padding: "12px 14px",
+      background: C.card2,
+      borderRadius: 10,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 6
+    }
+  }, "Sync steps"), ["1. Tap Export on Device A — saves a .json file", "2. Send the file to Device B (email, WhatsApp, etc.)", "3. Open Forge Training on Device B", "4. Tap Import and choose the file"].map((s, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      marginBottom: 4
+    }
+  }, s))));
+}
+
 // ─── Client Switcher ──────────────────────────────────────────────────────────
 
 function ClientSwitcher({
@@ -889,8 +1461,14 @@ function ClientSwitcher({
   activeId,
   onSwitch,
   onClose,
-  onAddClient
+  onAddClient,
+  onArchive,
+  onReinstate,
+  onEditClient
 }) {
+  const [showArchived, setShowArchived] = useState(false);
+  const active = clients.filter(c => !c.archived);
+  const archived = clients.filter(c => c.archived);
   return /*#__PURE__*/React.createElement(Sheet, {
     title: "CLIENTS",
     onClose: onClose
@@ -898,8 +1476,16 @@ function ClientSwitcher({
     style: {
       marginBottom: 10
     }
-  }, clients.map((c, i) => /*#__PURE__*/React.createElement("div", {
+  }, active.map((c, i) => /*#__PURE__*/React.createElement("div", {
     key: c.id,
+    style: {
+      background: c.id === activeId ? C.accent + "18" : C.card2,
+      borderRadius: 14,
+      border: `1.5px solid ${c.id === activeId ? C.accent + "66" : C.border}`,
+      marginBottom: 8,
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
     onClick: () => {
       onSwitch(c.id);
       onClose();
@@ -909,15 +1495,11 @@ function ClientSwitcher({
       alignItems: "center",
       gap: 14,
       padding: "12px 14px",
-      marginBottom: 8,
-      background: c.id === activeId ? C.accent + "18" : C.card2,
-      borderRadius: 14,
-      border: `1.5px solid ${c.id === activeId ? C.accent + "66" : C.border}`,
       cursor: "pointer"
     }
   }, /*#__PURE__*/React.createElement(Avatar, {
     name: c.name,
-    idx: i,
+    idx: clients.indexOf(c),
     size: 46
   }), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -940,20 +1522,120 @@ function ClientSwitcher({
       fontSize: 20,
       fontWeight: 700
     }
-  }, "\u2713")))), /*#__PURE__*/React.createElement("button", {
+  }, "\u2713")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      borderTop: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      onEditClient(c);
+      onClose();
+    },
+    style: {
+      flex: 1,
+      background: "none",
+      border: "none",
+      borderRight: `1px solid ${C.border}`,
+      padding: "8px",
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "\u270E Edit Profile"), /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      onArchive(c.id);
+      if (c.id === activeId) onClose();
+    },
+    style: {
+      flex: 1,
+      background: "none",
+      border: "none",
+      padding: "8px",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "\uD83D\uDCE6 Archive"))))), /*#__PURE__*/React.createElement("button", {
     onClick: onAddClient,
     style: {
       width: "100%",
       background: "none",
       border: `1px dashed ${C.accent + "55"}`,
       borderRadius: 12,
-      padding: "14px",
+      padding: "12px",
       color: C.accent,
       cursor: "pointer",
       fontSize: 14,
+      fontWeight: 700,
+      marginBottom: 10
+    }
+  }, "+ Add New Client"), archived.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowArchived(s => !s),
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      padding: "10px",
+      color: C.muted,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 8
+    }
+  }, showArchived ? "▲" : "▼", " Archived clients (", archived.length, ")"), showArchived && archived.map((c, i) => /*#__PURE__*/React.createElement("div", {
+    key: c.id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      padding: "10px 14px",
+      background: C.card2,
+      borderRadius: 12,
+      border: `1px solid ${C.border}`,
+      marginBottom: 6,
+      opacity: 0.7
+    }
+  }, /*#__PURE__*/React.createElement(Avatar, {
+    name: c.name,
+    idx: clients.indexOf(c),
+    size: 38
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, c.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub
+    }
+  }, "Archived")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      onReinstate(c.id);
+      onSwitch(c.id);
+      onClose();
+    },
+    style: {
+      background: C.accent + "22",
+      border: `1px solid ${C.accent}44`,
+      borderRadius: 8,
+      padding: "6px 12px",
+      color: C.accent,
+      cursor: "pointer",
+      fontSize: 12,
       fontWeight: 700
     }
-  }, "+ Add New Client"));
+  }, "Reinstate")))));
 }
 
 // ─── Add Client ───────────────────────────────────────────────────────────────
@@ -1582,7 +2264,8 @@ function LogTab({
 }) {
   const today = new Date().toLocaleDateString("en-ZA", {
     day: "2-digit",
-    month: "short"
+    month: "short",
+    year: "numeric"
   });
   const progExNames = program ? program.exercises.map(e => e.name) : [];
   // All available exercises: program's first, then global list (deduped)
@@ -3434,6 +4117,10 @@ const TABS = [{
   id: "report",
   icon: "📊",
   label: "Report"
+}, {
+  id: "calendar",
+  icon: "📅",
+  label: "Calendar"
 }];
 function App() {
   const [clients, setClients] = useState(() => lsGet('forge_clients', INIT_CLIENTS));
@@ -3441,6 +4128,8 @@ function App() {
   const [tab, setTab] = useState("programs");
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [showAddClient, setShowAddClient] = useState(false);
+  const [showDataSync, setShowDataSync] = useState(false);
+  const [editClientTarget, setEditClientTarget] = useState(null);
   const [customExercises, setCustomExercises] = useState(() => lsGet('forge_customEx', []));
   const [customEquipment, setCustomEquipment] = useState(() => lsGet('forge_customEquip', []));
   const [customLaterality, setCustomLaterality] = useState(() => lsGet('forge_customLat', []));
@@ -3520,10 +4209,31 @@ function App() {
       bw,
       height,
       email,
+      archived: false,
       programs: [],
       activeProgramId: null
     }]);
     switchClient(id);
+  };
+  const archiveClient = id => updClient(id, c => ({
+    ...c,
+    archived: true
+  }));
+  const reinstateClient = id => updClient(id, c => ({
+    ...c,
+    archived: false
+  }));
+  const editClientProfile = updated => updClient(updated.id, () => updated);
+  const importData = data => {
+    if (data.clients) setClients(data.clients);
+    if (data.customData) {
+      if (data.customData.exercises) setCustomExercises(data.customData.exercises);
+      if (data.customData.equipment) setCustomEquipment(data.customData.equipment);
+      if (data.customData.laterality) setCustomLaterality(data.customData.laterality);
+      if (data.customData.categories) setCustomCategories(data.customData.categories);
+      if (data.customData.progTypes) setCustomProgTypes(data.customData.progTypes);
+      if (data.customData.setTypes) setCustomSetTypes(data.customData.setTypes);
+    }
   };
   const setActiveProgram = pid => updClient(activeClientId, c => ({
     ...c,
@@ -3620,12 +4330,29 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
       fontFamily: "'Bebas Neue',cursive",
       fontSize: 20,
       letterSpacing: 4,
       color: C.accent
     }
   }, "FORGE TRAINING"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowDataSync(true),
+    style: {
+      background: "none",
+      border: "none",
+      color: C.muted,
+      cursor: "pointer",
+      fontSize: 18,
+      padding: "2px 4px"
+    },
+    title: "Data & Sync"
+  }, "\u2699\uFE0F")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowSwitcher(true),
     style: {
       background: C.card2,
@@ -3684,6 +4411,8 @@ function App() {
   }), tab === "report" && activeClient && /*#__PURE__*/React.createElement(ReportTab, {
     client: activeClient,
     program: activeProgram
+  }), tab === "calendar" && /*#__PURE__*/React.createElement(CalendarTab, {
+    client: activeClient
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card,
@@ -3733,6 +4462,18 @@ function App() {
     onAddClient: () => {
       setShowSwitcher(false);
       setShowAddClient(true);
+    },
+    onArchive: id => {
+      archiveClient(id);
+      if (id === activeClientId) {
+        const first = clients.find(c => !c.archived && c.id !== id);
+        if (first) switchClient(first.id);
+      }
+    },
+    onReinstate: reinstateClient,
+    onEditClient: c => {
+      setEditClientTarget(c);
+      setShowSwitcher(false);
     }
   }), showAddClient && /*#__PURE__*/React.createElement(AddClientModal, {
     onAdd: c => {
@@ -3740,6 +4481,22 @@ function App() {
       setShowAddClient(false);
     },
     onClose: () => setShowAddClient(false)
+  }), editClientTarget && /*#__PURE__*/React.createElement(EditClientModal, {
+    client: editClientTarget,
+    onSave: editClientProfile,
+    onClose: () => setEditClientTarget(null)
+  }), showDataSync && /*#__PURE__*/React.createElement(DataSyncSheet, {
+    clients: clients,
+    customData: {
+      exercises: customExercises,
+      equipment: customEquipment,
+      laterality: customLaterality,
+      categories: customCategories,
+      progTypes: customProgTypes,
+      setTypes: customSetTypes
+    },
+    onImport: importData,
+    onClose: () => setShowDataSync(false)
   }));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
