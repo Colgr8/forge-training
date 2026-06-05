@@ -45,6 +45,15 @@ const PROG_TYPES = ["General Strength", "Hypertrophy", "Endurance Strength", "Ma
 const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Negative"];
 const EQUIP_LIST = ["Barbell", "Dumbbell", "Cable machine", "Bodyweight", "Kettlebell", "Long band", "Short band", "Medicine ball", "Trap(Hex) bar"];
 const LAT_LIST = ["Bilateral", "Unilateral - Left", "Unilateral - Right", "Alternating", "Contralateral"];
+const RPE_DESC = {
+  4: "Minimal Effort",
+  5: "Light",
+  6: "Moderate",
+  7: "Hard",
+  8: "Very Hard",
+  9: "Near Maximal",
+  10: "Maximal"
+};
 const EX_LIST = ["Chest Press", "Shoulder Press", "Fly", "Lateral raise", "Row", "Chinups", "Reverse fly", "Bicep curls", "Tricep dips", "Squat", "Deadlift", "Forward lunge", "Reverse lunge"];
 const SEED_EX = [{
   name: "Squat",
@@ -1013,6 +1022,7 @@ function CalendarTab({
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
   const [selDay, setSelDay] = useState(null);
+  const [detailSess, setDetailSess] = useState(null);
   const allSessions = useMemo(() => {
     if (!client) return [];
     return (client.programs || []).flatMap(p => p.sessions.map(s => ({
@@ -1189,19 +1199,21 @@ function CalendarTab({
     }
   }, "No training session on this day.") : selSessions.map((s, si) => /*#__PURE__*/React.createElement("div", {
     key: si,
+    onClick: () => setDetailSess(s),
     style: {
       background: C.card,
       borderRadius: 12,
       padding: "14px",
-      border: `1px solid ${C.border}`,
-      marginBottom: 10
+      border: `1px solid ${C.accent + "44"}`,
+      marginBottom: 10,
+      cursor: "pointer"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 10
+      marginBottom: 6
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1211,38 +1223,22 @@ function CalendarTab({
   }, s.programName), /*#__PURE__*/React.createElement(Tag, {
     text: `${s.entries.length} sets`,
     color: C.blue
-  })), Object.entries(s.entries.reduce((acc, e) => {
-    if (!acc[e.ex]) acc[e.ex] = [];
-    acc[e.ex].push(e);
-    return acc;
-  }, {})).map(([exName, entries]) => /*#__PURE__*/React.createElement("div", {
-    key: exName,
-    style: {
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
-      color: C.sub,
-      fontWeight: 700,
-      marginBottom: 4
+      color: C.sub
     }
-  }, exName), /*#__PURE__*/React.createElement("div", {
+  }, [...new Set(s.entries.map(e => e.ex))].join(" · ")), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 5
+      fontSize: 11,
+      color: C.accent,
+      marginTop: 6,
+      fontWeight: 700
     }
-  }, entries.map((e, ei) => /*#__PURE__*/React.createElement("span", {
-    key: ei,
-    style: {
-      background: C.card2,
-      borderRadius: 6,
-      padding: "4px 10px",
-      fontSize: 12,
-      border: `1px solid ${C.border}`
-    }
-  }, "Set ", e.set, ": ", e.reps, "\xD7", e.load, "kg", e.power ? ` · ${e.power}W` : "")))))))), /*#__PURE__*/React.createElement("div", {
+  }, "Tap to view full session \u2192"))), detailSess && /*#__PURE__*/React.createElement(SessionDetailSheet, {
+    session: detailSess,
+    onClose: () => setDetailSess(null)
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card2,
       borderRadius: 12,
@@ -1452,6 +1448,103 @@ function DataSyncSheet({
       marginBottom: 4
     }
   }, s))));
+}
+
+// ─── Session Detail Sheet ─────────────────────────────────────────────────────
+
+function SessionDetailSheet({
+  session,
+  onClose
+}) {
+  const exGroups = session.entries.reduce((acc, e) => {
+    if (!acc[e.ex]) acc[e.ex] = [];
+    acc[e.ex].push(e);
+    return acc;
+  }, {});
+  const totalVol = session.entries.reduce((s, e) => s + (e.load * e.reps || 0), 0);
+  const avgRPE = session.entries.length ? (session.entries.reduce((s, e) => s + (e.rpe || 0), 0) / session.entries.length).toFixed(1) : "–";
+  return /*#__PURE__*/React.createElement(Sheet, {
+    title: `SESSION · ${session.date}`,
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement(StatCard, {
+    label: "Total Volume",
+    value: totalVol,
+    unit: " kg",
+    color: C.blue
+  }), /*#__PURE__*/React.createElement(StatCard, {
+    label: "Avg RPE",
+    value: avgRPE,
+    unit: "",
+    color: C.warn
+  })), Object.entries(exGroups).map(([exName, entries]) => /*#__PURE__*/React.createElement("div", {
+    key: exName,
+    style: {
+      background: C.card2,
+      borderRadius: 12,
+      padding: "12px 14px",
+      marginBottom: 10,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      marginBottom: 8,
+      color: C.accent
+    }
+  }, exName), entries.map((e, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "6px 0",
+      borderBottom: i < entries.length - 1 ? `1px solid ${C.border}` : "none"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.muted,
+      fontSize: 11,
+      marginRight: 6
+    }
+  }, "Set ", e.set), e.reps, " reps \xB7 ", e.type, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.sub,
+      fontSize: 11
+    }
+  }, " \xB7 RPE ", e.rpe, " \xB7 RIR ", e.rir)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "right",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      color: C.accent,
+      lineHeight: 1
+    }
+  }, e.load, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      opacity: 0.6
+    }
+  }, " kg")), e.power && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.gold
+    }
+  }, e.power, " W")))))));
 }
 
 // ─── Client Switcher ──────────────────────────────────────────────────────────
@@ -2548,8 +2641,9 @@ function LogTab({
     onChange: e => upd("rpe", +e.target.value),
     style: ss
   }, [4, 5, 6, 7, 8, 9, 10].map(r => /*#__PURE__*/React.createElement("option", {
-    key: r
-  }, r))))), vol > 0 && (() => {
+    key: r,
+    value: r
+  }, r, " \u2013 ", RPE_DESC[r]))))), vol > 0 && (() => {
     const oneRM = est1RM(+form.load, +form.reps);
     const vel = form.velocity ? +form.velocity : estVelocity(+form.load, oneRM);
     const power = calcPower(+form.load, vel);
@@ -3004,10 +3098,15 @@ function PrintPreview({
     style.id = "forge-print-style";
     style.textContent = `
       @media print {
-        body > * { display: none !important; }
-        #forge-print-root { display: block !important; position: static !important;
-          background: white !important; color: black !important; overflow: visible !important; }
-        #forge-print-root .no-print { display: none !important; }
+        body * { visibility: hidden !important; }
+        #forge-print-root, #forge-print-root * { visibility: visible !important; }
+        #forge-print-root {
+          position: absolute !important; left: 0 !important; top: 0 !important;
+          width: 100% !important; background: white !important; color: black !important;
+          font-family: sans-serif !important;
+        }
+        #forge-print-root .no-print { display: none !important; visibility: hidden !important; }
+        @page { margin: 1.5cm; }
       }
     `;
     document.head.appendChild(style);
@@ -3161,9 +3260,51 @@ function PrintPreview({
       marginTop: 28
     }
   }, t);
-  const mailSubject = encodeURIComponent(`Training Report – ${program.name}`);
-  const mailBody = encodeURIComponent(`Hi ${client.name.split(" ")[0]},\n\nPlease find your training report below.\n\nProgram: ${program.name}\nDate: ${today}\n\nRegards`);
-  const mailHref = client.email ? `mailto:${client.email}?subject=${mailSubject}&body=${mailBody}` : null;
+
+  // ── Share/Email: use Web Share API on mobile, fallback to mailto ──
+  const handleEmail = async () => {
+    // Collect the visible print content as HTML
+    const el = document.getElementById("forge-print-root");
+    if (!el) return;
+    const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width">
+      <title>Training Report – ${client.name}</title>
+      <style>body{font-family:sans-serif;color:#111;padding:24px;max-width:720px;margin:0 auto}
+      table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #eee;text-align:left;font-size:13px}
+      h2{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#999;margin:24px 0 8px;border-bottom:1px solid #eee;padding-bottom:4px}
+      </style></head><body>${el.querySelector('[data-report-body]')?.innerHTML || el.innerHTML}</body></html>`;
+    const blob = new Blob([htmlContent], {
+      type: "text/html"
+    });
+    const file = new File([blob], `${client.name.replace(/\s+/g, "-")}-report.html`, {
+      type: "text/html"
+    });
+    if (navigator.share && navigator.canShare && navigator.canShare({
+      files: [file]
+    })) {
+      try {
+        await navigator.share({
+          title: `Training Report – ${client.name}`,
+          files: [file]
+        });
+        return;
+      } catch (e) {
+        if (e.name === "AbortError") return;
+      }
+    }
+    // Fallback: download file then open email
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.name;
+    a.click();
+    URL.revokeObjectURL(url);
+    if (client.email) {
+      setTimeout(() => {
+        window.location.href = `mailto:${client.email}?subject=${encodeURIComponent("Training Report – " + program.name)}&body=${encodeURIComponent("Hi " + client.name.split(" ")[0] + ",\n\nPlease find your training report attached.\n\nRegards")}`;
+      }, 500);
+    }
+  };
   return /*#__PURE__*/React.createElement("div", {
     id: "forge-print-root",
     style: {
@@ -3206,21 +3347,23 @@ function PrintPreview({
       flex: 1,
       fontSize: 13,
       color: "#166534",
-      fontWeight: 600
+      fontWeight: 600,
+      minWidth: 120
     }
-  }, "\uD83D\uDCC4 Press ", /*#__PURE__*/React.createElement("strong", null, "Ctrl+P"), " (or \u2318P on Mac) \u2192 ", /*#__PURE__*/React.createElement("strong", null, "Save as PDF")), mailHref && /*#__PURE__*/React.createElement("a", {
-    href: mailHref,
+  }, "Tap Print to save as PDF"), client.email && /*#__PURE__*/React.createElement("button", {
+    onClick: handleEmail,
     style: {
       background: "#059669",
       color: "#fff",
-      textDecoration: "none",
+      border: "none",
       borderRadius: 8,
       padding: "9px 16px",
       fontSize: 13,
       fontWeight: 700,
+      cursor: "pointer",
       whiteSpace: "nowrap"
     }
-  }, "\u2709 Email ", client.name.split(" ")[0]), /*#__PURE__*/React.createElement("button", {
+  }, "\u2709 Email / Share"), /*#__PURE__*/React.createElement("button", {
     onClick: () => window.print(),
     style: {
       background: "#1d4ed8",
@@ -3233,7 +3376,8 @@ function PrintPreview({
       cursor: "pointer",
       whiteSpace: "nowrap"
     }
-  }, "\uD83D\uDDA8 Print / Save PDF")), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDDA8 Print / PDF")), /*#__PURE__*/React.createElement("div", {
+    "data-report-body": "1",
     style: {
       maxWidth: 720,
       margin: "0 auto",
@@ -4309,12 +4453,14 @@ function App() {
     style: {
       background: C.bg,
       color: C.text,
-      minHeight: "100dvh",
-      maxWidth: 520,
+      height: "100dvh",
+      width: "100%",
+      maxWidth: 600,
       margin: "0 auto",
       fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif",
       display: "flex",
-      flexDirection: "column"
+      flexDirection: "column",
+      overflow: "hidden"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {

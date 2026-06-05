@@ -1,4 +1,4 @@
-const CACHE = 'forge-v2';
+const CACHE = 'forge-v3';
 const FILES = [
   '/',
   '/index.html',
@@ -33,6 +33,3 @@ self.addEventListener('fetch', e => {
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );
 });
-
-});
-
