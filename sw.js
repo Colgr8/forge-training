@@ -1,4 +1,4 @@
-const CACHE = 'forge-v3';
+const CACHE = 'forge-v4';
 const FILES = [
   '/',
   '/index.html',
@@ -7,6 +7,7 @@ const FILES = [
   '/react-dom.min.js',
   '/prop-types.min.js',
   '/recharts.min.js',
+  '/jspdf.min.js',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',

@@ -3261,48 +3261,222 @@ function PrintPreview({
     }
   }, t);
 
-  // ── Share/Email: use Web Share API on mobile, fallback to mailto ──
+  // ── Generate PDF with jsPDF ───────────────────────────────────────────────
+  const buildPDF = () => {
+    const {
+      jsPDF
+    } = window.jspdf;
+    const doc = new jsPDF({
+      orientation: "p",
+      unit: "mm",
+      format: "a4"
+    });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const M = 18,
+      CW = W - M * 2;
+    let y = M;
+    const newPage = () => {
+      doc.addPage();
+      y = M;
+    };
+    const guard = need => {
+      if (y + need > H - 14) newPage();
+    };
+    const BLK = [17, 24, 39],
+      GRY = [107, 114, 128],
+      GRN = [5, 150, 105],
+      BLU = [37, 99, 235],
+      GLD = [180, 120, 0];
+    const drawRow = (cells, widths, isHdr, colCols) => {
+      if (isHdr) {
+        doc.setFillColor(249, 250, 251);
+        doc.rect(M, y, CW, 7, "F");
+      }
+      let x = M;
+      cells.forEach((c, i) => {
+        doc.setFontSize(isHdr ? 7.5 : 10.5);
+        doc.setFont("helvetica", isHdr ? "bold" : "normal");
+        doc.setTextColor(...(colCols?.[i] || (isHdr ? GRY : BLK)));
+        doc.text(String(c ?? "–"), x + 1.5, y + (isHdr ? 4.5 : 5.5));
+        x += widths[i];
+      });
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(0.2);
+      doc.line(M, y + 7, M + CW, y + 7);
+      y += 8;
+    };
+    const secHead = t => {
+      guard(14);
+      y += 2;
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...GRY);
+      doc.text(t, M, y);
+      y += 2;
+      doc.setDrawColor(229, 231, 235);
+      doc.line(M, y, M + CW, y);
+      y += 5;
+    };
+
+    // Header
+    doc.setFontSize(26);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...BLK);
+    doc.text(client.name, M, y);
+    y += 9;
+    doc.setFontSize(10.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...GRY);
+    doc.text(`${program.name} · ${program.type} · ${program.category}`, M, y);
+    y += 5.5;
+    doc.text(`Generated: ${today}  ·  ${program.sessions.length} sessions${client.bw ? " · " + client.bw + " kg BW" : ""}`, M, y);
+    y += 4;
+    doc.setDrawColor(...BLK);
+    doc.setLineWidth(0.6);
+    doc.line(M, y, M + CW, y);
+    y += 9;
+
+    // Best lifts
+    if (bests.length > 0) {
+      secHead("BEST LIFTS SUMMARY");
+      const hdr = ["Exercise", "Best", "Est 1RM", "Power", "Rel", "First", "Last", "Change"];
+      const ws = [46, 22, 22, 24, 18, 17, 17, 19];
+      drawRow(hdr, ws, true);
+      bests.forEach(b => {
+        guard(9);
+        drawRow([b.name, `${b.bestLoad}kg`, `${b.b1RM}kg`, `${b.bPow}W`, `${b.rel}×`, `${b.first}kg`, `${b.last}kg`, `+${b.pct}%`], ws, false, [BLK, GRN, BLU, GLD, GLD, GRY, BLK, GRN]);
+      });
+      y += 4;
+    }
+
+    // Session history
+    if (sessionData.length > 0) {
+      secHead("SESSION HISTORY");
+      const exNames = exercises.map(e => e.name);
+      const ew = Math.max(14, Math.floor((CW - 44) / Math.max(exNames.length, 1)));
+      const hdr = ["Session", "Date", "Avg RPE", ...exNames.map(n => n.length > 9 ? n.slice(0, 9) + "…" : n)];
+      const ws = [20, 22, 20, ...exNames.map(() => ew)];
+      drawRow(hdr, ws, true);
+      sessionData.forEach(s => {
+        guard(9);
+        drawRow([s.session, s.date || "", s.avgRPE ? s.avgRPE.toFixed(1) : "–", ...exNames.map(n => s[`load_${n}`] ? `${s[`load_${n}`]}kg` : "–")], ws, false);
+      });
+      y += 4;
+    }
+
+    // Feedback
+    const fbItems = [{
+      k: "strength",
+      l: "Strength Progress"
+    }, {
+      k: "relative",
+      l: "Relative Strength"
+    }, {
+      k: "technique",
+      l: "Technique Notes"
+    }, {
+      k: "fatigue",
+      l: "Workload / Fatigue"
+    }, {
+      k: "focus",
+      l: "Next Focus"
+    }].filter(({
+      k
+    }) => fb[k]);
+    if (fbItems.length > 0) {
+      secHead("TRAINER'S FEEDBACK");
+      fbItems.forEach(({
+        k,
+        l
+      }) => {
+        guard(18);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...GRY);
+        doc.text(l.toUpperCase(), M, y);
+        y += 5;
+        doc.setFontSize(10.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...BLK);
+        const lines = doc.splitTextToSize(fb[k], CW);
+        lines.forEach(line => {
+          guard(7);
+          doc.text(line, M, y);
+          y += 5.5;
+        });
+        y += 3;
+      });
+    }
+
+    // Footer on every page
+    const pages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8.5);
+      doc.setTextColor(...GRY);
+      doc.text(`Forge Training · ${client.name}`, M, H - 8);
+      doc.text(`${i} / ${pages}`, W - M, H - 8, {
+        align: "right"
+      });
+    }
+    return doc;
+  };
+
+  // ── Email/Share as real PDF ───────────────────────────────────────────────
   const handleEmail = async () => {
-    // Collect the visible print content as HTML
-    const el = document.getElementById("forge-print-root");
-    if (!el) return;
-    const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width">
-      <title>Training Report – ${client.name}</title>
-      <style>body{font-family:sans-serif;color:#111;padding:24px;max-width:720px;margin:0 auto}
-      table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #eee;text-align:left;font-size:13px}
-      h2{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#999;margin:24px 0 8px;border-bottom:1px solid #eee;padding-bottom:4px}
-      </style></head><body>${el.querySelector('[data-report-body]')?.innerHTML || el.innerHTML}</body></html>`;
-    const blob = new Blob([htmlContent], {
-      type: "text/html"
-    });
-    const file = new File([blob], `${client.name.replace(/\s+/g, "-")}-report.html`, {
-      type: "text/html"
-    });
-    if (navigator.share && navigator.canShare && navigator.canShare({
-      files: [file]
-    })) {
-      try {
+    try {
+      const doc = buildPDF();
+      const pdfBlob = doc.output("blob");
+      const fname = `${client.name.replace(/\s+/g, "-")}-report.pdf`;
+      const file = new File([pdfBlob], fname, {
+        type: "application/pdf"
+      });
+      if (navigator.share && navigator.canShare?.({
+        files: [file]
+      })) {
         await navigator.share({
           title: `Training Report – ${client.name}`,
           files: [file]
         });
-        return;
-      } catch (e) {
-        if (e.name === "AbortError") return;
+      } else {
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fname;
+        a.click();
+        URL.revokeObjectURL(url);
+        if (client.email) {
+          setTimeout(() => {
+            window.location.href = `mailto:${client.email}?subject=${encodeURIComponent("Training Report – " + program.name)}&body=${encodeURIComponent("Hi " + client.name.split(" ")[0] + ",\n\nPlease find your training report attached.\n\nRegards")}`;
+          }, 600);
+        }
       }
+    } catch (e) {
+      console.error("PDF email error:", e);
     }
-    // Fallback: download file then open email
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = file.name;
-    a.click();
-    URL.revokeObjectURL(url);
-    if (client.email) {
-      setTimeout(() => {
-        window.location.href = `mailto:${client.email}?subject=${encodeURIComponent("Training Report – " + program.name)}&body=${encodeURIComponent("Hi " + client.name.split(" ")[0] + ",\n\nPlease find your training report attached.\n\nRegards")}`;
-      }, 500);
+  };
+
+  // ── Print full PDF via jsPDF ──────────────────────────────────────────────
+  const handlePrint = () => {
+    try {
+      const doc = buildPDF();
+      const blob = doc.output("bloburl");
+      const ifr = document.createElement("iframe");
+      ifr.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;border:none;";
+      document.body.appendChild(ifr);
+      ifr.src = blob;
+      ifr.onload = () => {
+        ifr.contentWindow.focus();
+        ifr.contentWindow.print();
+        setTimeout(() => {
+          try {
+            document.body.removeChild(ifr);
+          } catch {}
+        }, 3000);
+      };
+    } catch (e) {
+      console.error("Print error:", e);
     }
   };
   return /*#__PURE__*/React.createElement("div", {
@@ -3350,7 +3524,7 @@ function PrintPreview({
       fontWeight: 600,
       minWidth: 120
     }
-  }, "Tap Print to save as PDF"), client.email && /*#__PURE__*/React.createElement("button", {
+  }, "Report preview"), client.email && /*#__PURE__*/React.createElement("button", {
     onClick: handleEmail,
     style: {
       background: "#059669",
@@ -3363,8 +3537,8 @@ function PrintPreview({
       cursor: "pointer",
       whiteSpace: "nowrap"
     }
-  }, "\u2709 Email / Share"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => window.print(),
+  }, "\u2709 Email PDF"), /*#__PURE__*/React.createElement("button", {
+    onClick: handlePrint,
     style: {
       background: "#1d4ed8",
       color: "#fff",
@@ -3376,7 +3550,7 @@ function PrintPreview({
       cursor: "pointer",
       whiteSpace: "nowrap"
     }
-  }, "\uD83D\uDDA8 Print / PDF")), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDDA8 Print / Save PDF")), /*#__PURE__*/React.createElement("div", {
     "data-report-body": "1",
     style: {
       maxWidth: 720,
