@@ -3271,17 +3271,17 @@ function PrintPreview({
       unit: "mm",
       format: "a4"
     });
-    const W = doc.internal.pageSize.getWidth();
-    const H = doc.internal.pageSize.getHeight();
-    const M = 18,
-      CW = W - M * 2;
+    const W = doc.internal.pageSize.getWidth(); // 210
+    const H = doc.internal.pageSize.getHeight(); // 297
+    const M = 15,
+      CW = W - M * 2; // 180mm content width
     let y = M;
     const newPage = () => {
       doc.addPage();
       y = M;
     };
     const guard = need => {
-      if (y + need > H - 14) newPage();
+      if (y + need > H - 18) newPage();
     };
     const BLK = [17, 24, 39],
       GRY = [107, 114, 128],
@@ -3295,10 +3295,14 @@ function PrintPreview({
       }
       let x = M;
       cells.forEach((c, i) => {
-        doc.setFontSize(isHdr ? 7.5 : 10.5);
+        const text = String(c ?? "–");
+        doc.setFontSize(isHdr ? 7 : 9.5);
         doc.setFont("helvetica", isHdr ? "bold" : "normal");
         doc.setTextColor(...(colCols?.[i] || (isHdr ? GRY : BLK)));
-        doc.text(String(c ?? "–"), x + 1.5, y + (isHdr ? 4.5 : 5.5));
+        // Clip text to column width
+        const maxW = widths[i] - 2;
+        const fitted = doc.splitTextToSize(text, maxW)[0] || text.slice(0, 12);
+        doc.text(fitted, x + 1, y + (isHdr ? 4.5 : 5.5));
         x += widths[i];
       });
       doc.setDrawColor(229, 231, 235);
@@ -3308,40 +3312,42 @@ function PrintPreview({
     };
     const secHead = t => {
       guard(14);
-      y += 2;
-      doc.setFontSize(8);
+      y += 3;
+      doc.setFontSize(7.5);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(...GRY);
       doc.text(t, M, y);
       y += 2;
-      doc.setDrawColor(229, 231, 235);
+      doc.setDrawColor(209, 213, 219);
+      doc.setLineWidth(0.3);
       doc.line(M, y, M + CW, y);
       y += 5;
     };
 
-    // Header
-    doc.setFontSize(26);
+    // ── Header ──────────────────────────────────────────────────────────────
+    doc.setFontSize(24);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...BLK);
     doc.text(client.name, M, y);
-    y += 9;
-    doc.setFontSize(10.5);
+    y += 8;
+    doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...GRY);
-    doc.text(`${program.name} · ${program.type} · ${program.category}`, M, y);
-    y += 5.5;
-    doc.text(`Generated: ${today}  ·  ${program.sessions.length} sessions${client.bw ? " · " + client.bw + " kg BW" : ""}`, M, y);
+    doc.text(`${program.name} · ${program.type}`, M, y);
+    y += 5;
+    doc.text(`Generated: ${today}  ·  ${program.sessions.length} sessions${client.bw ? "  ·  " + client.bw + " kg BW" : ""}`, M, y);
     y += 4;
     doc.setDrawColor(...BLK);
-    doc.setLineWidth(0.6);
+    doc.setLineWidth(0.5);
     doc.line(M, y, M + CW, y);
-    y += 9;
+    y += 8;
 
-    // Best lifts
+    // ── Best lifts ──────────────────────────────────────────────────────────
     if (bests.length > 0) {
       secHead("BEST LIFTS SUMMARY");
-      const hdr = ["Exercise", "Best", "Est 1RM", "Power", "Rel", "First", "Last", "Change"];
-      const ws = [46, 22, 22, 24, 18, 17, 17, 19];
+      // Fixed widths that sum to exactly CW (180mm)
+      const hdr = ["Exercise", "Best Load", "Est 1RM", "Peak Power", "Rel Str", "First", "Last", "Change"];
+      const ws = [42, 24, 22, 26, 18, 16, 16, 16]; // total = 180
       drawRow(hdr, ws, true);
       bests.forEach(b => {
         guard(9);
@@ -3350,22 +3356,25 @@ function PrintPreview({
       y += 4;
     }
 
-    // Session history
+    // ── Session history ─────────────────────────────────────────────────────
     if (sessionData.length > 0) {
       secHead("SESSION HISTORY");
       const exNames = exercises.map(e => e.name);
-      const ew = Math.max(14, Math.floor((CW - 44) / Math.max(exNames.length, 1)));
-      const hdr = ["Session", "Date", "Avg RPE", ...exNames.map(n => n.length > 9 ? n.slice(0, 9) + "…" : n)];
-      const ws = [20, 22, 20, ...exNames.map(() => ew)];
+      const fixedW = 55; // session + date + RPE columns
+      const exCols = Math.min(exNames.length, 4); // max 4 exercise cols
+      const ew = Math.floor((CW - fixedW) / Math.max(exCols, 1));
+      const shownEx = exNames.slice(0, exCols);
+      const hdr = ["Session", "Date", "Avg RPE", ...shownEx.map(n => n.length > 10 ? n.slice(0, 10) + "…" : n)];
+      const ws = [18, 22, 15, ...shownEx.map(() => ew)];
       drawRow(hdr, ws, true);
       sessionData.forEach(s => {
         guard(9);
-        drawRow([s.session, s.date || "", s.avgRPE ? s.avgRPE.toFixed(1) : "–", ...exNames.map(n => s[`load_${n}`] ? `${s[`load_${n}`]}kg` : "–")], ws, false);
+        drawRow([s.session, s.date || "", s.avgRPE ? s.avgRPE.toFixed(1) : "–", ...shownEx.map(n => s[`load_${n}`] ? `${s[`load_${n}`]}kg` : "–")], ws, false);
       });
       y += 4;
     }
 
-    // Feedback
+    // ── Trainer's feedback ──────────────────────────────────────────────────
     const fbItems = [{
       k: "strength",
       l: "Strength Progress"
@@ -3390,30 +3399,30 @@ function PrintPreview({
         k,
         l
       }) => {
-        guard(18);
-        doc.setFontSize(8);
+        guard(20);
+        doc.setFontSize(7.5);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(...GRY);
         doc.text(l.toUpperCase(), M, y);
         y += 5;
-        doc.setFontSize(10.5);
+        doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(...BLK);
         const lines = doc.splitTextToSize(fb[k], CW);
         lines.forEach(line => {
-          guard(7);
+          guard(6);
           doc.text(line, M, y);
-          y += 5.5;
+          y += 5;
         });
-        y += 3;
+        y += 4;
       });
     }
 
-    // Footer on every page
+    // ── Footer on every page ────────────────────────────────────────────────
     const pages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pages; i++) {
       doc.setPage(i);
-      doc.setFontSize(8.5);
+      doc.setFontSize(8);
       doc.setTextColor(...GRY);
       doc.text(`Forge Training · ${client.name}`, M, H - 8);
       doc.text(`${i} / ${pages}`, W - M, H - 8, {
@@ -3422,16 +3431,17 @@ function PrintPreview({
     }
     return doc;
   };
+  const pdfName = () => `${client.name.replace(/\s+/g, "-")}-report.pdf`;
 
-  // ── Email/Share as real PDF ───────────────────────────────────────────────
+  // ── Email PDF ─────────────────────────────────────────────────────────────
   const handleEmail = async () => {
     try {
       const doc = buildPDF();
       const pdfBlob = doc.output("blob");
-      const fname = `${client.name.replace(/\s+/g, "-")}-report.pdf`;
-      const file = new File([pdfBlob], fname, {
+      const file = new File([pdfBlob], pdfName(), {
         type: "application/pdf"
       });
+      // Try Web Share API (Android Chrome)
       if (navigator.share && navigator.canShare?.({
         files: [file]
       })) {
@@ -3440,43 +3450,30 @@ function PrintPreview({
           files: [file]
         });
       } else {
+        // Fallback: download then open email
         const url = URL.createObjectURL(pdfBlob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = fname;
+        a.download = pdfName();
         a.click();
         URL.revokeObjectURL(url);
         if (client.email) {
           setTimeout(() => {
             window.location.href = `mailto:${client.email}?subject=${encodeURIComponent("Training Report – " + program.name)}&body=${encodeURIComponent("Hi " + client.name.split(" ")[0] + ",\n\nPlease find your training report attached.\n\nRegards")}`;
-          }, 600);
+          }, 800);
         }
       }
     } catch (e) {
-      console.error("PDF email error:", e);
+      console.error("Email PDF error:", e);
     }
   };
 
-  // ── Print full PDF via jsPDF ──────────────────────────────────────────────
+  // ── Print / Save PDF ──────────────────────────────────────────────────────
   const handlePrint = () => {
     try {
-      const doc = buildPDF();
-      const blob = doc.output("bloburl");
-      const ifr = document.createElement("iframe");
-      ifr.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;border:none;";
-      document.body.appendChild(ifr);
-      ifr.src = blob;
-      ifr.onload = () => {
-        ifr.contentWindow.focus();
-        ifr.contentWindow.print();
-        setTimeout(() => {
-          try {
-            document.body.removeChild(ifr);
-          } catch {}
-        }, 3000);
-      };
+      buildPDF().save(pdfName());
     } catch (e) {
-      console.error("Print error:", e);
+      console.error("Save PDF error:", e);
     }
   };
   return /*#__PURE__*/React.createElement("div", {
