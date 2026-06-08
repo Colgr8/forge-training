@@ -3261,7 +3261,7 @@ function PrintPreview({
     }
   }, t);
 
-  // ── Generate PDF with jsPDF ───────────────────────────────────────────────
+  // ── Generate PDF with jsPDF (tables + charts) ────────────────────────────
   const buildPDF = () => {
     const {
       jsPDF
@@ -3271,8 +3271,8 @@ function PrintPreview({
       unit: "mm",
       format: "a4"
     });
-    const W = doc.internal.pageSize.getWidth(); // 210
-    const H = doc.internal.pageSize.getHeight(); // 297
+    const W = doc.internal.pageSize.getWidth(); // 210mm
+    const H = doc.internal.pageSize.getHeight(); // 297mm
     const M = 15,
       CW = W - M * 2; // 180mm content width
     let y = M;
@@ -3288,6 +3288,14 @@ function PrintPreview({
       GRN = [5, 150, 105],
       BLU = [37, 99, 235],
       GLD = [180, 120, 0];
+
+    // Parse hex → [r,g,b]
+    const rgb = hex => {
+      const h = hex.replace("#", "");
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    };
+
+    // Table row
     const drawRow = (cells, widths, isHdr, colCols) => {
       if (isHdr) {
         doc.setFillColor(249, 250, 251);
@@ -3299,9 +3307,7 @@ function PrintPreview({
         doc.setFontSize(isHdr ? 7 : 9.5);
         doc.setFont("helvetica", isHdr ? "bold" : "normal");
         doc.setTextColor(...(colCols?.[i] || (isHdr ? GRY : BLK)));
-        // Clip text to column width
-        const maxW = widths[i] - 2;
-        const fitted = doc.splitTextToSize(text, maxW)[0] || text.slice(0, 12);
+        const fitted = doc.splitTextToSize(text, widths[i] - 2)[0] || text.slice(0, 12);
         doc.text(fitted, x + 1, y + (isHdr ? 4.5 : 5.5));
         x += widths[i];
       });
@@ -3310,6 +3316,8 @@ function PrintPreview({
       doc.line(M, y + 7, M + CW, y + 7);
       y += 8;
     };
+
+    // Section heading
     const secHead = t => {
       guard(14);
       y += 3;
@@ -3324,7 +3332,95 @@ function PrintPreview({
       y += 5;
     };
 
-    // ── Header ──────────────────────────────────────────────────────────────
+    // Line chart drawer
+    const drawChart = (data, keys, colors, names, unit, title) => {
+      const allVals = keys.flatMap(k => data.map(d => d[k]).filter(v => v != null && !isNaN(v)));
+      if (!allVals.length) return;
+      const CH = 54,
+        padL = 20,
+        padR = 4,
+        padT = 6,
+        padB = 16;
+      const plotW = CW - padL - padR;
+      const plotH = CH - padT - padB;
+      guard(CH + 10);
+      y += 3;
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...GRY);
+      doc.text(title, M, y);
+      y += 3;
+      const ox = M + padL; // plot origin x
+      const oy = y + padT; // plot origin y
+      const n = data.length;
+      const minV = Math.min(...allVals);
+      const maxV = Math.max(...allVals);
+      const range = maxV - minV || 1;
+      const px_ = i => ox + (n <= 1 ? plotW / 2 : i / (n - 1) * plotW);
+      const py_ = v => oy + plotH - (v - minV) / range * plotH;
+
+      // Grid lines + Y labels
+      doc.setLineWidth(0.15);
+      [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+        const gy = oy + plotH * (1 - f);
+        doc.setDrawColor(229, 231, 235);
+        doc.line(ox, gy, ox + plotW, gy);
+        const val = minV + f * range;
+        doc.setFontSize(5.5);
+        doc.setTextColor(...GRY);
+        doc.text((val >= 100 ? val.toFixed(0) : val.toFixed(1)) + unit, ox - 2, gy + 1.5, {
+          align: "right"
+        });
+      });
+
+      // X axis session labels
+      data.forEach((d, i) => {
+        doc.setFontSize(5.5);
+        doc.setTextColor(...GRY);
+        doc.text(d.session || "", px_(i), oy + plotH + 5, {
+          align: "center"
+        });
+      });
+
+      // Draw each series
+      keys.forEach((k, ki) => {
+        const col = rgb(colors[ki]);
+        doc.setDrawColor(...col);
+        doc.setLineWidth(0.55);
+        doc.setFillColor(...col);
+        const pts = data.map((d, i) => {
+          const v = d[k];
+          return v != null ? {
+            x: px_(i),
+            y: py_(v)
+          } : null;
+        });
+
+        // Line segments
+        for (let i = 1; i < pts.length; i++) {
+          if (pts[i - 1] && pts[i]) doc.line(pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y);
+        }
+        // Dots
+        pts.forEach(p => {
+          if (p) doc.circle(p.x, p.y, 0.9, "F");
+        });
+      });
+
+      // Legend
+      let lx = ox;
+      const ly = y + CH - 4;
+      keys.forEach((k, ki) => {
+        doc.setFillColor(...rgb(colors[ki]));
+        doc.rect(lx, ly - 1.5, 7, 1.5, "F");
+        doc.setFontSize(6);
+        doc.setTextColor(...GRY);
+        doc.text(names[ki], lx + 8, ly);
+        lx += 8 + doc.getTextWidth(names[ki]) + 5;
+      });
+      y += CH + 2;
+    };
+
+    // ── Page header ──────────────────────────────────────────────────────────
     doc.setFontSize(24);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...BLK);
@@ -3335,19 +3431,18 @@ function PrintPreview({
     doc.setTextColor(...GRY);
     doc.text(`${program.name} · ${program.type}`, M, y);
     y += 5;
-    doc.text(`Generated: ${today}  ·  ${program.sessions.length} sessions${client.bw ? "  ·  " + client.bw + " kg BW" : ""}`, M, y);
+    doc.text(`Generated: ${today}  ·  ${program.sessions.length} sessions${client.bw ? " · " + client.bw + " kg BW" : ""}`, M, y);
     y += 4;
     doc.setDrawColor(...BLK);
     doc.setLineWidth(0.5);
     doc.line(M, y, M + CW, y);
     y += 8;
 
-    // ── Best lifts ──────────────────────────────────────────────────────────
+    // ── Best lifts table ──────────────────────────────────────────────────────
     if (bests.length > 0) {
       secHead("BEST LIFTS SUMMARY");
-      // Fixed widths that sum to exactly CW (180mm)
       const hdr = ["Exercise", "Best Load", "Est 1RM", "Peak Power", "Rel Str", "First", "Last", "Change"];
-      const ws = [42, 24, 22, 26, 18, 16, 16, 16]; // total = 180
+      const ws = [42, 24, 22, 26, 18, 16, 16, 16]; // = 180mm
       drawRow(hdr, ws, true);
       bests.forEach(b => {
         guard(9);
@@ -3356,13 +3451,12 @@ function PrintPreview({
       y += 4;
     }
 
-    // ── Session history ─────────────────────────────────────────────────────
+    // ── Session history table ──────────────────────────────────────────────────
     if (sessionData.length > 0) {
       secHead("SESSION HISTORY");
       const exNames = exercises.map(e => e.name);
-      const fixedW = 55; // session + date + RPE columns
-      const exCols = Math.min(exNames.length, 4); // max 4 exercise cols
-      const ew = Math.floor((CW - fixedW) / Math.max(exCols, 1));
+      const exCols = Math.min(exNames.length, 4);
+      const ew = Math.floor((CW - 55) / Math.max(exCols, 1));
       const shownEx = exNames.slice(0, exCols);
       const hdr = ["Session", "Date", "Avg RPE", ...shownEx.map(n => n.length > 10 ? n.slice(0, 10) + "…" : n)];
       const ws = [18, 22, 15, ...shownEx.map(() => ew)];
@@ -3374,7 +3468,32 @@ function PrintPreview({
       y += 4;
     }
 
-    // ── Trainer's feedback ──────────────────────────────────────────────────
+    // ── Charts ────────────────────────────────────────────────────────────────
+    if (sessionData.length > 1 && exercises.length > 0) {
+      const exNames = exercises.map(e => e.name);
+      const exCols_ = exColors; // hex colour per exercise from parent scope
+
+      secHead("PROGRESSION CHARTS");
+
+      // 1. Load progression
+      drawChart(sessionData, exNames.map(n => `load_${n}`), exCols_, exNames, "kg", "1. LOAD PROGRESSION");
+
+      // 2. Estimated 1RM progression
+      drawChart(sessionData, exNames.map(n => `onerm_${n}`), exCols_, exNames, "kg", "2. ESTIMATED 1RM PROGRESSION");
+
+      // 3. Power progression
+      drawChart(sessionData, exNames.map(n => `power_${n}`), exCols_, exNames, "W", "3. POWER PROGRESSION");
+
+      // 4. Relative strength (only if BW recorded)
+      if (hasBW) {
+        drawChart(sessionData, exNames.map(n => `rel_${n}`), exCols_, exNames, "×", "4. RELATIVE STRENGTH PROGRESSION");
+      }
+
+      // 5. Session intensity trend
+      drawChart(sessionData, ["avgRPE"], [C.warn], ["Avg RPE"], "", "5. SESSION INTENSITY TREND (AVG RPE)");
+    }
+
+    // ── Trainer's feedback ────────────────────────────────────────────────────
     const fbItems = [{
       k: "strength",
       l: "Strength Progress"
@@ -3418,7 +3537,7 @@ function PrintPreview({
       });
     }
 
-    // ── Footer on every page ────────────────────────────────────────────────
+    // ── Footer on every page ──────────────────────────────────────────────────
     const pages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pages; i++) {
       doc.setPage(i);
