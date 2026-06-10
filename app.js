@@ -1,3 +1,4 @@
+function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 function lsGet(key, fallback) {
   try {
     const v = localStorage.getItem(key);
@@ -40,6 +41,42 @@ const calcPower = (load, vel) => Math.round(load * 9.81 * vel); // Watts (mean p
 const initials = name => name.trim().split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
 const AV_COLS = [C.accent, C.blue, "#AA44FF", C.gold, "#FF5060", "#FF8020", "#44AAFF", "#FF44AA"];
 const avCol = idx => AV_COLS[idx % AV_COLS.length];
+
+// ─── Responsive width hook ────────────────────────────────────────────────────
+function useWindowWidth() {
+  const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 600);
+  useEffect(() => {
+    const h = () => setW(window.innerWidth);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  return w;
+}
+
+// ─── Custom X-axis tick: session ID + date ────────────────────────────────────
+function SessionXTick({
+  x,
+  y,
+  payload,
+  dateMap
+}) {
+  const date = dateMap?.[payload?.value] || "";
+  return /*#__PURE__*/React.createElement("g", {
+    transform: `translate(${x},${y})`
+  }, /*#__PURE__*/React.createElement("text", {
+    textAnchor: "middle",
+    fill: C.muted,
+    fontSize: 10,
+    dy: 12,
+    fontFamily: "inherit"
+  }, payload?.value), date && /*#__PURE__*/React.createElement("text", {
+    textAnchor: "middle",
+    fill: C.muted,
+    fontSize: 8,
+    dy: 23,
+    fontFamily: "inherit"
+  }, date));
+}
 const CATEGORIES = ["Strength", "Power", "Stability", "Mobility"];
 const PROG_TYPES = ["General Strength", "Hypertrophy", "Endurance Strength", "Max Strength", "Power", "Muscular Endurance", "Hybrid"];
 const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Negative"];
@@ -2828,7 +2865,7 @@ function ProgressTab({
     if (exercises.length > 0 && !exercises.find(e => e.name === sel)) setSel(exercises[0].name);
   }, [program?.id]);
   const [metric, setMetric] = useState("Load"); // Load | Est 1RM | Power
-
+  const dateMap = useMemo(() => Object.fromEntries((sessions || []).map(s => [s.id, s.date])), [sessions]);
   const chartData = useMemo(() => {
     if (!sel) return [];
     return sessions.map(s => {
@@ -2841,6 +2878,7 @@ function ProgressTab({
       const power = top.power || calcPower(maxLoad, vel);
       return {
         session: s.id,
+        date: s.date,
         "Load": maxLoad,
         "Est 1RM": oneRM,
         "Power": power
@@ -3336,11 +3374,11 @@ function PrintPreview({
     const drawChart = (data, keys, colors, names, unit, title) => {
       const allVals = keys.flatMap(k => data.map(d => d[k]).filter(v => v != null && !isNaN(v)));
       if (!allVals.length) return;
-      const CH = 54,
+      const CH = 58,
         padL = 20,
         padR = 4,
         padT = 6,
-        padB = 16;
+        padB = 20;
       const plotW = CW - padL - padR;
       const plotH = CH - padT - padB;
       guard(CH + 10);
@@ -3373,11 +3411,14 @@ function PrintPreview({
         });
       });
 
-      // X axis session labels
+      // X axis session labels + date
       data.forEach((d, i) => {
         doc.setFontSize(5.5);
         doc.setTextColor(...GRY);
         doc.text(d.session || "", px_(i), oy + plotH + 5, {
+          align: "center"
+        });
+        if (d.date) doc.text(d.date, px_(i), oy + plotH + 9.5, {
           align: "center"
         });
       });
@@ -4052,6 +4093,7 @@ function ReportTab({
   })), children, exercises.length > 1 && /*#__PURE__*/React.createElement(ChartLegend, null));
   const hasSessions = sessionData.length > 1;
   const hasBW = !!client.bw;
+  const dateMap = useMemo(() => Object.fromEntries(sessionData.map(d => [d.session, d.date])), [sessionData]);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "16px 14px"
@@ -4187,12 +4229,12 @@ function ReportTab({
     strokeDasharray: "3 3"
   }), /*#__PURE__*/React.createElement(XAxis, {
     dataKey: "session",
-    tick: {
-      fill: C.muted,
-      fontSize: 11
-    },
     axisLine: false,
-    tickLine: false
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, _extends({}, props, {
+      dateMap: dateMap
+    }))
   }), /*#__PURE__*/React.createElement(YAxis, {
     tick: {
       fill: C.muted,
@@ -4241,12 +4283,12 @@ function ReportTab({
     strokeDasharray: "3 3"
   }), /*#__PURE__*/React.createElement(XAxis, {
     dataKey: "session",
-    tick: {
-      fill: C.muted,
-      fontSize: 11
-    },
     axisLine: false,
-    tickLine: false
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, _extends({}, props, {
+      dateMap: dateMap
+    }))
   }), /*#__PURE__*/React.createElement(YAxis, {
     tick: {
       fill: C.muted,
@@ -4296,12 +4338,12 @@ function ReportTab({
     strokeDasharray: "3 3"
   }), /*#__PURE__*/React.createElement(XAxis, {
     dataKey: "session",
-    tick: {
-      fill: C.muted,
-      fontSize: 11
-    },
     axisLine: false,
-    tickLine: false
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, _extends({}, props, {
+      dateMap: dateMap
+    }))
   }), /*#__PURE__*/React.createElement(YAxis, {
     tick: {
       fill: C.muted,
@@ -4350,12 +4392,12 @@ function ReportTab({
     strokeDasharray: "3 3"
   }), /*#__PURE__*/React.createElement(XAxis, {
     dataKey: "session",
-    tick: {
-      fill: C.muted,
-      fontSize: 11
-    },
     axisLine: false,
-    tickLine: false
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, _extends({}, props, {
+      dateMap: dateMap
+    }))
   }), /*#__PURE__*/React.createElement(YAxis, {
     tick: {
       fill: C.muted,
@@ -4417,12 +4459,12 @@ function ReportTab({
     strokeDasharray: "3 3"
   }), /*#__PURE__*/React.createElement(XAxis, {
     dataKey: "session",
-    tick: {
-      fill: C.muted,
-      fontSize: 11
-    },
     axisLine: false,
-    tickLine: false
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, _extends({}, props, {
+      dateMap: dateMap
+    }))
   }), /*#__PURE__*/React.createElement(YAxis, {
     domain: [4, 10],
     tick: {
@@ -4739,13 +4781,15 @@ function App() {
       })
     }));
   };
+  const screenW = useWindowWidth();
+  const isTablet = screenW >= 640;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.bg,
       color: C.text,
       height: "100dvh",
       width: "100%",
-      maxWidth: 600,
+      maxWidth: isTablet ? "100%" : 520,
       margin: "0 auto",
       fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif",
       display: "flex",
