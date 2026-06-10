@@ -3048,12 +3048,12 @@ function ProgressTab({
     strokeDasharray: "3 3"
   }), /*#__PURE__*/React.createElement(XAxis, {
     dataKey: "session",
-    tick: {
-      fill: C.muted,
-      fontSize: 11
-    },
     axisLine: false,
-    tickLine: false
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, _extends({}, props, {
+      dateMap: dateMap
+    }))
   }), /*#__PURE__*/React.createElement(YAxis, {
     tick: {
       fill: C.muted,
