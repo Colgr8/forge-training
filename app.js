@@ -2876,12 +2876,15 @@ function ProgressTab({
       const oneRM = est1RM(maxLoad, top.reps);
       const vel = top.velocity || estVelocity(maxLoad, oneRM);
       const power = top.power || calcPower(maxLoad, vel);
+      // Max reps across all sets this session for this exercise
+      const maxReps = Math.max(...ee.map(e => e.reps));
       return {
         session: s.id,
         date: s.date,
         "Load": maxLoad,
         "Est 1RM": oneRM,
-        "Power": power
+        "Power": power,
+        "Reps": maxReps
       };
     }).filter(Boolean);
   }, [sessions, sel]);
@@ -2889,6 +2892,7 @@ function ProgressTab({
     last = chartData.at(-1)?.[metric];
   const bestPower = chartData.length ? Math.max(...chartData.map(d => d["Power"] || 0)) : 0;
   const best1RM = chartData.length ? Math.max(...chartData.map(d => d["Est 1RM"] || 0)) : 0;
+  const bestReps = chartData.length ? Math.max(...chartData.map(d => d["Reps"] || 0)) : 0;
   const pct = first && last ? ((last - first) / first * 100).toFixed(1) : 0;
   const METRIC_OPTS = [{
     key: "Load",
@@ -2905,6 +2909,11 @@ function ProgressTab({
     label: "Power",
     unit: "W",
     color: C.gold
+  }, {
+    key: "Reps",
+    label: "Reps",
+    unit: " reps",
+    color: "#FF8020"
   }];
   if (!program) return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2995,10 +3004,10 @@ function ProgressTab({
     unit: " W",
     color: C.gold
   }), /*#__PURE__*/React.createElement(StatCard, {
-    label: "Total gain",
-    value: first && last ? `+${pct}` : "–",
-    unit: first && last ? "%" : "",
-    color: C.accent
+    label: metric === "Reps" ? "Best Reps" : "Total gain",
+    value: metric === "Reps" ? bestReps || "–" : first && last ? `+${pct}` : "–",
+    unit: metric === "Reps" ? " reps" : first && last ? "%" : "",
+    color: "#FF8020"
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
