@@ -3534,13 +3534,16 @@ function PrintPreview({
       // 3. Power progression
       drawChart(sessionData, exNames.map(n => `power_${n}`), exCols_, exNames, "W", "3. POWER PROGRESSION");
 
-      // 4. Relative strength (only if BW recorded)
+      // 4. Reps progression
+      drawChart(sessionData, exNames.map(n => `reps_${n}`), exCols_, exNames, " reps", "4. REPS PROGRESSION (MAX REPS PER SESSION)");
+
+      // 5. Relative strength (only if BW recorded)
       if (hasBW) {
-        drawChart(sessionData, exNames.map(n => `rel_${n}`), exCols_, exNames, "×", "4. RELATIVE STRENGTH PROGRESSION");
+        drawChart(sessionData, exNames.map(n => `rel_${n}`), exCols_, exNames, "×", "5. RELATIVE STRENGTH PROGRESSION");
       }
 
-      // 5. Session intensity trend
-      drawChart(sessionData, ["avgRPE"], [C.warn], ["Avg RPE"], "", "5. SESSION INTENSITY TREND (AVG RPE)");
+      // 6. Session intensity trend
+      drawChart(sessionData, ["avgRPE"], [C.warn], ["Avg RPE"], "", "6. SESSION INTENSITY TREND (AVG RPE)");
     }
 
     // ── Trainer's feedback ────────────────────────────────────────────────────
@@ -3866,6 +3869,12 @@ function PrintPreview({
     colors: exColors,
     names: exercises.map(e => e.name),
     unit: "W"
+  }), secH("Reps progression (max reps per session)"), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: exercises.map(e => `reps_${e.name}`),
+    colors: exColors,
+    names: exercises.map(e => e.name),
+    unit: " reps"
   }), hasBW && /*#__PURE__*/React.createElement(React.Fragment, null, secH("Relative strength progression (est 1RM ÷ BW)"), /*#__PURE__*/React.createElement(SvgChartPrint, {
     data: sessionData,
     keys: exercises.map(e => `rel_${e.name}`),
@@ -3972,6 +3981,7 @@ function ReportTab({
         row[`load_${ex.name}`] = maxLoad;
         row[`onerm_${ex.name}`] = oneRM;
         row[`power_${ex.name}`] = top.power || calcPower(maxLoad, vel);
+        row[`reps_${ex.name}`] = Math.max(...ee.map(e => e.reps));
         if (client.bw) row[`rel_${ex.name}`] = +(oneRM / client.bw).toFixed(2);
       });
       return row;
@@ -4377,6 +4387,61 @@ function ReportTab({
     name: ex.name,
     stroke: exColors[i],
     strokeWidth: 2.5,
+    dot: {
+      fill: exColors[i],
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }))))), /*#__PURE__*/React.createElement(ChartCard, {
+    title: "Reps progression (max reps per session)"
+  }, /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, _extends({}, props, {
+      dateMap: dateMap
+    }))
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fill: C.muted,
+      fontSize: 11
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 34,
+    unit: " reps"
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    }
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Line, {
+    key: ex.name,
+    type: "monotone",
+    dataKey: `reps_${ex.name}`,
+    name: ex.name,
+    stroke: exColors[i],
+    strokeWidth: 2.5,
+    strokeDasharray: "4 2",
     dot: {
       fill: exColors[i],
       r: 3,
