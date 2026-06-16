@@ -19,7 +19,8 @@ const {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  ReferenceLine
 } = Recharts;
 const C = {
   bg: "#0B0B16",
@@ -38,6 +39,55 @@ const est1RM = (load, reps) => +(load * (1 + reps / 30)).toFixed(1);
 // Load-velocity relationship: v = 0.15 + 1.0 × (1 − load/1RM), floored at 0.15 m/s
 const estVelocity = (load, oneRM) => +Math.max(0.15, 0.15 + 1.0 * (1 - load / Math.max(oneRM, load))).toFixed(2);
 const calcPower = (load, vel) => Math.round(load * 9.81 * vel); // Watts (mean per rep)
+
+// Injury Index: % increase in load vs previous session for the same exercise.
+// Decreases/deloads are clamped to 0 (they don't add injury risk).
+// Bigger positive jumps => steeper slope => higher injury risk.
+// Acute:Chronic Workload Ratio
+// acute  = session volume (load × reps) for current session
+// chronic = average session volume over previous 4 sessions with this exercise
+// Safe zone: 0.8–1.3 | Caution: 1.3–1.5 | High risk: >1.5
+const calcACWR = (sessions, exName, currentIndex) => {
+  // Compute volume per session for this exercise
+  const vols = sessions.map(s => {
+    const entries = s.entries.filter(e => e.ex === exName);
+    return entries.reduce((sum, e) => sum + e.load * e.reps, 0);
+  });
+  const acute = vols[currentIndex];
+  if (!acute) return null;
+  // Chronic: mean of up to 4 previous sessions that had volume > 0
+  const prev = vols.slice(Math.max(0, currentIndex - 4), currentIndex).filter(v => v > 0);
+  if (!prev.length) return null;
+  const chronic = prev.reduce((a, b) => a + b, 0) / prev.length;
+  return chronic > 0 ? +(acute / chronic).toFixed(2) : null;
+};
+const acwrZone = v => {
+  if (v == null) return {
+    label: "–",
+    color: C.muted
+  };
+  if (v > 1.5) return {
+    label: "High risk",
+    color: C.warn
+  };
+  if (v > 1.3) return {
+    label: "Caution",
+    color: "#FFB020"
+  };
+  if (v >= 0.8) return {
+    label: "Optimal",
+    color: "#10D4A0"
+  };
+  return {
+    label: "Low load",
+    color: C.blue
+  };
+};
+const injuryIndex = (curr, prev) => {
+  if (prev == null || curr == null || prev === 0) return 0;
+  const pct = (curr - prev) / prev * 100;
+  return pct > 0 ? +pct.toFixed(1) : 0;
+};
 const initials = name => name.trim().split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
 const AV_COLS = [C.accent, C.blue, "#AA44FF", C.gold, "#FF5060", "#FF8020", "#44AAFF", "#FF44AA"];
 const avCol = idx => AV_COLS[idx % AV_COLS.length];
@@ -1053,7 +1103,8 @@ function EditClientModal({
 // ─── Calendar Tab ─────────────────────────────────────────────────────────────
 
 function CalendarTab({
-  client
+  client,
+  onDeleteSession
 }) {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
@@ -1274,7 +1325,8 @@ function CalendarTab({
     }
   }, "Tap to view full session \u2192"))), detailSess && /*#__PURE__*/React.createElement(SessionDetailSheet, {
     session: detailSess,
-    onClose: () => setDetailSess(null)
+    onClose: () => setDetailSess(null),
+    onDelete: s => onDeleteSession(s.programId, s.id)
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card2,
@@ -1491,8 +1543,10 @@ function DataSyncSheet({
 
 function SessionDetailSheet({
   session,
-  onClose
+  onClose,
+  onDelete
 }) {
+  const [confirmDel, setConfirmDel] = useState(false);
   const exGroups = session.entries.reduce((acc, e) => {
     if (!acc[e.ex]) acc[e.ex] = [];
     acc[e.ex].push(e);
@@ -1581,7 +1635,74 @@ function SessionDetailSheet({
       fontSize: 11,
       color: C.gold
     }
-  }, e.power, " W")))))));
+  }, e.power, " W")))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 18,
+      paddingTop: 14,
+      borderTop: `1px solid ${C.border}`
+    }
+  }, !confirmDel ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmDel(true),
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px solid ${C.warn}55`,
+      borderRadius: 10,
+      padding: "12px",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "\uD83D\uDDD1 Delete this session") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.warn + "15",
+      border: `1px solid ${C.warn}55`,
+      borderRadius: 10,
+      padding: "14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: C.text,
+      marginBottom: 12,
+      lineHeight: 1.5
+    }
+  }, "Delete this session permanently? This cannot be undone."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmDel(false),
+    style: {
+      flex: 1,
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "10px",
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      onDelete(session);
+      onClose();
+    },
+    style: {
+      flex: 1,
+      background: C.warn,
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      color: "#fff",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "Delete")))));
 }
 
 // ─── Client Switcher ──────────────────────────────────────────────────────────
@@ -2886,13 +3007,24 @@ function ProgressTab({
         "Power": power,
         "Reps": maxReps
       };
-    }).filter(Boolean);
+    }).filter(Boolean).map((d, i, arr) => ({
+      ...d,
+      "Injury Index": injuryIndex(d.Load, i > 0 ? arr[i - 1].Load : null)
+    })).map((d, i, arr) => {
+      // ACWR: need original session index in full sessions array
+      const sessIdx = sessions.findIndex(s => s.id === d.session);
+      return {
+        ...d,
+        "ACWR": calcACWR(sessions, sel, sessIdx)
+      };
+    });
   }, [sessions, sel]);
   const first = chartData[0]?.[metric],
     last = chartData.at(-1)?.[metric];
   const bestPower = chartData.length ? Math.max(...chartData.map(d => d["Power"] || 0)) : 0;
   const best1RM = chartData.length ? Math.max(...chartData.map(d => d["Est 1RM"] || 0)) : 0;
   const bestReps = chartData.length ? Math.max(...chartData.map(d => d["Reps"] || 0)) : 0;
+  const peakInjury = chartData.length ? Math.max(...chartData.map(d => d["Injury Index"] || 0)) : 0;
   const pct = first && last ? ((last - first) / first * 100).toFixed(1) : 0;
   const METRIC_OPTS = [{
     key: "Load",
@@ -2914,6 +3046,16 @@ function ProgressTab({
     label: "Reps",
     unit: " reps",
     color: "#FF8020"
+  }, {
+    key: "Injury Index",
+    label: "Injury Index",
+    unit: "%",
+    color: C.warn
+  }, {
+    key: "ACWR",
+    label: "ACWR",
+    unit: "×",
+    color: "#AA44FF"
   }];
   if (!program) return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3003,10 +3145,32 @@ function ProgressTab({
     value: bestPower || "–",
     unit: " W",
     color: C.gold
-  }), /*#__PURE__*/React.createElement(StatCard, {
-    label: metric === "Reps" ? "Best Reps" : "Total gain",
-    value: metric === "Reps" ? bestReps || "–" : first && last ? `+${pct}` : "–",
-    unit: metric === "Reps" ? " reps" : first && last ? "%" : "",
+  }), metric === "ACWR" ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 10,
+      padding: "10px 12px",
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      marginBottom: 3,
+      fontWeight: 700
+    }
+  }, "Zone"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 16,
+      fontWeight: 700,
+      color: acwrZone(last).color
+    }
+  }, acwrZone(last).label)) : /*#__PURE__*/React.createElement(StatCard, {
+    label: metric === "Reps" ? "Best Reps" : metric === "Injury Index" ? "Peak Risk" : "Total gain",
+    value: metric === "Reps" ? bestReps || "–" : metric === "Injury Index" ? peakInjury : first && last ? `+${pct}` : "–",
+    unit: metric === "Reps" ? " reps" : metric === "Injury Index" ? "%" : first && last ? "%" : "",
     color: "#FF8020"
   })), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3080,7 +3244,51 @@ function ProgressTab({
       color: C.text,
       fontSize: 12
     }
-  }), /*#__PURE__*/React.createElement(Line, {
+  }), metric === "Injury Index" && /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 10,
+    stroke: C.warn,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "High risk >10%",
+      position: "insideTopRight",
+      fill: C.warn,
+      fontSize: 10
+    }
+  }), metric === "ACWR" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 0.8,
+    stroke: C.blue,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "0.8 Low load",
+      position: "insideBottomRight",
+      fill: C.blue,
+      fontSize: 9
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 1.3,
+    stroke: "#FFB020",
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "1.3 Caution",
+      position: "insideTopRight",
+      fill: "#FFB020",
+      fontSize: 9
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 1.5,
+    stroke: C.warn,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "1.5 High risk",
+      position: "insideTopRight",
+      fill: C.warn,
+      fontSize: 9
+    }
+  })), /*#__PURE__*/React.createElement(Line, {
     type: "monotone",
     dataKey: metric,
     stroke: METRIC_OPTS.find(m => m.key === metric)?.color,
@@ -3537,13 +3745,19 @@ function PrintPreview({
       // 4. Reps progression
       drawChart(sessionData, exNames.map(n => `reps_${n}`), exCols_, exNames, " reps", "4. REPS PROGRESSION (MAX REPS PER SESSION)");
 
-      // 5. Relative strength (only if BW recorded)
+      // 5. Injury index progression
+      drawChart(sessionData, exNames.map(n => `injury_${n}`), exCols_, exNames, "%", "5. INJURY INDEX (% LOAD INCREASE VS PREVIOUS SESSION)");
+
+      // 6. ACWR
+      drawChart(sessionData, exNames.map(n => `acwr_${n}`), exCols_, exNames, "×", "6. ACWR - ACUTE:CHRONIC WORKLOAD RATIO (SWEET SPOT: 0.8-1.3)");
+
+      // 7. Relative strength (only if BW recorded)
       if (hasBW) {
-        drawChart(sessionData, exNames.map(n => `rel_${n}`), exCols_, exNames, "×", "5. RELATIVE STRENGTH PROGRESSION");
+        drawChart(sessionData, exNames.map(n => `rel_${n}`), exCols_, exNames, "×", "7. RELATIVE STRENGTH PROGRESSION");
       }
 
-      // 6. Session intensity trend
-      drawChart(sessionData, ["avgRPE"], [C.warn], ["Avg RPE"], "", "6. SESSION INTENSITY TREND (AVG RPE)");
+      // 8. Session intensity trend
+      drawChart(sessionData, ["avgRPE"], [C.warn], ["Avg RPE"], "", "8. SESSION INTENSITY TREND (AVG RPE)");
     }
 
     // ── Trainer's feedback ────────────────────────────────────────────────────
@@ -3875,6 +4089,18 @@ function PrintPreview({
     colors: exColors,
     names: exercises.map(e => e.name),
     unit: " reps"
+  }), secH("Injury index (% load increase vs previous session)"), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: exercises.map(e => `injury_${e.name}`),
+    colors: exColors,
+    names: exercises.map(e => e.name),
+    unit: "%"
+  }), secH("ACWR — Acute:Chronic Workload Ratio (sweet spot 0.8–1.3)"), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: exercises.map(e => `acwr_${e.name}`),
+    colors: exColors,
+    names: exercises.map(e => e.name),
+    unit: "\xD7"
   }), hasBW && /*#__PURE__*/React.createElement(React.Fragment, null, secH("Relative strength progression (est 1RM ÷ BW)"), /*#__PURE__*/React.createElement(SvgChartPrint, {
     data: sessionData,
     keys: exercises.map(e => `rel_${e.name}`),
@@ -3964,7 +4190,7 @@ function ReportTab({
 
   // Per-session chart data
   const sessionData = useMemo(() => {
-    return sessions.map(s => {
+    const rows = sessions.map(s => {
       const row = {
         session: s.id,
         date: s.date
@@ -3986,6 +4212,20 @@ function ReportTab({
       });
       return row;
     });
+    // Second pass: injury index per exercise
+    exercises.forEach(ex => {
+      rows.forEach((row, i) => {
+        const prevLoad = i > 0 ? rows[i - 1][`load_${ex.name}`] : null;
+        row[`injury_${ex.name}`] = injuryIndex(row[`load_${ex.name}`], prevLoad);
+      });
+    });
+    // Third pass: ACWR per exercise
+    exercises.forEach(ex => {
+      rows.forEach((row, i) => {
+        row[`acwr_${ex.name}`] = calcACWR(sessions, ex.name, i);
+      });
+    });
+    return rows;
   }, [sessions, exercises, client.bw]);
 
   // Best lifts summary
@@ -4448,7 +4688,201 @@ function ReportTab({
       strokeWidth: 0
     },
     connectNulls: true
-  }))))), hasBW && /*#__PURE__*/React.createElement(ChartCard, {
+  }))))), /*#__PURE__*/React.createElement(ChartCard, {
+    title: "Injury index (% load increase vs previous session)"
+  }, /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, _extends({}, props, {
+      dateMap: dateMap
+    }))
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fill: C.muted,
+      fontSize: 11
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 34,
+    unit: "%"
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 10,
+    stroke: C.warn,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "High risk >10%",
+      position: "insideTopRight",
+      fill: C.warn,
+      fontSize: 10
+    }
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Line, {
+    key: ex.name,
+    type: "monotone",
+    dataKey: `injury_${ex.name}`,
+    name: ex.name,
+    stroke: exColors[i],
+    strokeWidth: 2.5,
+    dot: {
+      fill: exColors[i],
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 14px 12px",
+      fontSize: 11,
+      color: C.sub,
+      lineHeight: 1.5
+    }
+  }, "Steeper upward slopes indicate larger week-to-week load jumps and higher injury risk. Values above the dashed 10% line warrant caution.")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 14,
+      border: `1px solid ${C.border}`,
+      overflow: "hidden",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px 4px"
+    }
+  }, /*#__PURE__*/React.createElement(SecLabel, {
+    text: "ACWR \u2014 Acute:Chronic Workload Ratio"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub,
+      marginBottom: 6,
+      lineHeight: 1.5
+    }
+  }, "Acute (last session volume) \xF7 Chronic (avg of previous 4 sessions). Sweet spot: ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#10D4A0",
+      fontWeight: 700
+    }
+  }, "0.8\u20131.3"), " \xB7 Caution: ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#FFB020",
+      fontWeight: 700
+    }
+  }, "1.3\u20131.5"), " \xB7 High risk: ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.warn,
+      fontWeight: 700
+    }
+  }, ">1.5"))), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 210
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, _extends({}, props, {
+      dateMap: dateMap
+    }))
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fill: C.muted,
+      fontSize: 11
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 34,
+    unit: "\xD7",
+    domain: [0, "auto"]
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 0.8,
+    stroke: C.blue,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.5,
+    label: {
+      value: "0.8 Low",
+      position: "insideBottomRight",
+      fill: C.blue,
+      fontSize: 9
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 1.3,
+    stroke: "#FFB020",
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.5,
+    label: {
+      value: "1.3 Caution",
+      position: "insideTopRight",
+      fill: "#FFB020",
+      fontSize: 9
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 1.5,
+    stroke: C.warn,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.5,
+    label: {
+      value: "1.5 High risk",
+      position: "insideTopRight",
+      fill: C.warn,
+      fontSize: 9
+    }
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Line, {
+    key: ex.name,
+    type: "monotone",
+    dataKey: `acwr_${ex.name}`,
+    name: ex.name,
+    stroke: exColors[i],
+    strokeWidth: 2.5,
+    dot: {
+      fill: exColors[i],
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  })))), exercises.length > 1 && /*#__PURE__*/React.createElement(ChartLegend, null)), hasBW && /*#__PURE__*/React.createElement(ChartCard, {
     title: "Relative strength progression (est 1RM \xF7 BW)"
   }, /*#__PURE__*/React.createElement(ResponsiveContainer, {
     width: "100%",
@@ -4800,6 +5234,18 @@ function App() {
       activeProgramId: c.activeProgramId || id
     }));
   };
+  const deleteSession = (programId, sessionId) => {
+    updClient(activeClientId, c => ({
+      ...c,
+      programs: c.programs.map(p => {
+        if (p.id !== programId) return p;
+        return {
+          ...p,
+          sessions: p.sessions.filter(s => s.id !== sessionId)
+        };
+      })
+    }));
+  };
   const editProgram = updated => {
     updClient(activeClientId, c => ({
       ...c,
@@ -4966,7 +5412,8 @@ function App() {
     client: activeClient,
     program: activeProgram
   }), tab === "calendar" && /*#__PURE__*/React.createElement(CalendarTab, {
-    client: activeClient
+    client: activeClient,
+    onDeleteSession: deleteSession
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card,
