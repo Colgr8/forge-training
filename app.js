@@ -83,6 +83,107 @@ const acwrZone = v => {
     color: C.blue
   };
 };
+
+// ─── Training Quality Indices (all 0–100) ────────────────────────────────────
+
+// Hypertrophy Index: volume in optimal rep range relative to max strength
+// Peaks at 6–12 reps, moderate-high intensity (65–85% 1RM)
+const calcHypIndex = (totalVol, oneRM, avgReps, avgTUT) => {
+  const repFactor = avgReps >= 6 && avgReps <= 12 ? 1.0 : avgReps > 12 && avgReps <= 20 ? 0.8 : avgReps > 3 && avgReps < 6 ? 0.5 : 0.2;
+  // TUT factor: optimal hypertrophy TUT = 40–70 s per set
+  let tutFactor = 1.0; // default (no tempo data)
+  if (avgTUT != null && avgTUT > 0) {
+    if (avgTUT >= 40 && avgTUT <= 70) tutFactor = 1.0;else if (avgTUT < 40) tutFactor = Math.max(0.4, avgTUT / 40);else tutFactor = Math.max(0.6, 70 / avgTUT);
+  }
+  return Math.min(100, Math.round(totalVol / oneRM * repFactor * tutFactor * 10));
+};
+
+// Max Strength Index: % of estimated 1RM used (90%+ = true max strength zone)
+const calcMSI = (maxLoad, oneRM) => Math.min(100, Math.round(maxLoad / Math.max(oneRM, maxLoad) * 100));
+
+// Strength Endurance Index: volume × high-rep factor (rewards 15+ reps at load)
+const calcSEI = (totalVol, oneRM, avgReps) => {
+  const repFactor = Math.max(0, Math.min(1, (avgReps - 8) / 14)); // 0 at 8, 1 at 22 reps
+  return Math.min(100, Math.round(totalVol / oneRM * repFactor * 8));
+};
+
+// Power Index: watts relative to strength ceiling (explosive efficiency)
+// Higher = moving loads more explosively relative to what they can lift
+// If concentric seconds known, derive velocity: v ≈ ROM(0.45m) / conSecs
+const velFromConSecs = conSecs => conSecs > 0 ? +(0.45 / conSecs).toFixed(2) : null;
+const calcPowerIndex = (power, oneRM) => Math.round(Math.min(100, power / Math.max(oneRM, 1) * 10));
+
+// Zone descriptors for Training Indices
+const trainingZone = (key, val) => {
+  if (val == null) return {
+    label: "–",
+    color: C.muted
+  };
+  if (key === "Hyp Index") {
+    if (val >= 70) return {
+      label: "High stimulus",
+      color: "#10D4A0"
+    };
+    if (val >= 40) return {
+      label: "Moderate",
+      color: "#FFB020"
+    };
+    return {
+      label: "Low stimulus",
+      color: C.blue
+    };
+  }
+  if (key === "Max Str Index") {
+    if (val >= 90) return {
+      label: "Peaking",
+      color: C.warn
+    };
+    if (val >= 80) return {
+      label: "Max strength",
+      color: "#FF8020"
+    };
+    if (val >= 65) return {
+      label: "Strength zone",
+      color: "#FFB020"
+    };
+    return {
+      label: "Sub-maximal",
+      color: C.blue
+    };
+  }
+  if (key === "Str End Index") {
+    if (val >= 60) return {
+      label: "High endurance",
+      color: "#10D4A0"
+    };
+    if (val >= 30) return {
+      label: "Moderate",
+      color: "#FFB020"
+    };
+    return {
+      label: "Low",
+      color: C.blue
+    };
+  }
+  if (key === "Power Index") {
+    if (val >= 60) return {
+      label: "Highly explosive",
+      color: "#AA44FF"
+    };
+    if (val >= 30) return {
+      label: "Good power",
+      color: "#FFB020"
+    };
+    return {
+      label: "Low power",
+      color: C.blue
+    };
+  }
+  return {
+    label: "–",
+    color: C.muted
+  };
+};
 const injuryIndex = (curr, prev) => {
   if (prev == null || curr == null || prev === 0) return 0;
   const pct = (curr - prev) / prev * 100;
@@ -148,28 +249,36 @@ const SEED_EX = [{
   lat: "Bilateral",
   pattern: "Squat",
   firstLoad: 100,
-  lastLoad: 122
+  lastLoad: 122,
+  eccSecs: 3,
+  conSecs: 1
 }, {
   name: "Chest Press",
   eq: "Dumbbell",
   lat: "Bilateral",
   pattern: "Vertical Push",
   firstLoad: 60,
-  lastLoad: 85
+  lastLoad: 85,
+  eccSecs: 3,
+  conSecs: 1
 }, {
   name: "Row",
   eq: "Cable machine",
   lat: "Bilateral",
   pattern: "Horiz. Pull",
   firstLoad: 17,
-  lastLoad: 32
+  lastLoad: 32,
+  eccSecs: 2,
+  conSecs: 1
 }, {
   name: "Forward lunge",
   eq: "Dumbbell",
   lat: "Alternating",
   pattern: "Lunge",
   firstLoad: 20,
-  lastLoad: 30
+  lastLoad: 30,
+  eccSecs: 3,
+  conSecs: 1
 }];
 const SEED_SESSIONS = [{
   id: "S1",
@@ -708,7 +817,9 @@ function ExerciseBuilder({
   const [exForm, setExForm] = useState({
     name: "",
     eq: "Barbell",
-    lat: "Bilateral"
+    lat: "Bilateral",
+    eccSecs: "",
+    conSecs: ""
   });
   const [editIdx, setEditIdx] = useState(null); // index being edited inline
   const updEx = (k, v) => setExForm(f => ({
@@ -725,7 +836,9 @@ function ExerciseBuilder({
     setExForm({
       name: "",
       eq: "Barbell",
-      lat: "Bilateral"
+      lat: "Bilateral",
+      eccSecs: "",
+      conSecs: ""
     });
   };
   const removeEx = i => {
@@ -790,7 +903,12 @@ function ExerciseBuilder({
       color: C.sub,
       marginTop: 2
     }
-  }, ex.eq, " \xB7 ", ex.lat)), /*#__PURE__*/React.createElement("button", {
+  }, ex.eq, " \xB7 ", ex.lat, (ex.eccSecs || ex.conSecs) && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.accent,
+      fontWeight: 700
+    }
+  }, " \xB7 \u23F1 ", ex.eccSecs || "?", "/", ex.conSecs || "?", "s"))), /*#__PURE__*/React.createElement("button", {
     onClick: () => setEditIdx(i),
     style: {
       background: "none",
@@ -870,7 +988,48 @@ function ExerciseBuilder({
     options: latList,
     onAddOption: onAddLat,
     addLabel: "Add laterality"
-  }))), /*#__PURE__*/React.createElement("button", {
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Eccentric (s)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0.5",
+    step: "0.5",
+    placeholder: "e.g. 3",
+    value: exForm.eccSecs,
+    onChange: e => updEx("eccSecs", e.target.value),
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Concentric (s)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0.5",
+    step: "0.5",
+    placeholder: "e.g. 1",
+    value: exForm.conSecs,
+    onChange: e => updEx("conSecs", e.target.value),
+    style: ss
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 10,
+      lineHeight: 1.4
+    }
+  }, "Prescribed tempo \u2014 sets the TUT target for hypertrophy. Optional."), /*#__PURE__*/React.createElement("button", {
     onClick: addEx,
     disabled: !exForm.name,
     style: {
@@ -902,7 +1061,9 @@ function ExRowEdit({
   const [form, setForm] = useState({
     name: ex.name,
     eq: ex.eq,
-    lat: ex.lat
+    lat: ex.lat,
+    eccSecs: ex.eccSecs || "",
+    conSecs: ex.conSecs || ""
   });
   const upd = (k, v) => setForm(f => ({
     ...f,
@@ -951,6 +1112,46 @@ function ExRowEdit({
     onAddOption: onAddLat,
     addLabel: "Add laterality"
   }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Eccentric (s)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0.5",
+    step: "0.5",
+    placeholder: "e.g. 3",
+    value: form.eccSecs,
+    onChange: e => upd("eccSecs", e.target.value),
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Concentric (s)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0.5",
+    step: "0.5",
+    placeholder: "e.g. 1",
+    value: form.conSecs,
+    onChange: e => upd("conSecs", e.target.value),
+    style: ss
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 10
+    }
+  }, "Prescribed tempo for hypertrophy TUT"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8
@@ -1635,7 +1836,12 @@ function SessionDetailSheet({
       fontSize: 11,
       color: C.gold
     }
-  }, e.power, " W")))))), /*#__PURE__*/React.createElement("div", {
+  }, e.power, " W"), e.repTime && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#AA44FF"
+    }
+  }, e.repTime, "s/rep")))))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 18,
       paddingTop: 14,
@@ -2529,9 +2735,15 @@ function LogTab({
     load: "",
     rir: 2,
     rpe: 7,
-    velocity: ""
+    velocity: "",
+    repTime: ""
   });
   const [saved, setSaved] = useState(false);
+  const [tempoOverride, setTempoOverride] = useState({
+    eccSecs: "",
+    conSecs: ""
+  }); // session-only override
+  const [editingTempo, setEditingTempo] = useState(false);
   const upd = (k, v) => setForm(f => ({
     ...f,
     [k]: v
@@ -2548,8 +2760,14 @@ function LogTab({
       load: "",
       rir: 2,
       rpe: 7,
-      velocity: ""
+      velocity: "",
+      repTime: ""
     });
+    setTempoOverride({
+      eccSecs: "",
+      conSecs: ""
+    });
+    setEditingTempo(false);
   }, [program?.id]);
 
   // When switching exercise, clear reps/load but keep set type & rpe/rir
@@ -2559,8 +2777,14 @@ function LogTab({
       ...f,
       reps: "",
       load: "",
-      velocity: ""
+      velocity: "",
+      repTime: ""
     }));
+    setTempoOverride({
+      eccSecs: "",
+      conSecs: ""
+    });
+    setEditingTempo(false);
     setSaved(false);
   };
   const vol = form.reps && form.load ? +form.reps * +form.load : 0;
@@ -2573,8 +2797,13 @@ function LogTab({
   const submit = () => {
     if (!form.reps || !form.load || !program) return;
     const oneRM = est1RM(+form.load, +form.reps);
-    const vel = form.velocity ? +form.velocity : estVelocity(+form.load, oneRM);
+    const velFromRepT_ = form.repTime ? +(0.45 / +form.repTime).toFixed(2) : null;
+    const vel = form.velocity ? +form.velocity : velFromRepT_ ? velFromRepT_ : estVelocity(+form.load, oneRM);
     const power = calcPower(+form.load, vel);
+    // Effective tempo: session override > program-prescribed default
+    const exDefSub = program?.exercises.find(e => e.name === activeEx);
+    const eccUsed = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDefSub?.eccSecs || null;
+    const conUsed = tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDefSub?.conSecs || null;
     onAddEntry({
       ex: activeEx,
       ...form,
@@ -2583,13 +2812,17 @@ function LogTab({
       load: +form.load,
       velocity: +vel.toFixed(2),
       power,
+      repTime: form.repTime ? +form.repTime : null,
+      eccSecs: eccUsed,
+      conSecs: conUsed,
       date: today
     });
     setForm(f => ({
       ...f,
       reps: "",
       load: "",
-      velocity: ""
+      velocity: "",
+      repTime: ""
     }));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -2774,7 +3007,7 @@ function LogTab({
     style: {
       display: "flex",
       gap: 10,
-      marginBottom: 14
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2801,11 +3034,258 @@ function LogTab({
   }, [4, 5, 6, 7, 8, 9, 10].map(r => /*#__PURE__*/React.createElement("option", {
     key: r,
     value: r
-  }, r, " \u2013 ", RPE_DESC[r]))))), vol > 0 && (() => {
+  }, r, " \u2013 ", RPE_DESC[r]))))), (() => {
+    const exDef = program?.exercises.find(e => e.name === activeEx);
+    const hasTempo = exDef?.eccSecs || exDef?.conSecs;
+    // Effective tempo: session override (if set) > program default
+    const effEcc = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDef?.eccSecs || null;
+    const effCon = tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDef?.conSecs || null;
+    const isOverridden = tempoOverride.eccSecs !== "" || tempoOverride.conSecs !== "";
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card2 + "88",
+        borderRadius: 10,
+        padding: "10px 12px",
+        border: `1px dashed ${C.border}`,
+        marginBottom: 12
+      }
+    }, hasTempo && !editingTempo && /*#__PURE__*/React.createElement("div", {
+      onClick: () => {
+        setTempoOverride({
+          eccSecs: effEcc ?? "",
+          conSecs: effCon ?? ""
+        });
+        setEditingTempo(true);
+      },
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 10,
+        padding: "6px 10px",
+        background: C.accent + "15",
+        borderRadius: 8,
+        border: `1px solid ${C.accent + "33"}`,
+        cursor: "pointer"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 16
+      }
+    }, "\u23F1"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        fontWeight: 700,
+        letterSpacing: 1,
+        textTransform: "uppercase"
+      }
+    }, isOverridden ? "Tempo (adjusted this session)" : "Prescribed Tempo", " ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        opacity: 0.6,
+        fontWeight: 400
+      }
+    }, "\xB7 tap to adjust")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: C.accent,
+        fontWeight: 700
+      }
+    }, effEcc || "?", "s eccentric / ", effCon || "?", "s concentric", /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.sub,
+        fontWeight: 400
+      }
+    }, " \u2014 target TUT: ", form.reps ? Math.round(+form.reps * ((effEcc || 2) + (effCon || 1))) : "–", form.reps ? "s" : ""))), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 14,
+        color: C.muted
+      }
+    }, "\u270E")), hasTempo && editingTempo && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 10,
+        padding: "10px 12px",
+        background: C.accent + "10",
+        borderRadius: 8,
+        border: `1px solid ${C.accent + "33"}`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        fontWeight: 700,
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        marginBottom: 8
+      }
+    }, "Adjust tempo for this session"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Eccentric (s)"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0.5",
+      step: "0.5",
+      value: tempoOverride.eccSecs,
+      onChange: e => setTempoOverride(t => ({
+        ...t,
+        eccSecs: e.target.value
+      })),
+      style: ss
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Concentric (s)"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0.5",
+      step: "0.5",
+      value: tempoOverride.conSecs,
+      onChange: e => setTempoOverride(t => ({
+        ...t,
+        conSecs: e.target.value
+      })),
+      style: ss
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setTempoOverride({
+          eccSecs: "",
+          conSecs: ""
+        });
+        setEditingTempo(false);
+      },
+      style: {
+        flex: 1,
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 8,
+        padding: "8px",
+        color: C.sub,
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 700
+      }
+    }, "Reset to default (", exDef.eccSecs || "?", "/", exDef.conSecs || "?", "s)"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditingTempo(false),
+      style: {
+        flex: 1,
+        background: C.accent,
+        border: "none",
+        borderRadius: 8,
+        padding: "8px",
+        color: "#001A12",
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 700
+      }
+    }, "Done"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: hasTempo ? 10 : 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        letterSpacing: 1.5,
+        textTransform: "uppercase",
+        fontWeight: 700,
+        marginBottom: 8
+      }
+    }, "Power measurement"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10,
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Rep time (s)"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0.1",
+      step: "0.1",
+      placeholder: "e.g. 0.5",
+      value: form.repTime,
+      onChange: e => upd("repTime", e.target.value),
+      style: ss
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        marginTop: 3
+      }
+    }, "\u23F1 Manual \u2014 stopwatch")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Bar speed (m/s)"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0.1",
+      step: "0.01",
+      placeholder: "e.g. 0.85",
+      value: form.velocity,
+      onChange: e => upd("velocity", e.target.value),
+      style: ss
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        marginTop: 3
+      }
+    }, "\uD83D\uDCE1 Device \u2014 overrides rep time"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        lineHeight: 1.4
+      }
+    }, "Enter one or neither. Device reading takes priority over rep time.")));
+  })(), vol > 0 && (() => {
     const oneRM = est1RM(+form.load, +form.reps);
-    const vel = form.velocity ? +form.velocity : estVelocity(+form.load, oneRM);
+    // velocity: measured > derived from conSecs > estimated from load/1RM
+    // Velocity: measured > from rep time > estimated
+    const velFromRepT = form.repTime ? +(0.45 / +form.repTime).toFixed(2) : null;
+    const vel = form.velocity ? +form.velocity : velFromRepT ? velFromRepT : estVelocity(+form.load, oneRM);
     const power = calcPower(+form.load, vel);
-    const isEst = !form.velocity;
+    const velLabel = form.velocity ? "m/s (measured)" : velFromRepT ? "m/s (from rep time)" : "m/s (estimated)";
+    // TUT from effective tempo (session override > prescribed default)
+    const exDef2 = program?.exercises.find(e => e.name === activeEx);
+    const eccS = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDef2?.eccSecs || null;
+    const conS = tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDef2?.conSecs || null;
+    const tut = (eccS || conS) && form.reps ? Math.round(+form.reps * ((eccS || 2) + (conS || 1))) : null;
+    const tutZone = !tut ? null : tut >= 40 && tut <= 70 ? {
+      label: "Optimal TUT ✓",
+      color: C.accent
+    } : tut < 40 ? {
+      label: "Below optimal",
+      color: "#FFB020"
+    } : {
+      label: "Extended TUT",
+      color: C.blue
+    };
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
@@ -2826,10 +3306,10 @@ function LogTab({
       style: {
         display: "flex",
         gap: 8,
-        marginBottom: 14
+        marginBottom: tut ? 8 : 14
       }
     }, /*#__PURE__*/React.createElement(StatCard, {
-      label: isEst ? "Est. Power" : "Power",
+      label: "Power",
       value: power,
       unit: " W",
       color: C.gold
@@ -2849,31 +3329,62 @@ function LogTab({
         marginBottom: 3,
         fontWeight: 700
       }
-    }, "Velocity"), /*#__PURE__*/React.createElement("input", {
-      type: "number",
-      min: "0",
-      step: "0.01",
-      placeholder: `${vel} est.`,
-      value: form.velocity,
-      onChange: e => upd("velocity", e.target.value),
+    }, "Velocity"), /*#__PURE__*/React.createElement("div", {
       style: {
-        ...ss,
-        padding: "4px 0",
-        background: "transparent",
-        border: "none",
         fontSize: 22,
         fontFamily: "'Bebas Neue',cursive",
         letterSpacing: 1,
         color: C.gold,
-        width: "100%"
+        lineHeight: 1.2
       }
-    }), /*#__PURE__*/React.createElement("div", {
+    }, vel.toFixed(2)), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10,
         color: C.muted,
         marginTop: 1
       }
-    }, "m/s", isEst ? " (estimated)" : ""))));
+    }, velLabel))), tut && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(StatCard, {
+      label: "TUT this set",
+      value: tut,
+      unit: "s",
+      color: tutZone.color
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card2,
+        borderRadius: 10,
+        padding: "10px 12px",
+        flex: 1,
+        display: "flex",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        letterSpacing: 1.5,
+        textTransform: "uppercase",
+        marginBottom: 3,
+        fontWeight: 700
+      }
+    }, "Hypertrophy"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 700,
+        color: tutZone.color
+      }
+    }, tutZone.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        marginTop: 1
+      }
+    }, "Target: 40\u201370s")))));
   })(), /*#__PURE__*/React.createElement("button", {
     onClick: submit,
     style: {
@@ -2999,13 +3510,23 @@ function ProgressTab({
       const power = top.power || calcPower(maxLoad, vel);
       // Max reps across all sets this session for this exercise
       const maxReps = Math.max(...ee.map(e => e.reps));
+      const totalVol = ee.reduce((sum, e) => sum + e.load * e.reps, 0);
+      const avgReps = ee.reduce((sum, e) => sum + e.reps, 0) / ee.length;
+      // TUT: prefer actual logged tempo per entry (session adjustment), else program default
+      const exDef = sessions.length ? program?.exercises?.find(e => e.name === sel) : null;
+      const loggedTempo = ee.filter(e => e.eccSecs || e.conSecs);
+      const avgTUT = loggedTempo.length ? ee.reduce((sum, e) => sum + e.reps * ((e.eccSecs || exDef?.eccSecs || 2) + (e.conSecs || exDef?.conSecs || 1)), 0) / ee.length : exDef?.eccSecs || exDef?.conSecs ? top.reps * ((exDef.eccSecs || 2) + (exDef.conSecs || 1)) : null;
       return {
         session: s.id,
         date: s.date,
         "Load": maxLoad,
         "Est 1RM": oneRM,
         "Power": power,
-        "Reps": maxReps
+        "Reps": maxReps,
+        "Hyp Index": calcHypIndex(totalVol, oneRM, avgReps, avgTUT),
+        "Max Str Index": calcMSI(maxLoad, oneRM),
+        "Str End Index": calcSEI(totalVol, oneRM, avgReps),
+        "Power Index": calcPowerIndex(power, oneRM)
       };
     }).filter(Boolean).map((d, i, arr) => ({
       ...d,
@@ -3055,6 +3576,26 @@ function ProgressTab({
     key: "ACWR",
     label: "ACWR",
     unit: "×",
+    color: "#AA44FF"
+  }, {
+    key: "Hyp Index",
+    label: "Hyp Index",
+    unit: "",
+    color: "#10D4A0"
+  }, {
+    key: "Max Str Index",
+    label: "Max Str",
+    unit: "%",
+    color: "#FF8020"
+  }, {
+    key: "Str End Index",
+    label: "Str End",
+    unit: "",
+    color: "#5060FF"
+  }, {
+    key: "Power Index",
+    label: "Power Index",
+    unit: "",
     color: "#AA44FF"
   }];
   if (!program) return /*#__PURE__*/React.createElement("div", {
@@ -3145,7 +3686,7 @@ function ProgressTab({
     value: bestPower || "–",
     unit: " W",
     color: C.gold
-  }), metric === "ACWR" ? /*#__PURE__*/React.createElement("div", {
+  }), metric === "ACWR" || ["Hyp Index", "Max Str Index", "Str End Index", "Power Index"].includes(metric) ? /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card2,
       borderRadius: 10,
@@ -3163,11 +3704,11 @@ function ProgressTab({
     }
   }, "Zone"), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: 700,
-      color: acwrZone(last).color
+      color: metric === "ACWR" ? acwrZone(last).color : trainingZone(metric, last).color
     }
-  }, acwrZone(last).label)) : /*#__PURE__*/React.createElement(StatCard, {
+  }, metric === "ACWR" ? acwrZone(last).label : trainingZone(metric, last).label)) : /*#__PURE__*/React.createElement(StatCard, {
     label: metric === "Reps" ? "Best Reps" : metric === "Injury Index" ? "Peak Risk" : "Total gain",
     value: metric === "Reps" ? bestReps || "–" : metric === "Injury Index" ? peakInjury : first && last ? `+${pct}` : "–",
     unit: metric === "Reps" ? " reps" : metric === "Injury Index" ? "%" : first && last ? "%" : "",
@@ -3261,7 +3802,7 @@ function ProgressTab({
     strokeDasharray: "4 3",
     strokeOpacity: 0.6,
     label: {
-      value: "0.8 Low load",
+      value: "0.8 Low",
       position: "insideBottomRight",
       fill: C.blue,
       fontSize: 9
@@ -3284,6 +3825,39 @@ function ProgressTab({
     strokeOpacity: 0.6,
     label: {
       value: "1.5 High risk",
+      position: "insideTopRight",
+      fill: C.warn,
+      fontSize: 9
+    }
+  })), metric === "Max Str Index" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 65,
+    stroke: C.blue,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "65% Strength zone",
+      position: "insideTopRight",
+      fill: C.blue,
+      fontSize: 9
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 80,
+    stroke: "#FF8020",
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "80% Max strength",
+      position: "insideTopRight",
+      fill: "#FF8020",
+      fontSize: 9
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 90,
+    stroke: C.warn,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "90% Peaking",
       position: "insideTopRight",
       fill: C.warn,
       fontSize: 9
@@ -3751,13 +4325,18 @@ function PrintPreview({
       // 6. ACWR
       drawChart(sessionData, exNames.map(n => `acwr_${n}`), exCols_, exNames, "×", "6. ACWR - ACUTE:CHRONIC WORKLOAD RATIO (SWEET SPOT: 0.8-1.3)");
 
-      // 7. Relative strength (only if BW recorded)
+      // 7–10. Training quality indices (one chart per exercise)
+      exNames.forEach((n, ni) => {
+        drawChart(sessionData, [`hyp_${n}`, `msi_${n}`, `sei_${n}`, `pi_${n}`], ["#10D4A0", "#FF8020", "#5060FF", "#AA44FF"], ["Hyp Index", "Max Str", "Str End", "Power Index"], "", `TRAINING QUALITY INDICES — ${n.toUpperCase()}`);
+      });
+
+      // Relative strength (only if BW recorded)
       if (hasBW) {
-        drawChart(sessionData, exNames.map(n => `rel_${n}`), exCols_, exNames, "×", "7. RELATIVE STRENGTH PROGRESSION");
+        drawChart(sessionData, exNames.map(n => `rel_${n}`), exCols_, exNames, "×", "RELATIVE STRENGTH PROGRESSION");
       }
 
-      // 8. Session intensity trend
-      drawChart(sessionData, ["avgRPE"], [C.warn], ["Avg RPE"], "", "8. SESSION INTENSITY TREND (AVG RPE)");
+      // Session intensity trend
+      drawChart(sessionData, ["avgRPE"], [C.warn], ["Avg RPE"], "", "SESSION INTENSITY TREND (AVG RPE)");
     }
 
     // ── Trainer's feedback ────────────────────────────────────────────────────
@@ -4101,7 +4680,18 @@ function PrintPreview({
     colors: exColors,
     names: exercises.map(e => e.name),
     unit: "\xD7"
-  }), hasBW && /*#__PURE__*/React.createElement(React.Fragment, null, secH("Relative strength progression (est 1RM ÷ BW)"), /*#__PURE__*/React.createElement(SvgChartPrint, {
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement("div", {
+    key: ex.name,
+    style: {
+      marginBottom: 8
+    }
+  }, secH(`Training quality indices — ${ex.name}`), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: [`hyp_${ex.name}`, `msi_${ex.name}`, `sei_${ex.name}`, `pi_${ex.name}`],
+    colors: ["#10D4A0", "#FF8020", "#5060FF", "#AA44FF"],
+    names: ["Hyp Index", "Max Str", "Str End", "Power Index"],
+    unit: ""
+  }))), hasBW && /*#__PURE__*/React.createElement(React.Fragment, null, secH("Relative strength progression (est 1RM ÷ BW)"), /*#__PURE__*/React.createElement(SvgChartPrint, {
     data: sessionData,
     keys: exercises.map(e => `rel_${e.name}`),
     colors: exColors,
@@ -4207,7 +4797,17 @@ function ReportTab({
         row[`load_${ex.name}`] = maxLoad;
         row[`onerm_${ex.name}`] = oneRM;
         row[`power_${ex.name}`] = top.power || calcPower(maxLoad, vel);
+        const totalVol = ee.reduce((sum, e) => sum + e.load * e.reps, 0);
+        const avgReps = ee.reduce((sum, e) => sum + e.reps, 0) / ee.length;
+        // TUT: prefer actual logged tempo per entry, else program-prescribed default
+        const prescEx = (program?.exercises || []).find(e => e.name === ex.name);
+        const loggedT = ee.filter(e => e.eccSecs || e.conSecs);
+        const avgTUT = loggedT.length ? ee.reduce((sum, e) => sum + e.reps * ((e.eccSecs || prescEx?.eccSecs || 2) + (e.conSecs || prescEx?.conSecs || 1)), 0) / ee.length : prescEx?.eccSecs || prescEx?.conSecs ? Math.max(...ee.map(e => e.reps)) * ((prescEx.eccSecs || 2) + (prescEx.conSecs || 1)) : null;
         row[`reps_${ex.name}`] = Math.max(...ee.map(e => e.reps));
+        row[`hyp_${ex.name}`] = calcHypIndex(totalVol, oneRM, avgReps, avgTUT);
+        row[`msi_${ex.name}`] = calcMSI(maxLoad, oneRM);
+        row[`sei_${ex.name}`] = calcSEI(totalVol, oneRM, avgReps);
+        row[`pi_${ex.name}`] = calcPowerIndex(top.power || calcPower(maxLoad, vel), oneRM);
         if (client.bw) row[`rel_${ex.name}`] = +(oneRM / client.bw).toFixed(2);
       });
       return row;
@@ -4882,7 +5482,171 @@ function ReportTab({
       strokeWidth: 0
     },
     connectNulls: true
-  })))), exercises.length > 1 && /*#__PURE__*/React.createElement(ChartLegend, null)), hasBW && /*#__PURE__*/React.createElement(ChartCard, {
+  })))), exercises.length > 1 && /*#__PURE__*/React.createElement(ChartLegend, null)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 14,
+      border: `1px solid ${C.border}`,
+      overflow: "hidden",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px 4px"
+    }
+  }, /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Training quality indices (0\u2013100 scale)"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub,
+      marginBottom: 6,
+      lineHeight: 1.5
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#10D4A0",
+      fontWeight: 700
+    }
+  }, "Hyp"), "=Hypertrophy \xB7 ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#FF8020",
+      fontWeight: 700
+    }
+  }, "Max Str"), "=Max Strength \xB7 ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#5060FF",
+      fontWeight: 700
+    }
+  }, "Str End"), "=Strength Endurance \xB7 ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#AA44FF",
+      fontWeight: 700
+    }
+  }, "Power"), "=Power Index")), exercises.map((ex, i) => /*#__PURE__*/React.createElement("div", {
+    key: ex.name,
+    style: {
+      padding: "0 14px 12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub,
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, ex.name), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 160
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, _extends({}, props, {
+      dateMap: dateMap
+    }))
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    domain: [0, 100],
+    tick: {
+      fill: C.muted,
+      fontSize: 10
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 28
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 11
+    }
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: `hyp_${ex.name}`,
+    name: "Hyp Index",
+    stroke: "#10D4A0",
+    strokeWidth: 2,
+    dot: {
+      fill: "#10D4A0",
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: `msi_${ex.name}`,
+    name: "Max Str",
+    stroke: "#FF8020",
+    strokeWidth: 2,
+    dot: {
+      fill: "#FF8020",
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: `sei_${ex.name}`,
+    name: "Str End",
+    stroke: "#5060FF",
+    strokeWidth: 2,
+    dot: {
+      fill: "#5060FF",
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: `pi_${ex.name}`,
+    name: "Power Index",
+    stroke: "#AA44FF",
+    strokeWidth: 2,
+    dot: {
+      fill: "#AA44FF",
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 14,
+      flexWrap: "wrap",
+      padding: "0 14px 12px"
+    }
+  }, [["Hyp Index", "#10D4A0"], ["Max Str", "#FF8020"], ["Str End", "#5060FF"], ["Power Index", "#AA44FF"]].map(([l, c]) => /*#__PURE__*/React.createElement("div", {
+    key: l,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 11,
+      color: C.sub
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 14,
+      height: 3,
+      background: c,
+      display: "inline-block",
+      borderRadius: 2
+    }
+  }), l)))), hasBW && /*#__PURE__*/React.createElement(ChartCard, {
     title: "Relative strength progression (est 1RM \xF7 BW)"
   }, /*#__PURE__*/React.createElement(ResponsiveContainer, {
     width: "100%",
@@ -5262,6 +6026,9 @@ function App() {
     rpe,
     velocity,
     power,
+    repTime,
+    eccSecs,
+    conSecs,
     date
   }) => {
     if (!activeProgram) return;
@@ -5274,7 +6041,10 @@ function App() {
       rir,
       rpe,
       velocity,
-      power
+      power,
+      repTime,
+      eccSecs,
+      conSecs
     };
     updClient(activeClientId, c => ({
       ...c,
