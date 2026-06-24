@@ -193,6 +193,37 @@ const initials = name => name.trim().split(/\s+/).map(w => w[0]).join("").slice(
 const AV_COLS = [C.accent, C.blue, "#AA44FF", C.gold, "#FF5060", "#FF8020", "#44AAFF", "#FF44AA"];
 const avCol = idx => AV_COLS[idx % AV_COLS.length];
 
+// Isometric helpers
+const isIsoType = t => ["Ovrc Iso-Neuro", "Ovrc Iso-Max", "Yielding Iso"].includes(t);
+const isOvrcIso = t => t === "Ovrc Iso-Neuro" || t === "Ovrc Iso-Max";
+const isYieldIso = t => t === "Yielding Iso";
+const ISO_META = {
+  "Ovrc Iso-Neuro": {
+    color: "#FF5060",
+    icon: "⚡",
+    label: "Overcoming Iso — Neuromuscular",
+    desc: "0.5–1s rapid maximal bursts. Max nervous system stimulation. No external load.",
+    holdTarget: "0.5–1s",
+    setsReps: "6–10 reps"
+  },
+  "Ovrc Iso-Max": {
+    color: "#FF8020",
+    icon: "💪",
+    label: "Overcoming Iso — Maximal Force",
+    desc: "3s sustained maximal push. High stimulus, recoverable. No external load.",
+    holdTarget: "3s",
+    setsReps: "4 sets × 3 reps"
+  },
+  "Yielding Iso": {
+    color: "#5060FF",
+    icon: "🏋",
+    label: "Yielding Iso — Iso Hold",
+    desc: "Hold against gravity. Targets weaker tendon regions. Ideal for tendinopathy rehab.",
+    holdTarget: "30–45s",
+    setsReps: "3 sets × 60–85% MVIC"
+  }
+};
+
 // ─── Responsive width hook ────────────────────────────────────────────────────
 function useWindowWidth() {
   const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 600);
@@ -230,7 +261,7 @@ function SessionXTick({
 }
 const CATEGORIES = ["Strength", "Power", "Stability", "Mobility"];
 const PROG_TYPES = ["General Strength", "Hypertrophy", "Endurance Strength", "Max Strength", "Power", "Muscular Endurance", "Hybrid"];
-const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Negative"];
+const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Negative", "Ovrc Iso-Neuro", "Ovrc Iso-Max", "Yielding Iso"];
 const EQUIP_LIST = ["Barbell", "Dumbbell", "Cable machine", "Bodyweight", "Kettlebell", "Long band", "Short band", "Medicine ball", "Trap(Hex) bar"];
 const LAT_LIST = ["Bilateral", "Unilateral - Left", "Unilateral - Right", "Alternating", "Contralateral"];
 const RPE_DESC = {
@@ -1841,7 +1872,17 @@ function SessionDetailSheet({
       fontSize: 11,
       color: "#AA44FF"
     }
-  }, e.repTime, "s/rep")))))), /*#__PURE__*/React.createElement("div", {
+  }, e.repTime, "s/rep"), e.holdDuration && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#5060FF"
+    }
+  }, "\u23F1 ", e.holdDuration, "s hold"), e.mvic && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#5060FF"
+    }
+  }, e.mvic, "% MVIC")))))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 18,
       paddingTop: 14,
@@ -2736,7 +2777,9 @@ function LogTab({
     rir: 2,
     rpe: 7,
     velocity: "",
-    repTime: ""
+    repTime: "",
+    holdDuration: "",
+    mvic: ""
   });
   const [saved, setSaved] = useState(false);
   const [tempoOverride, setTempoOverride] = useState({
@@ -2761,7 +2804,9 @@ function LogTab({
       rir: 2,
       rpe: 7,
       velocity: "",
-      repTime: ""
+      repTime: "",
+      holdDuration: "",
+      mvic: ""
     });
     setTempoOverride({
       eccSecs: "",
@@ -2778,7 +2823,9 @@ function LogTab({
       reps: "",
       load: "",
       velocity: "",
-      repTime: ""
+      repTime: "",
+      holdDuration: "",
+      mvic: ""
     }));
     setTempoOverride({
       eccSecs: "",
@@ -2809,12 +2856,14 @@ function LogTab({
       ...form,
       reps: +form.reps,
       setNo: +form.setNo,
-      load: +form.load,
-      velocity: +vel.toFixed(2),
-      power,
+      load: isOvrcIso(form.type) ? 0 : +form.load,
+      velocity: isOvrcIso(form.type) ? 0 : +vel.toFixed(2),
+      power: isOvrcIso(form.type) ? 0 : power,
       repTime: form.repTime ? +form.repTime : null,
       eccSecs: eccUsed,
       conSecs: conUsed,
+      holdDuration: form.holdDuration ? +form.holdDuration : null,
+      mvic: form.mvic ? +form.mvic : null,
       date: today
     });
     setForm(f => ({
@@ -2822,7 +2871,9 @@ function LogTab({
       reps: "",
       load: "",
       velocity: "",
-      repTime: ""
+      repTime: "",
+      holdDuration: "",
+      mvic: ""
     }));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -2940,7 +2991,45 @@ function LogTab({
   }, today, " \xB7 ", program.name)), /*#__PURE__*/React.createElement(Tag, {
     text: program.name,
     color: C.blue
-  })), /*#__PURE__*/React.createElement("div", {
+  })), isIsoType(form.type) && (() => {
+    const m = ISO_META[form.type];
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10,
+        alignItems: "flex-start",
+        padding: "10px 12px",
+        background: m.color + "18",
+        borderRadius: 10,
+        border: `1px solid ${m.color + "44"}`,
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 20
+      }
+    }, m.icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: m.color,
+        marginBottom: 2
+      }
+    }, m.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.sub,
+        lineHeight: 1.5
+      }
+    }, m.desc), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: m.color,
+        marginTop: 4,
+        fontWeight: 700
+      }
+    }, "Target: ", m.holdTarget, " hold \xB7 ", m.setsReps)));
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10,
@@ -2951,15 +3040,33 @@ function LogTab({
       flex: 1
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
-    t: "Reps"
+    t: isIsoType(form.type) ? "Contractions" : "Reps"
   }), /*#__PURE__*/React.createElement("input", {
     type: "number",
     min: "1",
-    placeholder: "8",
+    placeholder: isOvrcIso(form.type) ? "3" : isYieldIso(form.type) ? "1" : "8",
     value: form.reps,
     onChange: e => upd("reps", e.target.value),
     style: ss
-  })), /*#__PURE__*/React.createElement("div", {
+  })), isOvrcIso(form.type) ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Hold Duration (s)"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.holdDuration,
+    onChange: e => upd("holdDuration", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select\u2026"), form.type === "Ovrc Iso-Neuro" ? [0.5, 1].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "s")) : [3].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "s")))) : /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -2973,7 +3080,102 @@ function LogTab({
     value: form.load,
     onChange: e => upd("load", e.target.value),
     style: ss
-  }))), /*#__PURE__*/React.createElement("div", {
+  }))), isYieldIso(form.type) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Hold Duration (s)"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.holdDuration,
+    onChange: e => upd("holdDuration", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select\u2026"), [30, 35, 40, 45].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "s")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "% MVIC"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.mvic,
+    onChange: e => upd("mvic", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select\u2026"), Array.from({
+    length: 26
+  }, (_, i) => 60 + i).map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "%"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: C.muted,
+      marginTop: 2
+    }
+  }, "% max voluntary contraction"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.blue + "15",
+      borderRadius: 10,
+      padding: "12px 14px",
+      border: `1px solid ${C.blue + "33"}`,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.blue,
+      marginBottom: 6
+    }
+  }, "What is MVIC?"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub,
+      lineHeight: 1.6,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: C.text
+    }
+  }, "MVIC = Maximum Voluntary Isometric Contraction"), " \u2014 the absolute maximum force a muscle can produce in a static (non-moving) contraction. Essentially your ceiling for isometric strength. When you prescribe 60\u201385% MVIC you are telling the client to hold at that percentage of their maximum possible isometric effort for that position."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub,
+      lineHeight: 1.8
+    }
+  }, /*#__PURE__*/React.createElement("div", null, "\uD83D\uDD35 ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: C.text
+    }
+  }, "60% MVIC"), " \u2014 moderate effort, sustainable for longer holds, good for beginners or acute tendinopathy"), /*#__PURE__*/React.createElement("div", null, "\uD83D\uDFE1 ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: C.text
+    }
+  }, "70\u201375% MVIC"), " \u2014 typical sweet spot for tendon adaptation"), /*#__PURE__*/React.createElement("div", null, "\uD83D\uDD34 ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: C.text
+    }
+  }, "85% MVIC"), " \u2014 near-maximal, shorter sustainable duration, more advanced")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginTop: 8,
+      fontStyle: "italic"
+    }
+  }, "Estimated subjectively (similar to RPE) unless you have force measurement equipment. Guide: 60% = moderately challenging \xB7 75% = hard but holdable \xB7 85% = very difficult."))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10,
@@ -3009,7 +3211,7 @@ function LogTab({
       gap: 10,
       marginBottom: 12
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, !isOvrcIso(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -3275,7 +3477,8 @@ function LogTab({
     const exDef2 = program?.exercises.find(e => e.name === activeEx);
     const eccS = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDef2?.eccSecs || null;
     const conS = tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDef2?.conSecs || null;
-    const tut = (eccS || conS) && form.reps ? Math.round(+form.reps * ((eccS || 2) + (conS || 1))) : null;
+    // For isometrics, TUT = holdDuration × reps
+    const tut = isIsoType(form.type) && form.holdDuration && form.reps ? Math.round(+form.holdDuration * +form.reps) : (eccS || conS) && form.reps ? Math.round(+form.reps * ((eccS || 2) + (conS || 1))) : null;
     const tutZone = !tut ? null : tut >= 40 && tut <= 70 ? {
       label: "Optimal TUT ✓",
       color: C.accent
@@ -3302,7 +3505,7 @@ function LogTab({
       value: oneRM,
       unit: " kg",
       color: C.accent
-    })), /*#__PURE__*/React.createElement("div", {
+    })), !isIsoType(form.type) && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 8,
@@ -4802,7 +5005,9 @@ function ReportTab({
         // TUT: prefer actual logged tempo per entry, else program-prescribed default
         const prescEx = (program?.exercises || []).find(e => e.name === ex.name);
         const loggedT = ee.filter(e => e.eccSecs || e.conSecs);
-        const avgTUT = loggedT.length ? ee.reduce((sum, e) => sum + e.reps * ((e.eccSecs || prescEx?.eccSecs || 2) + (e.conSecs || prescEx?.conSecs || 1)), 0) / ee.length : prescEx?.eccSecs || prescEx?.conSecs ? Math.max(...ee.map(e => e.reps)) * ((prescEx.eccSecs || 2) + (prescEx.conSecs || 1)) : null;
+        // TUT: for iso sets use holdDuration×reps; else use tempo
+        const isoEntries = ee.filter(e => e.holdDuration);
+        const avgTUT = isoEntries.length ? isoEntries.reduce((sum, e) => sum + e.holdDuration * e.reps, 0) / isoEntries.length : loggedT.length ? ee.reduce((sum, e) => sum + e.reps * ((e.eccSecs || prescEx?.eccSecs || 2) + (e.conSecs || prescEx?.conSecs || 1)), 0) / ee.length : prescEx?.eccSecs || prescEx?.conSecs ? Math.max(...ee.map(e => e.reps)) * ((prescEx.eccSecs || 2) + (prescEx.conSecs || 1)) : null;
         row[`reps_${ex.name}`] = Math.max(...ee.map(e => e.reps));
         row[`hyp_${ex.name}`] = calcHypIndex(totalVol, oneRM, avgReps, avgTUT);
         row[`msi_${ex.name}`] = calcMSI(maxLoad, oneRM);
@@ -6029,6 +6234,8 @@ function App() {
     repTime,
     eccSecs,
     conSecs,
+    holdDuration,
+    mvic,
     date
   }) => {
     if (!activeProgram) return;
@@ -6044,7 +6251,9 @@ function App() {
       power,
       repTime,
       eccSecs,
-      conSecs
+      conSecs,
+      holdDuration,
+      mvic
     };
     updClient(activeClientId, c => ({
       ...c,
