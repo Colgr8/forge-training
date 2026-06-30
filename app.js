@@ -197,23 +197,6 @@ const avCol = idx => AV_COLS[idx % AV_COLS.length];
 const isIsoType = t => ["Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Yielding Iso-Holds", "Yielding Iso-GPP"].includes(t);
 const isOvrcIso = t => t === "Ovrc Iso-Ballistic" || t === "Ovrc Iso-Max";
 const isYieldIso = t => t === "Yielding Iso-Holds" || t === "Yielding Iso-GPP";
-
-// Band strength → kg load ranges (increments of 1kg)
-const BAND_RANGES = {
-  "Extra Light": [1, 2],
-  "Light": [2, 5],
-  "Medium": [6, 10],
-  "Heavy": [11, 20],
-  "Extra Heavy": [21, 35]
-};
-const bandRangeOptions = strength => {
-  const r = BAND_RANGES[strength];
-  if (!r) return [];
-  const [lo, hi] = r;
-  return Array.from({
-    length: hi - lo + 1
-  }, (_, i) => lo + i);
-};
 const ISO_META = {
   "Ovrc Iso-Ballistic": {
     color: "#FF5060",
@@ -2025,7 +2008,7 @@ function SessionDetailSheet({
               fontSize: 11,
               color: C.warn
             },
-            children: ["🔴 ", e.bandLength, " ", e.bandStrength, " (", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", e.bandUsage, ")", e.rawLoad != null && e.bandLoadKg ? ` — ${e.rawLoad}kg plate ${e.bandUsage === "assisted" ? "−" : "+"} ${e.bandLoadKg}kg band = ${e.load}kg effective` : ""]
+            children: ["🔴 ", e.bandLength, " ", e.bandStrength, " band — ", e.bandUsage]
           }, void 0, true)]
         }, void 0, true)]
       }, i, true))]
@@ -3005,8 +2988,7 @@ function LogTab({
     force: "",
     bandLength: "",
     bandStrength: "",
-    bandUsage: "resisted",
-    bandLoadKg: ""
+    bandUsage: "resisted"
   });
   const [showBand, setShowBand] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -3039,8 +3021,7 @@ function LogTab({
       force: "",
       bandLength: "",
       bandStrength: "",
-      bandUsage: "resisted",
-      bandLoadKg: ""
+      bandUsage: "resisted"
     });
     setShowBand(false);
     setTempoOverride({
@@ -3064,8 +3045,7 @@ function LogTab({
       force: "",
       bandLength: "",
       bandStrength: "",
-      bandUsage: "resisted",
-      bandLoadKg: ""
+      bandUsage: "resisted"
     }));
     setShowBand(false);
     setTempoOverride({
@@ -3075,10 +3055,7 @@ function LogTab({
     setEditingTempo(false);
     setSaved(false);
   };
-  const bandKgLive = showBand && form.bandLoadKg ? +form.bandLoadKg : 0;
-  const bandSignedLive = bandKgLive ? form.bandUsage === "assisted" ? -bandKgLive : bandKgLive : 0;
-  const effLoadLive = Math.max(0, (form.load ? +form.load : 0) + bandSignedLive);
-  const vol = form.reps && effLoadLive ? +form.reps * effLoadLive : 0;
+  const vol = form.reps && form.load ? +form.reps * +form.load : 0;
   const sessions = program?.sessions || [];
   // Group recent history by session (last 5 sessions that have this exercise)
   const recentSessions = sessions.filter(s => s.entries.some(e => e.ex === activeEx)).slice(-5).reverse().map(s => ({
@@ -3087,16 +3064,11 @@ function LogTab({
     sets: s.entries.filter(e => e.ex === activeEx)
   }));
   const submit = () => {
-    if (!form.reps || !program) return;
-    const rawLoad = form.load ? +form.load : 0;
-    const bandKg = showBand && form.bandLoadKg ? +form.bandLoadKg : 0;
-    const bandSigned = bandKg ? form.bandUsage === "assisted" ? -bandKg : bandKg : 0;
-    const effLoad = Math.max(0, rawLoad + bandSigned);
-    if (!effLoad && !isOvrcIso(form.type)) return; // need some load unless overcoming iso
-    const oneRM = est1RM(effLoad, +form.reps);
+    if (!form.reps || !form.load || !program) return;
+    const oneRM = est1RM(+form.load, +form.reps);
     const velFromRepT_ = form.repTime ? +(0.45 / +form.repTime).toFixed(2) : null;
-    const vel = form.velocity ? +form.velocity : velFromRepT_ ? velFromRepT_ : estVelocity(effLoad, oneRM);
-    const power = calcPower(effLoad, vel);
+    const vel = form.velocity ? +form.velocity : velFromRepT_ ? velFromRepT_ : estVelocity(+form.load, oneRM);
+    const power = calcPower(+form.load, vel);
     // Effective tempo: session override > program-prescribed default
     const exDefSub = program?.exercises.find(e => e.name === activeEx);
     const eccUsed = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDefSub?.eccSecs || null;
@@ -3106,8 +3078,7 @@ function LogTab({
       ...form,
       reps: +form.reps,
       setNo: +form.setNo,
-      load: isOvrcIso(form.type) ? 0 : effLoad,
-      rawLoad: isOvrcIso(form.type) ? null : rawLoad,
+      load: isOvrcIso(form.type) ? 0 : +form.load,
       velocity: isOvrcIso(form.type) ? 0 : +vel.toFixed(2),
       power: isOvrcIso(form.type) ? 0 : power,
       repTime: form.repTime ? +form.repTime : null,
@@ -3119,7 +3090,6 @@ function LogTab({
       bandLength: showBand && form.bandLength ? form.bandLength : null,
       bandStrength: showBand && form.bandStrength ? form.bandStrength : null,
       bandUsage: showBand ? form.bandUsage : null,
-      bandLoadKg: bandKg || null,
       date: today
     });
     setForm(f => ({
@@ -3133,8 +3103,7 @@ function LogTab({
       force: "",
       bandLength: "",
       bandStrength: "",
-      bandUsage: "resisted",
-      bandLoadKg: ""
+      bandUsage: "resisted"
     }));
     setShowBand(false);
     setSaved(true);
@@ -3846,10 +3815,7 @@ function LogTab({
                 t: "Strength"
               }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
                 value: form.bandStrength,
-                onChange: e => {
-                  upd("bandStrength", e.target.value);
-                  upd("bandLoadKg", "");
-                },
+                onChange: e => upd("bandStrength", e.target.value),
                 style: ss,
                 children: [/*#__PURE__*/_jsxDEV("option", {
                   value: "",
@@ -3858,34 +3824,6 @@ function LogTab({
                   value: v,
                   children: v
                 }, v, false))]
-              }, void 0, true)]
-            }, void 0, true)]
-          }, void 0, true), form.bandStrength && /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              marginBottom: 10
-            },
-            children: [/*#__PURE__*/_jsxDEV(Lbl, {
-              t: `Band load (kg) — ${BAND_RANGES[form.bandStrength][0]}–${BAND_RANGES[form.bandStrength][1]}kg range`
-            }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
-              value: form.bandLoadKg,
-              onChange: e => upd("bandLoadKg", e.target.value),
-              style: ss,
-              children: [/*#__PURE__*/_jsxDEV("option", {
-                value: "",
-                children: "Select…"
-              }, void 0, false), bandRangeOptions(form.bandStrength).map(v => /*#__PURE__*/_jsxDEV("option", {
-                value: v,
-                children: [v, " kg"]
-              }, v, true))]
-            }, void 0, true), form.bandLoadKg && /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontSize: 11,
-                color: C.warn,
-                marginTop: 6,
-                fontWeight: 600
-              },
-              children: [form.load || 0, "kg plate ", form.bandUsage === "assisted" ? "−" : "+", " ", form.bandLoadKg, "kg band", " = ", /*#__PURE__*/_jsxDEV("strong", {
-                children: [Math.max(0, (form.load ? +form.load : 0) + (form.bandUsage === "assisted" ? -+form.bandLoadKg : +form.bandLoadKg)), "kg effective load"]
               }, void 0, true)]
             }, void 0, true)]
           }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
@@ -4250,12 +4188,12 @@ function LogTab({
           }, void 0, true)]
         }, void 0, true);
       })(), vol > 0 && (() => {
-        const oneRM = est1RM(effLoadLive, +form.reps);
+        const oneRM = est1RM(+form.load, +form.reps);
         // velocity: measured > derived from conSecs > estimated from load/1RM
         // Velocity: measured > from rep time > estimated
         const velFromRepT = form.repTime ? +(0.45 / +form.repTime).toFixed(2) : null;
-        const vel = form.velocity ? +form.velocity : velFromRepT ? velFromRepT : estVelocity(effLoadLive, oneRM);
-        const power = calcPower(effLoadLive, vel);
+        const vel = form.velocity ? +form.velocity : velFromRepT ? velFromRepT : estVelocity(+form.load, oneRM);
+        const power = calcPower(+form.load, vel);
         const velLabel = form.velocity ? "m/s (measured)" : velFromRepT ? "m/s (from rep time)" : "m/s (estimated)";
         // TUT from effective tempo (session override > prescribed default)
         const exDef2 = program?.exercises.find(e => e.name === activeEx);
@@ -4529,7 +4467,7 @@ function LogTab({
                 fontSize: 12,
                 color: C.warn
               },
-              children: [" · 🔴 ", e.bandLength, " ", e.bandStrength, " ", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", "(", e.bandUsage, ")"]
+              children: [" · 🔴 ", e.bandLength, " ", e.bandStrength, " (", e.bandUsage, ")"]
             }, void 0, true), /*#__PURE__*/_jsxDEV("span", {
               style: {
                 fontSize: 12,
@@ -7278,7 +7216,6 @@ function App() {
     setNo,
     type,
     load,
-    rawLoad,
     rir,
     rpe,
     velocity,
@@ -7292,7 +7229,6 @@ function App() {
     bandLength,
     bandStrength,
     bandUsage,
-    bandLoadKg,
     date
   }) => {
     if (!activeProgram) return;
@@ -7302,7 +7238,6 @@ function App() {
       set: setNo,
       type,
       load,
-      rawLoad,
       rir,
       rpe,
       velocity,
@@ -7315,8 +7250,7 @@ function App() {
       force,
       bandLength,
       bandStrength,
-      bandUsage,
-      bandLoadKg
+      bandUsage
     };
     updClient(activeClientId, c => ({
       ...c,
