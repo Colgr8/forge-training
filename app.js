@@ -1,4 +1,3 @@
-import { jsxDEV as _jsxDEV, Fragment as _Fragment } from "react/jsx-dev-runtime";
 function lsGet(key, fallback) {
   try {
     const v = localStorage.getItem(key);
@@ -197,6 +196,23 @@ const avCol = idx => AV_COLS[idx % AV_COLS.length];
 const isIsoType = t => ["Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Yielding Iso-Holds", "Yielding Iso-GPP"].includes(t);
 const isOvrcIso = t => t === "Ovrc Iso-Ballistic" || t === "Ovrc Iso-Max";
 const isYieldIso = t => t === "Yielding Iso-Holds" || t === "Yielding Iso-GPP";
+
+// Band strength → kg load ranges (increments of 1kg)
+const BAND_RANGES = {
+  "Extra Light": [1, 2],
+  "Light": [2, 5],
+  "Medium": [6, 10],
+  "Heavy": [11, 20],
+  "Extra Heavy": [21, 35]
+};
+const bandRangeOptions = strength => {
+  const r = BAND_RANGES[strength];
+  if (!r) return [];
+  const [lo, hi] = r;
+  return Array.from({
+    length: hi - lo + 1
+  }, (_, i) => lo + i);
+};
 const ISO_META = {
   "Ovrc Iso-Ballistic": {
     color: "#FF5060",
@@ -251,24 +267,21 @@ function SessionXTick({
   dateMap
 }) {
   const date = dateMap?.[payload?.value] || "";
-  return /*#__PURE__*/_jsxDEV("g", {
-    transform: `translate(${x},${y})`,
-    children: [/*#__PURE__*/_jsxDEV("text", {
-      textAnchor: "middle",
-      fill: C.muted,
-      fontSize: 10,
-      dy: 12,
-      fontFamily: "inherit",
-      children: payload?.value
-    }, void 0, false), date && /*#__PURE__*/_jsxDEV("text", {
-      textAnchor: "middle",
-      fill: C.muted,
-      fontSize: 8,
-      dy: 23,
-      fontFamily: "inherit",
-      children: date
-    }, void 0, false)]
-  }, void 0, true);
+  return /*#__PURE__*/React.createElement("g", {
+    transform: `translate(${x},${y})`
+  }, /*#__PURE__*/React.createElement("text", {
+    textAnchor: "middle",
+    fill: C.muted,
+    fontSize: 10,
+    dy: 12,
+    fontFamily: "inherit"
+  }, payload?.value), date && /*#__PURE__*/React.createElement("text", {
+    textAnchor: "middle",
+    fill: C.muted,
+    fontSize: 8,
+    dy: 23,
+    fontFamily: "inherit"
+  }, date));
 }
 const CATEGORIES = ["Strength", "Power", "Stability", "Mobility"];
 const PROG_TYPES = ["General Strength", "Hypertrophy", "Endurance Strength", "Max Strength", "Power", "Muscular Endurance", "Hybrid"];
@@ -590,7 +603,7 @@ const ss = {
 };
 const Lbl = ({
   t
-}) => /*#__PURE__*/_jsxDEV("div", {
+}) => /*#__PURE__*/React.createElement("div", {
   style: {
     fontSize: 10,
     color: C.muted,
@@ -598,12 +611,11 @@ const Lbl = ({
     textTransform: "uppercase",
     marginBottom: 5,
     fontWeight: 700
-  },
-  children: t
-}, void 0, false);
+  }
+}, t);
 const SecLabel = ({
   text
-}) => /*#__PURE__*/_jsxDEV("div", {
+}) => /*#__PURE__*/React.createElement("div", {
   style: {
     fontSize: 10,
     color: C.muted,
@@ -611,14 +623,13 @@ const SecLabel = ({
     textTransform: "uppercase",
     marginBottom: 10,
     fontWeight: 700
-  },
-  children: text
-}, void 0, false);
+  }
+}, text);
 function Tag({
   text,
   color = C.accent
 }) {
-  return /*#__PURE__*/_jsxDEV("span", {
+  return /*#__PURE__*/React.createElement("span", {
     style: {
       background: color + "22",
       color,
@@ -629,9 +640,8 @@ function Tag({
       fontWeight: 700,
       letterSpacing: 0.4,
       whiteSpace: "nowrap"
-    },
-    children: text
-  }, void 0, false);
+    }
+  }, text);
 }
 function StatCard({
   label,
@@ -639,41 +649,37 @@ function StatCard({
   unit,
   color = C.accent
 }) {
-  return /*#__PURE__*/_jsxDEV("div", {
+  return /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card2,
       borderRadius: 10,
       padding: "10px 12px",
       flex: 1
-    },
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        fontSize: 10,
-        color: C.muted,
-        letterSpacing: 1.5,
-        textTransform: "uppercase",
-        marginBottom: 3,
-        fontWeight: 700
-      },
-      children: label
-    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        fontFamily: "'Bebas Neue',cursive",
-        fontSize: 26,
-        lineHeight: 1,
-        color,
-        letterSpacing: 1
-      },
-      children: [value, /*#__PURE__*/_jsxDEV("span", {
-        style: {
-          fontSize: 12,
-          marginLeft: 2,
-          opacity: 0.7
-        },
-        children: unit
-      }, void 0, false)]
-    }, void 0, true)]
-  }, void 0, true);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      marginBottom: 3,
+      fontWeight: 700
+    }
+  }, label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 26,
+      lineHeight: 1,
+      color,
+      letterSpacing: 1
+    }
+  }, value, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      marginLeft: 2,
+      opacity: 0.7
+    }
+  }, unit)));
 }
 function Avatar({
   name,
@@ -681,7 +687,7 @@ function Avatar({
   size = 44
 }) {
   const col = avCol(idx);
-  return /*#__PURE__*/_jsxDEV("div", {
+  return /*#__PURE__*/React.createElement("div", {
     style: {
       width: size,
       height: size,
@@ -696,9 +702,8 @@ function Avatar({
       letterSpacing: 1,
       color: col,
       flexShrink: 0
-    },
-    children: initials(name)
-  }, void 0, false);
+    }
+  }, initials(name));
 }
 
 // ─── AddableSelect ────────────────────────────────────────────────────────────
@@ -721,77 +726,71 @@ function AddableSelect({
     setAdding(false);
   };
   if (adding) {
-    return /*#__PURE__*/_jsxDEV("div", {
+    return /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 6
-      },
-      children: [/*#__PURE__*/_jsxDEV("input", {
-        autoFocus: true,
-        value: draft,
-        onChange: e => setDraft(e.target.value),
-        onKeyDown: e => {
-          if (e.key === "Enter") confirm();
-          if (e.key === "Escape") {
-            setAdding(false);
-            setDraft("");
-          }
-        },
-        placeholder: "Type & press Enter",
-        style: {
-          ...ss,
-          flex: 1
-        }
-      }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-        onClick: confirm,
-        style: {
-          background: C.accent,
-          color: "#001A12",
-          border: "none",
-          borderRadius: 8,
-          padding: "0 14px",
-          cursor: "pointer",
-          fontWeight: 700,
-          fontSize: 13,
-          flexShrink: 0
-        },
-        children: "Add"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-        onClick: () => {
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      autoFocus: true,
+      value: draft,
+      onChange: e => setDraft(e.target.value),
+      onKeyDown: e => {
+        if (e.key === "Enter") confirm();
+        if (e.key === "Escape") {
           setAdding(false);
           setDraft("");
-        },
-        style: {
-          background: "none",
-          color: C.sub,
-          border: `1px solid ${C.border}`,
-          borderRadius: 8,
-          padding: "0 10px",
-          cursor: "pointer",
-          fontSize: 16,
-          flexShrink: 0
-        },
-        children: "✕"
-      }, void 0, false)]
-    }, void 0, true);
+        }
+      },
+      placeholder: "Type & press Enter",
+      style: {
+        ...ss,
+        flex: 1
+      }
+    }), /*#__PURE__*/React.createElement("button", {
+      onClick: confirm,
+      style: {
+        background: C.accent,
+        color: "#001A12",
+        border: "none",
+        borderRadius: 8,
+        padding: "0 14px",
+        cursor: "pointer",
+        fontWeight: 700,
+        fontSize: 13,
+        flexShrink: 0
+      }
+    }, "Add"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setAdding(false);
+        setDraft("");
+      },
+      style: {
+        background: "none",
+        color: C.sub,
+        border: `1px solid ${C.border}`,
+        borderRadius: 8,
+        padding: "0 10px",
+        cursor: "pointer",
+        fontSize: 16,
+        flexShrink: 0
+      }
+    }, "✕"));
   }
-  return /*#__PURE__*/_jsxDEV("select", {
+  return /*#__PURE__*/React.createElement("select", {
     value: value,
     onChange: e => {
       if (e.target.value === "__add__") setAdding(true);else onChange(e.target.value);
     },
-    style: ss,
-    children: [options.map(o => /*#__PURE__*/_jsxDEV("option", {
-      value: o,
-      children: o
-    }, o, false)), /*#__PURE__*/_jsxDEV("option", {
-      disabled: true,
-      children: "──────────"
-    }, void 0, false), /*#__PURE__*/_jsxDEV("option", {
-      value: "__add__",
-      children: ["＋ ", addLabel]
-    }, void 0, true)]
-  }, void 0, true);
+    style: ss
+  }, options.map(o => /*#__PURE__*/React.createElement("option", {
+    key: o,
+    value: o
+  }, o)), /*#__PURE__*/React.createElement("option", {
+    disabled: true
+  }, "──────────"), /*#__PURE__*/React.createElement("option", {
+    value: "__add__"
+  }, "＋ ", addLabel));
 }
 
 // ─── Sheet ────────────────────────────────────────────────────────────────────
@@ -801,68 +800,61 @@ function Sheet({
   onClose,
   children
 }) {
-  return /*#__PURE__*/_jsxDEV(_Fragment, {
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      onClick: onClose,
-      style: {
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.72)",
-        zIndex: 99
-      }
-    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 100,
-        background: C.card,
-        borderRadius: "20px 20px 0 0",
-        border: `1px solid ${C.border}`,
-        maxHeight: "90vh",
-        overflowY: "auto"
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "16px 18px 12px",
-          borderBottom: `1px solid ${C.border}`,
-          position: "sticky",
-          top: 0,
-          background: C.card,
-          zIndex: 1
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontFamily: "'Bebas Neue',cursive",
-            fontSize: 20,
-            letterSpacing: 2.5,
-            color: C.accent
-          },
-          children: title
-        }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-          onClick: onClose,
-          style: {
-            background: "none",
-            border: "none",
-            color: C.sub,
-            fontSize: 22,
-            cursor: "pointer",
-            padding: 4
-          },
-          children: "✕"
-        }, void 0, false)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          padding: "16px 18px 32px"
-        },
-        children: children
-      }, void 0, false)]
-    }, void 0, true)]
-  }, void 0, true);
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    onClick: onClose,
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.72)",
+      zIndex: 99
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      zIndex: 100,
+      background: C.card,
+      borderRadius: "20px 20px 0 0",
+      border: `1px solid ${C.border}`,
+      maxHeight: "90vh",
+      overflowY: "auto"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "16px 18px 12px",
+      borderBottom: `1px solid ${C.border}`,
+      position: "sticky",
+      top: 0,
+      background: C.card,
+      zIndex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      letterSpacing: 2.5,
+      color: C.accent
+    }
+  }, title), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      background: "none",
+      border: "none",
+      color: C.sub,
+      fontSize: 22,
+      cursor: "pointer",
+      padding: 4
+    }
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "16px 18px 32px"
+    }
+  }, children)));
 }
 
 // ─── Exercise Builder (shared by Add & Edit program modals) ───────────────────
@@ -915,219 +907,198 @@ function ExerciseBuilder({
     } : e));
     setEditIdx(null);
   };
-  return /*#__PURE__*/_jsxDEV(_Fragment, {
-    children: [exercises.map((ex, i) => /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        background: C.card2,
-        borderRadius: 10,
-        marginBottom: 8,
-        border: `1px solid ${C.border}`,
-        overflow: "hidden"
-      },
-      children: editIdx === i ?
-      /*#__PURE__*/
-      // ── inline edit row ──
-      _jsxDEV("div", {
-        style: {
-          padding: "10px 12px"
-        },
-        children: /*#__PURE__*/_jsxDEV(ExRowEdit, {
-          ex: ex,
-          exList: exList,
-          equipList: equipList,
-          latList: latList,
-          onAddEx: onAddEx,
-          onAddEquip: onAddEquip,
-          onAddLat: onAddLat,
-          onSave: upd => saveEdit(i, upd),
-          onCancel: () => setEditIdx(null)
-        }, void 0, false)
-      }, void 0, false) :
-      /*#__PURE__*/
-      // ── display row ──
-      _jsxDEV("div", {
-        style: {
-          display: "flex",
-          alignItems: "center",
-          padding: "10px 12px",
-          gap: 10
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 1
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 14,
-              fontWeight: 700
-            },
-            children: ex.name
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.sub,
-              marginTop: 2
-            },
-            children: [ex.eq, " · ", ex.lat, (ex.eccSecs || ex.conSecs) && /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                color: C.accent,
-                fontWeight: 700
-              },
-              children: [" · ⏱ ", ex.eccSecs || "?", "/", ex.conSecs || "?", "s"]
-            }, void 0, true)]
-          }, void 0, true)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
-          onClick: () => setEditIdx(i),
-          style: {
-            background: "none",
-            border: `1px solid ${C.border}`,
-            borderRadius: 7,
-            color: C.sub,
-            cursor: "pointer",
-            fontSize: 13,
-            padding: "5px 10px",
-            fontWeight: 600
-          },
-          children: "✎ Edit"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-          onClick: () => removeEx(i),
-          style: {
-            background: "none",
-            border: "none",
-            color: C.warn,
-            cursor: "pointer",
-            fontSize: 20,
-            padding: "4px 6px"
-          },
-          children: "✕"
-        }, void 0, false)]
-      }, void 0, true)
-    }, i, false)), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        background: C.card2,
-        borderRadius: 10,
-        padding: "12px",
-        border: `1px dashed ${C.accent + "44"}`,
-        marginTop: 4
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontSize: 11,
-          color: C.accent,
-          fontWeight: 700,
-          marginBottom: 10,
-          letterSpacing: 1
-        },
-        children: "ADD EXERCISE"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          marginBottom: 8
-        },
-        children: [/*#__PURE__*/_jsxDEV(Lbl, {
-          t: "Exercise"
-        }, void 0, false), /*#__PURE__*/_jsxDEV(AddableSelect, {
-          value: exForm.name,
-          onChange: v => updEx("name", v),
-          options: ["", ...exList].filter((v, i, a) => a.indexOf(v) === i),
-          onAddOption: onAddEx,
-          addLabel: "Add new exercise"
-        }, void 0, false)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          gap: 8,
-          marginBottom: 10
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 1
-          },
-          children: [/*#__PURE__*/_jsxDEV(Lbl, {
-            t: "Equipment"
-          }, void 0, false), /*#__PURE__*/_jsxDEV(AddableSelect, {
-            value: exForm.eq,
-            onChange: v => updEx("eq", v),
-            options: equipList,
-            onAddOption: onAddEquip,
-            addLabel: "Add equipment"
-          }, void 0, false)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 1
-          },
-          children: [/*#__PURE__*/_jsxDEV(Lbl, {
-            t: "Laterality"
-          }, void 0, false), /*#__PURE__*/_jsxDEV(AddableSelect, {
-            value: exForm.lat,
-            onChange: v => updEx("lat", v),
-            options: latList,
-            onAddOption: onAddLat,
-            addLabel: "Add laterality"
-          }, void 0, false)]
-        }, void 0, true)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          gap: 8,
-          marginBottom: 6
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 1
-          },
-          children: [/*#__PURE__*/_jsxDEV(Lbl, {
-            t: "Eccentric (s)"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-            type: "number",
-            min: "0.5",
-            step: "0.5",
-            placeholder: "e.g. 3",
-            value: exForm.eccSecs,
-            onChange: e => updEx("eccSecs", e.target.value),
-            style: ss
-          }, void 0, false)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 1
-          },
-          children: [/*#__PURE__*/_jsxDEV(Lbl, {
-            t: "Concentric (s)"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-            type: "number",
-            min: "0.5",
-            step: "0.5",
-            placeholder: "e.g. 1",
-            value: exForm.conSecs,
-            onChange: e => updEx("conSecs", e.target.value),
-            style: ss
-          }, void 0, false)]
-        }, void 0, true)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontSize: 10,
-          color: C.muted,
-          marginBottom: 10,
-          lineHeight: 1.4
-        },
-        children: "Prescribed tempo — sets the TUT target for hypertrophy. Optional."
-      }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-        onClick: addEx,
-        disabled: !exForm.name,
-        style: {
-          width: "100%",
-          background: "none",
-          border: `1px solid ${exForm.name ? C.accent : C.border}`,
-          borderRadius: 8,
-          padding: "10px",
-          color: exForm.name ? C.accent : C.muted,
-          cursor: "pointer",
-          fontSize: 13,
-          fontWeight: 700
-        },
-        children: "+ Add to program"
-      }, void 0, false)]
-    }, void 0, true)]
-  }, void 0, true);
+  return /*#__PURE__*/React.createElement(React.Fragment, null, exercises.map((ex, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      background: C.card2,
+      borderRadius: 10,
+      marginBottom: 8,
+      border: `1px solid ${C.border}`,
+      overflow: "hidden"
+    }
+  }, editIdx === i ?
+  /*#__PURE__*/
+  // ── inline edit row ──
+  React.createElement("div", {
+    style: {
+      padding: "10px 12px"
+    }
+  }, /*#__PURE__*/React.createElement(ExRowEdit, {
+    ex: ex,
+    exList: exList,
+    equipList: equipList,
+    latList: latList,
+    onAddEx: onAddEx,
+    onAddEquip: onAddEquip,
+    onAddLat: onAddLat,
+    onSave: upd => saveEdit(i, upd),
+    onCancel: () => setEditIdx(null)
+  })) :
+  /*#__PURE__*/
+  // ── display row ──
+  React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      padding: "10px 12px",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 700
+    }
+  }, ex.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub,
+      marginTop: 2
+    }
+  }, ex.eq, " · ", ex.lat, (ex.eccSecs || ex.conSecs) && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.accent,
+      fontWeight: 700
+    }
+  }, " · ⏱ ", ex.eccSecs || "?", "/", ex.conSecs || "?", "s"))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditIdx(i),
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 7,
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 13,
+      padding: "5px 10px",
+      fontWeight: 600
+    }
+  }, "✎ Edit"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => removeEx(i),
+    style: {
+      background: "none",
+      border: "none",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 20,
+      padding: "4px 6px"
+    }
+  }, "✕")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 10,
+      padding: "12px",
+      border: `1px dashed ${C.accent + "44"}`,
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.accent,
+      fontWeight: 700,
+      marginBottom: 10,
+      letterSpacing: 1
+    }
+  }, "ADD EXERCISE"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Exercise"
+  }), /*#__PURE__*/React.createElement(AddableSelect, {
+    value: exForm.name,
+    onChange: v => updEx("name", v),
+    options: ["", ...exList].filter((v, i, a) => a.indexOf(v) === i),
+    onAddOption: onAddEx,
+    addLabel: "Add new exercise"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Equipment"
+  }), /*#__PURE__*/React.createElement(AddableSelect, {
+    value: exForm.eq,
+    onChange: v => updEx("eq", v),
+    options: equipList,
+    onAddOption: onAddEquip,
+    addLabel: "Add equipment"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Laterality"
+  }), /*#__PURE__*/React.createElement(AddableSelect, {
+    value: exForm.lat,
+    onChange: v => updEx("lat", v),
+    options: latList,
+    onAddOption: onAddLat,
+    addLabel: "Add laterality"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Eccentric (s)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0.5",
+    step: "0.5",
+    placeholder: "e.g. 3",
+    value: exForm.eccSecs,
+    onChange: e => updEx("eccSecs", e.target.value),
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Concentric (s)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0.5",
+    step: "0.5",
+    placeholder: "e.g. 1",
+    value: exForm.conSecs,
+    onChange: e => updEx("conSecs", e.target.value),
+    style: ss
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 10,
+      lineHeight: 1.4
+    }
+  }, "Prescribed tempo — sets the TUT target for hypertrophy. Optional."), /*#__PURE__*/React.createElement("button", {
+    onClick: addEx,
+    disabled: !exForm.name,
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px solid ${exForm.name ? C.accent : C.border}`,
+      borderRadius: 8,
+      padding: "10px",
+      color: exForm.name ? C.accent : C.muted,
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "+ Add to program")));
 }
 
 // Inline edit form for an existing exercise row
@@ -1153,134 +1124,121 @@ function ExRowEdit({
     ...f,
     [k]: v
   }));
-  return /*#__PURE__*/_jsxDEV(_Fragment, {
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginBottom: 8
-      },
-      children: [/*#__PURE__*/_jsxDEV(Lbl, {
-        t: "Exercise"
-      }, void 0, false), /*#__PURE__*/_jsxDEV(AddableSelect, {
-        value: form.name,
-        onChange: v => upd("name", v),
-        options: ["", ...exList].filter((v, i, a) => a.indexOf(v) === i),
-        onAddOption: onAddEx,
-        addLabel: "Add new exercise"
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        marginBottom: 10
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          flex: 1
-        },
-        children: [/*#__PURE__*/_jsxDEV(Lbl, {
-          t: "Equipment"
-        }, void 0, false), /*#__PURE__*/_jsxDEV(AddableSelect, {
-          value: form.eq,
-          onChange: v => upd("eq", v),
-          options: equipList,
-          onAddOption: onAddEquip,
-          addLabel: "Add equipment"
-        }, void 0, false)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          flex: 1
-        },
-        children: [/*#__PURE__*/_jsxDEV(Lbl, {
-          t: "Laterality"
-        }, void 0, false), /*#__PURE__*/_jsxDEV(AddableSelect, {
-          value: form.lat,
-          onChange: v => upd("lat", v),
-          options: latList,
-          onAddOption: onAddLat,
-          addLabel: "Add laterality"
-        }, void 0, false)]
-      }, void 0, true)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        marginBottom: 10
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          flex: 1
-        },
-        children: [/*#__PURE__*/_jsxDEV(Lbl, {
-          t: "Eccentric (s)"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-          type: "number",
-          min: "0.5",
-          step: "0.5",
-          placeholder: "e.g. 3",
-          value: form.eccSecs,
-          onChange: e => upd("eccSecs", e.target.value),
-          style: ss
-        }, void 0, false)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          flex: 1
-        },
-        children: [/*#__PURE__*/_jsxDEV(Lbl, {
-          t: "Concentric (s)"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-          type: "number",
-          min: "0.5",
-          step: "0.5",
-          placeholder: "e.g. 1",
-          value: form.conSecs,
-          onChange: e => upd("conSecs", e.target.value),
-          style: ss
-        }, void 0, false)]
-      }, void 0, true)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        fontSize: 10,
-        color: C.muted,
-        marginBottom: 10
-      },
-      children: "Prescribed tempo for hypertrophy TUT"
-    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        display: "flex",
-        gap: 8
-      },
-      children: [/*#__PURE__*/_jsxDEV("button", {
-        onClick: onCancel,
-        style: {
-          flex: 1,
-          background: "none",
-          border: `1px solid ${C.border}`,
-          borderRadius: 8,
-          padding: "9px",
-          color: C.sub,
-          cursor: "pointer",
-          fontSize: 13,
-          fontWeight: 700
-        },
-        children: "Cancel"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-        onClick: () => onSave(form),
-        style: {
-          flex: 2,
-          background: C.blue,
-          color: "#fff",
-          border: "none",
-          borderRadius: 8,
-          padding: "9px",
-          fontFamily: "'Bebas Neue',cursive",
-          fontSize: 18,
-          letterSpacing: 2,
-          cursor: "pointer"
-        },
-        children: "SAVE"
-      }, void 0, false)]
-    }, void 0, true)]
-  }, void 0, true);
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Exercise"
+  }), /*#__PURE__*/React.createElement(AddableSelect, {
+    value: form.name,
+    onChange: v => upd("name", v),
+    options: ["", ...exList].filter((v, i, a) => a.indexOf(v) === i),
+    onAddOption: onAddEx,
+    addLabel: "Add new exercise"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Equipment"
+  }), /*#__PURE__*/React.createElement(AddableSelect, {
+    value: form.eq,
+    onChange: v => upd("eq", v),
+    options: equipList,
+    onAddOption: onAddEquip,
+    addLabel: "Add equipment"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Laterality"
+  }), /*#__PURE__*/React.createElement(AddableSelect, {
+    value: form.lat,
+    onChange: v => upd("lat", v),
+    options: latList,
+    onAddOption: onAddLat,
+    addLabel: "Add laterality"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Eccentric (s)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0.5",
+    step: "0.5",
+    placeholder: "e.g. 3",
+    value: form.eccSecs,
+    onChange: e => upd("eccSecs", e.target.value),
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Concentric (s)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0.5",
+    step: "0.5",
+    placeholder: "e.g. 1",
+    value: form.conSecs,
+    onChange: e => upd("conSecs", e.target.value),
+    style: ss
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 10
+    }
+  }, "Prescribed tempo for hypertrophy TUT"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onCancel,
+    style: {
+      flex: 1,
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "9px",
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onSave(form),
+    style: {
+      flex: 2,
+      background: C.blue,
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "9px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 18,
+      letterSpacing: 2,
+      cursor: "pointer"
+    }
+  }, "SAVE")));
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -1325,84 +1283,77 @@ function EditClientModal({
     });
     onClose();
   };
-  return /*#__PURE__*/_jsxDEV(Sheet, {
+  return /*#__PURE__*/React.createElement(Sheet, {
     title: "EDIT PROFILE",
-    onClose: onClose,
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginBottom: 12
-      },
-      children: [/*#__PURE__*/_jsxDEV(Lbl, {
-        t: "Full name"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-        value: form.name,
-        onChange: e => upd("name", e.target.value),
-        style: ss
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        display: "flex",
-        gap: 10,
-        marginBottom: 12
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          flex: 1
-        },
-        children: [/*#__PURE__*/_jsxDEV(Lbl, {
-          t: "Bodyweight (kg)"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-          type: "number",
-          value: form.bw,
-          onChange: e => upd("bw", e.target.value),
-          placeholder: "75",
-          style: ss
-        }, void 0, false)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          flex: 1
-        },
-        children: [/*#__PURE__*/_jsxDEV(Lbl, {
-          t: "Height (m)"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-          type: "number",
-          step: "0.01",
-          value: form.height,
-          onChange: e => upd("height", e.target.value),
-          placeholder: "1.70",
-          style: ss
-        }, void 0, false)]
-      }, void 0, true)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginBottom: 22
-      },
-      children: [/*#__PURE__*/_jsxDEV(Lbl, {
-        t: "Email"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-        type: "email",
-        value: form.email,
-        onChange: e => upd("email", e.target.value),
-        placeholder: "client@email.com",
-        style: ss
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
-      onClick: submit,
-      style: {
-        width: "100%",
-        background: C.accent,
-        color: "#001A12",
-        border: "none",
-        borderRadius: 10,
-        padding: "14px",
-        fontFamily: "'Bebas Neue',cursive",
-        fontSize: 20,
-        letterSpacing: 2,
-        cursor: "pointer"
-      },
-      children: "SAVE CHANGES"
-    }, void 0, false)]
-  }, void 0, true);
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Full name"
+  }), /*#__PURE__*/React.createElement("input", {
+    value: form.name,
+    onChange: e => upd("name", e.target.value),
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Bodyweight (kg)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: form.bw,
+    onChange: e => upd("bw", e.target.value),
+    placeholder: "75",
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Height (m)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    step: "0.01",
+    value: form.height,
+    onChange: e => upd("height", e.target.value),
+    placeholder: "1.70",
+    style: ss
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 22
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Email"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    value: form.email,
+    onChange: e => upd("email", e.target.value),
+    placeholder: "client@email.com",
+    style: ss
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 10,
+      padding: "14px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      letterSpacing: 2,
+      cursor: "pointer"
+    }
+  }, "SAVE CHANGES"));
 }
 
 // ─── Calendar Tab ─────────────────────────────────────────────────────────────
@@ -1464,228 +1415,209 @@ function CalendarTab({
   const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
   const selKey = selDay ? `${viewYear}-${viewMonth}-${selDay}` : null;
   const selSessions = selKey ? sessionMap[selKey] || [] : [];
-  if (!client) return /*#__PURE__*/_jsxDEV("div", {
+  if (!client) return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "48px 24px",
       textAlign: "center"
-    },
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        fontSize: 42,
-        marginBottom: 14
-      },
-      children: "📅"
-    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        color: C.sub,
-        fontSize: 14
-      },
-      children: "No client selected."
-    }, void 0, false)]
-  }, void 0, true);
-  return /*#__PURE__*/_jsxDEV("div", {
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 42,
+      marginBottom: 14
+    }
+  }, "📅"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.sub,
+      fontSize: 14
+    }
+  }, "No client selected."));
+  return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "16px 14px"
-    },
-    children: [/*#__PURE__*/_jsxDEV("div", {
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: prevMonth,
+    style: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "8px 14px",
+      color: C.text,
+      cursor: "pointer",
+      fontSize: 16
+    }
+  }, "‹"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 22,
+      letterSpacing: 2,
+      color: C.text
+    }
+  }, MONTHS_FULL[viewMonth], " ", viewYear), /*#__PURE__*/React.createElement("button", {
+    onClick: nextMonth,
+    style: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "8px 14px",
+      color: C.text,
+      cursor: "pointer",
+      fontSize: 16
+    }
+  }, "›")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(7,1fr)",
+      marginBottom: 6
+    }
+  }, ["M", "T", "W", "T", "F", "S", "S"].map((d, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      textAlign: "center",
+      fontSize: 11,
+      color: C.muted,
+      fontWeight: 700,
+      padding: "4px 0",
+      letterSpacing: 1
+    }
+  }, d))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(7,1fr)",
+      gap: 3,
+      marginBottom: 16
+    }
+  }, grid.map((day, i) => {
+    if (!day) return /*#__PURE__*/React.createElement("div", {
+      key: i
+    });
+    const key = `${viewYear}-${viewMonth}-${day}`;
+    const hasSes = !!sessionMap[key];
+    const isToday = key === todayKey;
+    const isSel = day === selDay;
+    return /*#__PURE__*/React.createElement("button", {
+      key: i,
+      onClick: () => setSelDay(isSel ? null : day),
       style: {
+        aspectRatio: "1",
+        borderRadius: 8,
+        border: `1.5px solid ${isSel ? C.accent : hasSes ? C.accent + "44" : C.border}`,
+        background: isSel ? C.accent : hasSes ? C.accent + "18" : isToday ? C.card2 : "transparent",
+        color: isSel ? "#001A12" : isToday ? C.accent : C.text,
+        fontWeight: hasSes || isToday ? 700 : 400,
+        fontSize: 13,
+        cursor: "pointer",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
-        justifyContent: "space-between",
-        marginBottom: 16
-      },
-      children: [/*#__PURE__*/_jsxDEV("button", {
-        onClick: prevMonth,
-        style: {
-          background: C.card2,
-          border: `1px solid ${C.border}`,
-          borderRadius: 8,
-          padding: "8px 14px",
-          color: C.text,
-          cursor: "pointer",
-          fontSize: 16
-        },
-        children: "‹"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontFamily: "'Bebas Neue',cursive",
-          fontSize: 22,
-          letterSpacing: 2,
-          color: C.text
-        },
-        children: [MONTHS_FULL[viewMonth], " ", viewYear]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
-        onClick: nextMonth,
-        style: {
-          background: C.card2,
-          border: `1px solid ${C.border}`,
-          borderRadius: 8,
-          padding: "8px 14px",
-          color: C.text,
-          cursor: "pointer",
-          fontSize: 16
-        },
-        children: "›"
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+        justifyContent: "center",
+        gap: 2
+      }
+    }, day, hasSes && !isSel && /*#__PURE__*/React.createElement("span", {
       style: {
-        display: "grid",
-        gridTemplateColumns: "repeat(7,1fr)",
-        marginBottom: 6
-      },
-      children: ["M", "T", "W", "T", "F", "S", "S"].map((d, i) => /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          textAlign: "center",
-          fontSize: 11,
-          color: C.muted,
-          fontWeight: 700,
-          padding: "4px 0",
-          letterSpacing: 1
-        },
-        children: d
-      }, i, false))
-    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
+        width: 5,
+        height: 5,
+        borderRadius: "50%",
+        background: isSel ? "#001A12" : C.accent,
+        display: "block"
+      }
+    }));
+  })), selDay && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(SecLabel, {
+    text: `${selDay} ${MONTHS_FULL[viewMonth]} ${viewYear}`
+  }), selSessions.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 12,
+      padding: "20px",
+      textAlign: "center",
+      border: `1px solid ${C.border}`,
+      color: C.sub,
+      fontSize: 13
+    }
+  }, "No training session on this day.") : selSessions.map((s, si) => /*#__PURE__*/React.createElement("div", {
+    key: si,
+    onClick: () => setDetailSess(s),
+    style: {
+      background: C.card,
+      borderRadius: 12,
+      padding: "14px",
+      border: `1px solid ${C.accent + "44"}`,
+      marginBottom: 10,
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, s.programName), /*#__PURE__*/React.createElement(Tag, {
+    text: `${s.entries.length} sets`,
+    color: C.blue
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub
+    }
+  }, [...new Set(s.entries.map(e => e.ex))].join(" · ")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.accent,
+      marginTop: 6,
+      fontWeight: 700
+    }
+  }, "Tap to view full session →"))), detailSess && /*#__PURE__*/React.createElement(SessionDetailSheet, {
+    session: detailSess,
+    onClose: () => setDetailSess(null),
+    onDelete: s => onDeleteSession(s.programId, s.id)
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 12,
+      padding: "12px 16px",
+      border: `1px solid ${C.border}`,
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      marginBottom: 6,
+      fontWeight: 700
+    }
+  }, "This month"), (() => {
+    const count = Object.keys(sessionMap).filter(k => {
+      const [y, m] = k.split("-").map(Number);
+      return y === viewYear && m === viewMonth;
+    }).length;
+    return /*#__PURE__*/React.createElement("div", {
       style: {
-        display: "grid",
-        gridTemplateColumns: "repeat(7,1fr)",
-        gap: 3,
-        marginBottom: 16
-      },
-      children: grid.map((day, i) => {
-        if (!day) return /*#__PURE__*/_jsxDEV("div", {}, i, false);
-        const key = `${viewYear}-${viewMonth}-${day}`;
-        const hasSes = !!sessionMap[key];
-        const isToday = key === todayKey;
-        const isSel = day === selDay;
-        return /*#__PURE__*/_jsxDEV("button", {
-          onClick: () => setSelDay(isSel ? null : day),
-          style: {
-            aspectRatio: "1",
-            borderRadius: 8,
-            border: `1.5px solid ${isSel ? C.accent : hasSes ? C.accent + "44" : C.border}`,
-            background: isSel ? C.accent : hasSes ? C.accent + "18" : isToday ? C.card2 : "transparent",
-            color: isSel ? "#001A12" : isToday ? C.accent : C.text,
-            fontWeight: hasSes || isToday ? 700 : 400,
-            fontSize: 13,
-            cursor: "pointer",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 2
-          },
-          children: [day, hasSes && !isSel && /*#__PURE__*/_jsxDEV("span", {
-            style: {
-              width: 5,
-              height: 5,
-              borderRadius: "50%",
-              background: isSel ? "#001A12" : C.accent,
-              display: "block"
-            }
-          }, void 0, false)]
-        }, i, true);
-      })
-    }, void 0, false), selDay && /*#__PURE__*/_jsxDEV("div", {
-      children: [/*#__PURE__*/_jsxDEV(SecLabel, {
-        text: `${selDay} ${MONTHS_FULL[viewMonth]} ${viewYear}`
-      }, void 0, false), selSessions.length === 0 ? /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.card,
-          borderRadius: 12,
-          padding: "20px",
-          textAlign: "center",
-          border: `1px solid ${C.border}`,
-          color: C.sub,
-          fontSize: 13
-        },
-        children: "No training session on this day."
-      }, void 0, false) : selSessions.map((s, si) => /*#__PURE__*/_jsxDEV("div", {
-        onClick: () => setDetailSess(s),
-        style: {
-          background: C.card,
-          borderRadius: 12,
-          padding: "14px",
-          border: `1px solid ${C.accent + "44"}`,
-          marginBottom: 10,
-          cursor: "pointer"
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 6
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontWeight: 700,
-              fontSize: 14
-            },
-            children: s.programName
-          }, void 0, false), /*#__PURE__*/_jsxDEV(Tag, {
-            text: `${s.entries.length} sets`,
-            color: C.blue
-          }, void 0, false)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 12,
-            color: C.sub
-          },
-          children: [...new Set(s.entries.map(e => e.ex))].join(" · ")
-        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 11,
-            color: C.accent,
-            marginTop: 6,
-            fontWeight: 700
-          },
-          children: "Tap to view full session →"
-        }, void 0, false)]
-      }, si, true)), detailSess && /*#__PURE__*/_jsxDEV(SessionDetailSheet, {
-        session: detailSess,
-        onClose: () => setDetailSess(null),
-        onDelete: s => onDeleteSession(s.programId, s.id)
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: 28,
+        color: C.accent
+      }
+    }, count, " ", /*#__PURE__*/React.createElement("span", {
       style: {
-        background: C.card2,
-        borderRadius: 12,
-        padding: "12px 16px",
-        border: `1px solid ${C.border}`,
-        marginTop: 8
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontSize: 11,
-          color: C.muted,
-          letterSpacing: 1.5,
-          textTransform: "uppercase",
-          marginBottom: 6,
-          fontWeight: 700
-        },
-        children: "This month"
-      }, void 0, false), (() => {
-        const count = Object.keys(sessionMap).filter(k => {
-          const [y, m] = k.split("-").map(Number);
-          return y === viewYear && m === viewMonth;
-        }).length;
-        return /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontFamily: "'Bebas Neue',cursive",
-            fontSize: 28,
-            color: C.accent
-          },
-          children: [count, " ", /*#__PURE__*/_jsxDEV("span", {
-            style: {
-              fontSize: 14,
-              opacity: 0.7
-            },
-            children: ["session", count !== 1 ? "s" : "", " logged"]
-          }, void 0, true)]
-        }, void 0, true);
-      })()]
-    }, void 0, true)]
-  }, void 0, true);
+        fontSize: 14,
+        opacity: 0.7
+      }
+    }, "session", count !== 1 ? "s" : "", " logged"));
+  })()));
 }
 
 // ─── Data Sync Sheet ──────────────────────────────────────────────────────────
@@ -1734,147 +1666,133 @@ function DataSyncSheet({
     };
     reader.readAsText(file);
   };
-  return /*#__PURE__*/_jsxDEV(Sheet, {
+  return /*#__PURE__*/React.createElement(Sheet, {
     title: "DATA & SYNC",
-    onClose: onClose,
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        fontSize: 13,
-        color: C.sub,
-        marginBottom: 20,
-        lineHeight: 1.6
-      },
-      children: "To sync between your phone and tablet: export on one device, transfer the file, then import on the other."
-    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        background: C.card2,
-        borderRadius: 12,
-        padding: "16px",
-        marginBottom: 12,
-        border: `1px solid ${C.border}`
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontWeight: 700,
-          fontSize: 14,
-          marginBottom: 4
-        },
-        children: "📤 Export Backup"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontSize: 12,
-          color: C.sub,
-          marginBottom: 12
-        },
-        children: "Downloads all your clients, programs and session data as a JSON file."
-      }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-        onClick: exportData,
-        style: {
-          width: "100%",
-          background: C.accent,
-          color: "#001A12",
-          border: "none",
-          borderRadius: 10,
-          padding: "13px",
-          fontFamily: "'Bebas Neue',cursive",
-          fontSize: 18,
-          letterSpacing: 2,
-          cursor: "pointer"
-        },
-        children: "EXPORT DATA"
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        background: C.card2,
-        borderRadius: 12,
-        padding: "16px",
-        border: `1px solid ${C.border}`
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontWeight: 700,
-          fontSize: 14,
-          marginBottom: 4
-        },
-        children: "📥 Import Backup"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontSize: 12,
-          color: C.sub,
-          marginBottom: 12
-        },
-        children: "Loads a previously exported backup file. This will replace all current data."
-      }, void 0, false), imported ? /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.accent + "22",
-          border: `1px solid ${C.accent}44`,
-          borderRadius: 8,
-          padding: "12px",
-          textAlign: "center",
-          color: C.accent,
-          fontWeight: 700,
-          fontSize: 14
-        },
-        children: "✓ Data imported successfully!"
-      }, void 0, false) : /*#__PURE__*/_jsxDEV("label", {
-        style: {
-          display: "block",
-          width: "100%",
-          background: C.card,
-          border: `1.5px dashed ${C.border}`,
-          borderRadius: 10,
-          padding: "14px",
-          textAlign: "center",
-          cursor: "pointer",
-          color: C.sub,
-          fontSize: 13,
-          fontWeight: 700
-        },
-        children: ["📁 Choose backup file", /*#__PURE__*/_jsxDEV("input", {
-          type: "file",
-          accept: ".json",
-          onChange: handleFile,
-          style: {
-            display: "none"
-          }
-        }, void 0, false)]
-      }, void 0, true), error && /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          color: C.warn,
-          fontSize: 12,
-          marginTop: 8,
-          textAlign: "center"
-        },
-        children: error
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginTop: 16,
-        padding: "12px 14px",
-        background: C.card2,
-        borderRadius: 10,
-        border: `1px solid ${C.border}`
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontSize: 11,
-          color: C.muted,
-          fontWeight: 700,
-          letterSpacing: 1,
-          textTransform: "uppercase",
-          marginBottom: 6
-        },
-        children: "Sync steps"
-      }, void 0, false), ["1. Tap Export on Device A — saves a .json file", "2. Send the file to Device B (email, WhatsApp, etc.)", "3. Open Forge Training on Device B", "4. Tap Import and choose the file"].map((s, i) => /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontSize: 12,
-          color: C.sub,
-          marginBottom: 4
-        },
-        children: s
-      }, i, false))]
-    }, void 0, true)]
-  }, void 0, true);
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: C.sub,
+      marginBottom: 20,
+      lineHeight: 1.6
+    }
+  }, "To sync between your phone and tablet: export on one device, transfer the file, then import on the other."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 12,
+      padding: "16px",
+      marginBottom: 12,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      marginBottom: 4
+    }
+  }, "📤 Export Backup"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      marginBottom: 12
+    }
+  }, "Downloads all your clients, programs and session data as a JSON file."), /*#__PURE__*/React.createElement("button", {
+    onClick: exportData,
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 10,
+      padding: "13px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 18,
+      letterSpacing: 2,
+      cursor: "pointer"
+    }
+  }, "EXPORT DATA")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 12,
+      padding: "16px",
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      marginBottom: 4
+    }
+  }, "📥 Import Backup"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      marginBottom: 12
+    }
+  }, "Loads a previously exported backup file. This will replace all current data."), imported ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.accent + "22",
+      border: `1px solid ${C.accent}44`,
+      borderRadius: 8,
+      padding: "12px",
+      textAlign: "center",
+      color: C.accent,
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, "✓ Data imported successfully!") : /*#__PURE__*/React.createElement("label", {
+    style: {
+      display: "block",
+      width: "100%",
+      background: C.card,
+      border: `1.5px dashed ${C.border}`,
+      borderRadius: 10,
+      padding: "14px",
+      textAlign: "center",
+      cursor: "pointer",
+      color: C.sub,
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "📁 Choose backup file", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".json",
+    onChange: handleFile,
+    style: {
+      display: "none"
+    }
+  })), error && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.warn,
+      fontSize: 12,
+      marginTop: 8,
+      textAlign: "center"
+    }
+  }, error)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16,
+      padding: "12px 14px",
+      background: C.card2,
+      borderRadius: 10,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 6
+    }
+  }, "Sync steps"), ["1. Tap Export on Device A — saves a .json file", "2. Send the file to Device B (email, WhatsApp, etc.)", "3. Open Forge Training on Device B", "4. Tap Import and choose the file"].map((s, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      marginBottom: 4
+    }
+  }, s))));
 }
 
 // ─── Session Detail Sheet ─────────────────────────────────────────────────────
@@ -1892,202 +1810,180 @@ function SessionDetailSheet({
   }, {});
   const totalVol = session.entries.reduce((s, e) => s + (e.load * e.reps || 0), 0);
   const avgRPE = session.entries.length ? (session.entries.reduce((s, e) => s + (e.rpe || 0), 0) / session.entries.length).toFixed(1) : "–";
-  return /*#__PURE__*/_jsxDEV(Sheet, {
+  return /*#__PURE__*/React.createElement(Sheet, {
     title: `SESSION · ${session.date}`,
-    onClose: onClose,
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        marginBottom: 16
-      },
-      children: [/*#__PURE__*/_jsxDEV(StatCard, {
-        label: "Total Volume",
-        value: totalVol,
-        unit: " kg",
-        color: C.blue
-      }, void 0, false), /*#__PURE__*/_jsxDEV(StatCard, {
-        label: "Avg RPE",
-        value: avgRPE,
-        unit: "",
-        color: C.warn
-      }, void 0, false)]
-    }, void 0, true), Object.entries(exGroups).map(([exName, entries]) => /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        background: C.card2,
-        borderRadius: 12,
-        padding: "12px 14px",
-        marginBottom: 10,
-        border: `1px solid ${C.border}`
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontWeight: 700,
-          fontSize: 14,
-          marginBottom: 8,
-          color: C.accent
-        },
-        children: exName
-      }, void 0, false), entries.map((e, i) => /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "6px 0",
-          borderBottom: i < entries.length - 1 ? `1px solid ${C.border}` : "none"
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 13
-          },
-          children: [/*#__PURE__*/_jsxDEV("span", {
-            style: {
-              color: C.muted,
-              fontSize: 11,
-              marginRight: 6
-            },
-            children: ["Set ", e.set]
-          }, void 0, true), e.reps, " reps · ", e.type, /*#__PURE__*/_jsxDEV("span", {
-            style: {
-              color: C.sub,
-              fontSize: 11
-            },
-            children: [" · RPE ", e.rpe, " · RIR ", e.rir]
-          }, void 0, true)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            textAlign: "right",
-            flexShrink: 0
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontFamily: "'Bebas Neue',cursive",
-              fontSize: 20,
-              color: C.accent,
-              lineHeight: 1
-            },
-            children: [e.load, /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 11,
-                opacity: 0.6
-              },
-              children: " kg"
-            }, void 0, false)]
-          }, void 0, true), e.power && /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.gold
-            },
-            children: [e.power, " W"]
-          }, void 0, true), e.repTime && /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: "#AA44FF"
-            },
-            children: [e.repTime, "s/rep"]
-          }, void 0, true), e.holdDuration && /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: "#5060FF"
-            },
-            children: ["⏱ ", e.holdDuration, "s hold"]
-          }, void 0, true), e.mvic && /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: "#5060FF"
-            },
-            children: [e.mvic, "% MVIC"]
-          }, void 0, true), e.force && /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.gold
-            },
-            children: ["⚡ ", e.force, " N (", (e.force / 9.81).toFixed(1), " kgf)"]
-          }, void 0, true), e.bandStrength && /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.warn
-            },
-            children: ["🔴 ", e.bandLength, " ", e.bandStrength, " band — ", e.bandUsage]
-          }, void 0, true)]
-        }, void 0, true)]
-      }, i, true))]
-    }, exName, true)), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginTop: 18,
-        paddingTop: 14,
-        borderTop: `1px solid ${C.border}`
-      },
-      children: !confirmDel ? /*#__PURE__*/_jsxDEV("button", {
-        onClick: () => setConfirmDel(true),
-        style: {
-          width: "100%",
-          background: "none",
-          border: `1px solid ${C.warn}55`,
-          borderRadius: 10,
-          padding: "12px",
-          color: C.warn,
-          cursor: "pointer",
-          fontSize: 13,
-          fontWeight: 700
-        },
-        children: "🗑 Delete this session"
-      }, void 0, false) : /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.warn + "15",
-          border: `1px solid ${C.warn}55`,
-          borderRadius: 10,
-          padding: "14px"
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 13,
-            color: C.text,
-            marginBottom: 12,
-            lineHeight: 1.5
-          },
-          children: "Delete this session permanently? This cannot be undone."
-        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            gap: 8
-          },
-          children: [/*#__PURE__*/_jsxDEV("button", {
-            onClick: () => setConfirmDel(false),
-            style: {
-              flex: 1,
-              background: "none",
-              border: `1px solid ${C.border}`,
-              borderRadius: 8,
-              padding: "10px",
-              color: C.sub,
-              cursor: "pointer",
-              fontSize: 13,
-              fontWeight: 700
-            },
-            children: "Cancel"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-            onClick: () => {
-              onDelete(session);
-              onClose();
-            },
-            style: {
-              flex: 1,
-              background: C.warn,
-              border: "none",
-              borderRadius: 8,
-              padding: "10px",
-              color: "#fff",
-              cursor: "pointer",
-              fontSize: 13,
-              fontWeight: 700
-            },
-            children: "Delete"
-          }, void 0, false)]
-        }, void 0, true)]
-      }, void 0, true)
-    }, void 0, false)]
-  }, void 0, true);
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement(StatCard, {
+    label: "Total Volume",
+    value: totalVol,
+    unit: " kg",
+    color: C.blue
+  }), /*#__PURE__*/React.createElement(StatCard, {
+    label: "Avg RPE",
+    value: avgRPE,
+    unit: "",
+    color: C.warn
+  })), Object.entries(exGroups).map(([exName, entries]) => /*#__PURE__*/React.createElement("div", {
+    key: exName,
+    style: {
+      background: C.card2,
+      borderRadius: 12,
+      padding: "12px 14px",
+      marginBottom: 10,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      marginBottom: 8,
+      color: C.accent
+    }
+  }, exName), entries.map((e, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "6px 0",
+      borderBottom: i < entries.length - 1 ? `1px solid ${C.border}` : "none"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.muted,
+      fontSize: 11,
+      marginRight: 6
+    }
+  }, "Set ", e.set), e.reps, " reps · ", e.type, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.sub,
+      fontSize: 11
+    }
+  }, " · RPE ", e.rpe, " · RIR ", e.rir)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "right",
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      color: C.accent,
+      lineHeight: 1
+    }
+  }, e.load, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      opacity: 0.6
+    }
+  }, " kg")), e.power && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.gold
+    }
+  }, e.power, " W"), e.repTime && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#AA44FF"
+    }
+  }, e.repTime, "s/rep"), e.holdDuration && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#5060FF"
+    }
+  }, "⏱ ", e.holdDuration, "s hold"), e.mvic && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#5060FF"
+    }
+  }, e.mvic, "% MVIC"), e.force && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.gold
+    }
+  }, "⚡ ", e.force, " N (", (e.force / 9.81).toFixed(1), " kgf)"), e.bandStrength && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.warn
+    }
+  }, "🔴 ", e.bandLength, " ", e.bandStrength, " (", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", e.bandUsage, ")", e.rawLoad != null && e.bandLoadKg ? ` — ${e.rawLoad}kg plate ${e.bandUsage === "assisted" ? "−" : "+"} ${e.bandLoadKg}kg band = ${e.load}kg effective` : "")))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 18,
+      paddingTop: 14,
+      borderTop: `1px solid ${C.border}`
+    }
+  }, !confirmDel ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmDel(true),
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px solid ${C.warn}55`,
+      borderRadius: 10,
+      padding: "12px",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "🗑 Delete this session") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.warn + "15",
+      border: `1px solid ${C.warn}55`,
+      borderRadius: 10,
+      padding: "14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: C.text,
+      marginBottom: 12,
+      lineHeight: 1.5
+    }
+  }, "Delete this session permanently? This cannot be undone."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmDel(false),
+    style: {
+      flex: 1,
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "10px",
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      onDelete(session);
+      onClose();
+    },
+    style: {
+      flex: 1,
+      background: C.warn,
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      color: "#fff",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "Delete")))));
 }
 
 // ─── Client Switcher ──────────────────────────────────────────────────────────
@@ -2105,191 +2001,173 @@ function ClientSwitcher({
   const [showArchived, setShowArchived] = useState(false);
   const active = clients.filter(c => !c.archived);
   const archived = clients.filter(c => c.archived);
-  return /*#__PURE__*/_jsxDEV(Sheet, {
+  return /*#__PURE__*/React.createElement(Sheet, {
     title: "CLIENTS",
-    onClose: onClose,
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginBottom: 10
-      },
-      children: active.map((c, i) => /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: c.id === activeId ? C.accent + "18" : C.card2,
-          borderRadius: 14,
-          border: `1.5px solid ${c.id === activeId ? C.accent + "66" : C.border}`,
-          marginBottom: 8,
-          overflow: "hidden"
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          onClick: () => {
-            onSwitch(c.id);
-            onClose();
-          },
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-            padding: "12px 14px",
-            cursor: "pointer"
-          },
-          children: [/*#__PURE__*/_jsxDEV(Avatar, {
-            name: c.name,
-            idx: clients.indexOf(c),
-            size: 46
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              flex: 1
-            },
-            children: [/*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontWeight: 700,
-                fontSize: 15
-              },
-              children: c.name
-            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontSize: 12,
-                color: C.sub,
-                marginTop: 2
-              },
-              children: [c.programs.length, " program", c.programs.length !== 1 ? "s" : "", c.bw ? ` · ${c.bw} kg` : ""]
-            }, void 0, true)]
-          }, void 0, true), c.id === activeId && /*#__PURE__*/_jsxDEV("span", {
-            style: {
-              color: C.accent,
-              fontSize: 20,
-              fontWeight: 700
-            },
-            children: "✓"
-          }, void 0, false)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            borderTop: `1px solid ${C.border}`
-          },
-          children: [/*#__PURE__*/_jsxDEV("button", {
-            onClick: e => {
-              e.stopPropagation();
-              onEditClient(c);
-              onClose();
-            },
-            style: {
-              flex: 1,
-              background: "none",
-              border: "none",
-              borderRight: `1px solid ${C.border}`,
-              padding: "8px",
-              color: C.sub,
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 700
-            },
-            children: "✎ Edit Profile"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-            onClick: e => {
-              e.stopPropagation();
-              onArchive(c.id);
-              if (c.id === activeId) onClose();
-            },
-            style: {
-              flex: 1,
-              background: "none",
-              border: "none",
-              padding: "8px",
-              color: C.warn,
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 700
-            },
-            children: "📦 Archive"
-          }, void 0, false)]
-        }, void 0, true)]
-      }, c.id, true))
-    }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-      onClick: onAddClient,
-      style: {
-        width: "100%",
-        background: "none",
-        border: `1px dashed ${C.accent + "55"}`,
-        borderRadius: 12,
-        padding: "12px",
-        color: C.accent,
-        cursor: "pointer",
-        fontSize: 14,
-        fontWeight: 700,
-        marginBottom: 10
-      },
-      children: "+ Add New Client"
-    }, void 0, false), archived.length > 0 && /*#__PURE__*/_jsxDEV(_Fragment, {
-      children: [/*#__PURE__*/_jsxDEV("button", {
-        onClick: () => setShowArchived(s => !s),
-        style: {
-          width: "100%",
-          background: "none",
-          border: `1px solid ${C.border}`,
-          borderRadius: 10,
-          padding: "10px",
-          color: C.muted,
-          cursor: "pointer",
-          fontSize: 12,
-          fontWeight: 700,
-          marginBottom: 8
-        },
-        children: [showArchived ? "▲" : "▼", " Archived clients (", archived.length, ")"]
-      }, void 0, true), showArchived && archived.map((c, i) => /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "10px 14px",
-          background: C.card2,
-          borderRadius: 12,
-          border: `1px solid ${C.border}`,
-          marginBottom: 6,
-          opacity: 0.7
-        },
-        children: [/*#__PURE__*/_jsxDEV(Avatar, {
-          name: c.name,
-          idx: clients.indexOf(c),
-          size: 38
-        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 1
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontWeight: 700,
-              fontSize: 14
-            },
-            children: c.name
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.sub
-            },
-            children: "Archived"
-          }, void 0, false)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
-          onClick: () => {
-            onReinstate(c.id);
-            onSwitch(c.id);
-            onClose();
-          },
-          style: {
-            background: C.accent + "22",
-            border: `1px solid ${C.accent}44`,
-            borderRadius: 8,
-            padding: "6px 12px",
-            color: C.accent,
-            cursor: "pointer",
-            fontSize: 12,
-            fontWeight: 700
-          },
-          children: "Reinstate"
-        }, void 0, false)]
-      }, c.id, true))]
-    }, void 0, true)]
-  }, void 0, true);
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, active.map((c, i) => /*#__PURE__*/React.createElement("div", {
+    key: c.id,
+    style: {
+      background: c.id === activeId ? C.accent + "18" : C.card2,
+      borderRadius: 14,
+      border: `1.5px solid ${c.id === activeId ? C.accent + "66" : C.border}`,
+      marginBottom: 8,
+      overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: () => {
+      onSwitch(c.id);
+      onClose();
+    },
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 14,
+      padding: "12px 14px",
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement(Avatar, {
+    name: c.name,
+    idx: clients.indexOf(c),
+    size: 46
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 15
+    }
+  }, c.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      marginTop: 2
+    }
+  }, c.programs.length, " program", c.programs.length !== 1 ? "s" : "", c.bw ? ` · ${c.bw} kg` : "")), c.id === activeId && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.accent,
+      fontSize: 20,
+      fontWeight: 700
+    }
+  }, "✓")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      borderTop: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      onEditClient(c);
+      onClose();
+    },
+    style: {
+      flex: 1,
+      background: "none",
+      border: "none",
+      borderRight: `1px solid ${C.border}`,
+      padding: "8px",
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "✎ Edit Profile"), /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      onArchive(c.id);
+      if (c.id === activeId) onClose();
+    },
+    style: {
+      flex: 1,
+      background: "none",
+      border: "none",
+      padding: "8px",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "📦 Archive"))))), /*#__PURE__*/React.createElement("button", {
+    onClick: onAddClient,
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px dashed ${C.accent + "55"}`,
+      borderRadius: 12,
+      padding: "12px",
+      color: C.accent,
+      cursor: "pointer",
+      fontSize: 14,
+      fontWeight: 700,
+      marginBottom: 10
+    }
+  }, "+ Add New Client"), archived.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowArchived(s => !s),
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      padding: "10px",
+      color: C.muted,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 8
+    }
+  }, showArchived ? "▲" : "▼", " Archived clients (", archived.length, ")"), showArchived && archived.map((c, i) => /*#__PURE__*/React.createElement("div", {
+    key: c.id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      padding: "10px 14px",
+      background: C.card2,
+      borderRadius: 12,
+      border: `1px solid ${C.border}`,
+      marginBottom: 6,
+      opacity: 0.7
+    }
+  }, /*#__PURE__*/React.createElement(Avatar, {
+    name: c.name,
+    idx: clients.indexOf(c),
+    size: 38
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14
+    }
+  }, c.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub
+    }
+  }, "Archived")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      onReinstate(c.id);
+      onSwitch(c.id);
+      onClose();
+    },
+    style: {
+      background: C.accent + "22",
+      border: `1px solid ${C.accent}44`,
+      borderRadius: 8,
+      padding: "6px 12px",
+      color: C.accent,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "Reinstate")))));
 }
 
 // ─── Add Client ───────────────────────────────────────────────────────────────
@@ -2318,85 +2196,78 @@ function AddClientModal({
     });
     onClose();
   };
-  return /*#__PURE__*/_jsxDEV(Sheet, {
+  return /*#__PURE__*/React.createElement(Sheet, {
     title: "NEW CLIENT",
-    onClose: onClose,
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginBottom: 12
-      },
-      children: [/*#__PURE__*/_jsxDEV(Lbl, {
-        t: "Full name *"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-        value: form.name,
-        onChange: e => upd("name", e.target.value),
-        placeholder: "e.g. Jane Smith",
-        style: ss
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        display: "flex",
-        gap: 10,
-        marginBottom: 12
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          flex: 1
-        },
-        children: [/*#__PURE__*/_jsxDEV(Lbl, {
-          t: "Bodyweight (kg)"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-          type: "number",
-          value: form.bw,
-          onChange: e => upd("bw", e.target.value),
-          placeholder: "75",
-          style: ss
-        }, void 0, false)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          flex: 1
-        },
-        children: [/*#__PURE__*/_jsxDEV(Lbl, {
-          t: "Height (m)"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-          type: "number",
-          step: "0.01",
-          value: form.height,
-          onChange: e => upd("height", e.target.value),
-          placeholder: "1.70",
-          style: ss
-        }, void 0, false)]
-      }, void 0, true)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginBottom: 22
-      },
-      children: [/*#__PURE__*/_jsxDEV(Lbl, {
-        t: "Email (optional)"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-        type: "email",
-        value: form.email,
-        onChange: e => upd("email", e.target.value),
-        placeholder: "jane@email.com",
-        style: ss
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
-      onClick: submit,
-      style: {
-        width: "100%",
-        background: C.accent,
-        color: "#001A12",
-        border: "none",
-        borderRadius: 10,
-        padding: "14px",
-        fontFamily: "'Bebas Neue',cursive",
-        fontSize: 20,
-        letterSpacing: 2,
-        cursor: "pointer"
-      },
-      children: "CREATE CLIENT"
-    }, void 0, false)]
-  }, void 0, true);
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Full name *"
+  }), /*#__PURE__*/React.createElement("input", {
+    value: form.name,
+    onChange: e => upd("name", e.target.value),
+    placeholder: "e.g. Jane Smith",
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Bodyweight (kg)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    value: form.bw,
+    onChange: e => upd("bw", e.target.value),
+    placeholder: "75",
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Height (m)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    step: "0.01",
+    value: form.height,
+    onChange: e => upd("height", e.target.value),
+    placeholder: "1.70",
+    style: ss
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 22
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Email (optional)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    value: form.email,
+    onChange: e => upd("email", e.target.value),
+    placeholder: "jane@email.com",
+    style: ss
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 10,
+      padding: "14px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      letterSpacing: 2,
+      cursor: "pointer"
+    }
+  }, "CREATE CLIENT"));
 }
 
 // ─── Add Program Modal ────────────────────────────────────────────────────────
@@ -2435,145 +2306,129 @@ function AddProgramModal({
     });
     onClose();
   };
-  return /*#__PURE__*/_jsxDEV(Sheet, {
+  return /*#__PURE__*/React.createElement(Sheet, {
     title: step === 1 ? "NEW PROGRAM" : "EXERCISES",
-    onClose: onClose,
-    children: step === 1 ? /*#__PURE__*/_jsxDEV(_Fragment, {
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          marginBottom: 12
-        },
-        children: [/*#__PURE__*/_jsxDEV(Lbl, {
-          t: "Program name *"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-          value: form.name,
-          onChange: e => upd("name", e.target.value),
-          placeholder: "e.g. Summer Strength Block",
-          style: ss
-        }, void 0, false)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          marginBottom: 12
-        },
-        children: [/*#__PURE__*/_jsxDEV(Lbl, {
-          t: "Category"
-        }, void 0, false), /*#__PURE__*/_jsxDEV(AddableSelect, {
-          value: form.category,
-          onChange: v => upd("category", v),
-          options: categoryList,
-          onAddOption: onAddCategory,
-          addLabel: "Add category"
-        }, void 0, false)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          marginBottom: 22
-        },
-        children: [/*#__PURE__*/_jsxDEV(Lbl, {
-          t: "Program type"
-        }, void 0, false), /*#__PURE__*/_jsxDEV(AddableSelect, {
-          value: form.type,
-          onChange: v => upd("type", v),
-          options: progTypeList,
-          onAddOption: onAddProgType,
-          addLabel: "Add program type"
-        }, void 0, false)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          gap: 10
-        },
-        children: [/*#__PURE__*/_jsxDEV("button", {
-          onClick: onClose,
-          style: {
-            flex: 1,
-            background: "none",
-            border: `1px solid ${C.border}`,
-            borderRadius: 10,
-            padding: "13px",
-            color: C.sub,
-            cursor: "pointer",
-            fontSize: 14,
-            fontWeight: 700
-          },
-          children: "Cancel"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-          onClick: () => form.name.trim() && setStep(2),
-          style: {
-            flex: 2,
-            background: C.blue,
-            color: "#fff",
-            border: "none",
-            borderRadius: 10,
-            padding: "13px",
-            fontFamily: "'Bebas Neue',cursive",
-            fontSize: 20,
-            letterSpacing: 2,
-            cursor: "pointer"
-          },
-          children: "NEXT →"
-        }, void 0, false)]
-      }, void 0, true)]
-    }, void 0, true) : /*#__PURE__*/_jsxDEV(_Fragment, {
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontSize: 13,
-          color: C.sub,
-          marginBottom: 14
-        },
-        children: ["Add exercises to ", /*#__PURE__*/_jsxDEV("strong", {
-          style: {
-            color: C.text
-          },
-          children: form.name
-        }, void 0, false), ". You can also add more later while logging."]
-      }, void 0, true), /*#__PURE__*/_jsxDEV(ExerciseBuilder, {
-        exercises: exercises,
-        setExercises: setExercises,
-        exList: exList,
-        equipList: equipList,
-        latList: latList,
-        onAddEx: onAddEx,
-        onAddEquip: onAddEquip,
-        onAddLat: onAddLat
-      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          gap: 10,
-          marginTop: 18
-        },
-        children: [/*#__PURE__*/_jsxDEV("button", {
-          onClick: () => setStep(1),
-          style: {
-            flex: 1,
-            background: "none",
-            border: `1px solid ${C.border}`,
-            borderRadius: 10,
-            padding: "13px",
-            color: C.sub,
-            cursor: "pointer",
-            fontSize: 14,
-            fontWeight: 700
-          },
-          children: "← Back"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-          onClick: submit,
-          style: {
-            flex: 2,
-            background: C.accent,
-            color: "#001A12",
-            border: "none",
-            borderRadius: 10,
-            padding: "13px",
-            fontFamily: "'Bebas Neue',cursive",
-            fontSize: 20,
-            letterSpacing: 2,
-            cursor: "pointer"
-          },
-          children: "CREATE PROGRAM"
-        }, void 0, false)]
-      }, void 0, true)]
-    }, void 0, true)
-  }, void 0, false);
+    onClose: onClose
+  }, step === 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Program name *"
+  }), /*#__PURE__*/React.createElement("input", {
+    value: form.name,
+    onChange: e => upd("name", e.target.value),
+    placeholder: "e.g. Summer Strength Block",
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Category"
+  }), /*#__PURE__*/React.createElement(AddableSelect, {
+    value: form.category,
+    onChange: v => upd("category", v),
+    options: categoryList,
+    onAddOption: onAddCategory,
+    addLabel: "Add category"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 22
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Program type"
+  }), /*#__PURE__*/React.createElement(AddableSelect, {
+    value: form.type,
+    onChange: v => upd("type", v),
+    options: progTypeList,
+    onAddOption: onAddProgType,
+    addLabel: "Add program type"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      flex: 1,
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      padding: "13px",
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 14,
+      fontWeight: 700
+    }
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => form.name.trim() && setStep(2),
+    style: {
+      flex: 2,
+      background: C.blue,
+      color: "#fff",
+      border: "none",
+      borderRadius: 10,
+      padding: "13px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      letterSpacing: 2,
+      cursor: "pointer"
+    }
+  }, "NEXT →"))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: C.sub,
+      marginBottom: 14
+    }
+  }, "Add exercises to ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: C.text
+    }
+  }, form.name), ". You can also add more later while logging."), /*#__PURE__*/React.createElement(ExerciseBuilder, {
+    exercises: exercises,
+    setExercises: setExercises,
+    exList: exList,
+    equipList: equipList,
+    latList: latList,
+    onAddEx: onAddEx,
+    onAddEquip: onAddEquip,
+    onAddLat: onAddLat
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 18
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setStep(1),
+    style: {
+      flex: 1,
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      padding: "13px",
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 14,
+      fontWeight: 700
+    }
+  }, "← Back"), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    style: {
+      flex: 2,
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 10,
+      padding: "13px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      letterSpacing: 2,
+      cursor: "pointer"
+    }
+  }, "CREATE PROGRAM"))));
 }
 
 // ─── Edit Program Modal ───────────────────────────────────────────────────────
@@ -2614,95 +2469,88 @@ function EditProgramModal({
     });
     onClose();
   };
-  return /*#__PURE__*/_jsxDEV(Sheet, {
+  return /*#__PURE__*/React.createElement(Sheet, {
     title: "EDIT PROGRAM",
-    onClose: onClose,
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginBottom: 12
-      },
-      children: [/*#__PURE__*/_jsxDEV(Lbl, {
-        t: "Program name"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-        value: form.name,
-        onChange: e => upd("name", e.target.value),
-        style: ss
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginBottom: 12
-      },
-      children: [/*#__PURE__*/_jsxDEV(Lbl, {
-        t: "Category"
-      }, void 0, false), /*#__PURE__*/_jsxDEV(AddableSelect, {
-        value: form.category,
-        onChange: v => upd("category", v),
-        options: categoryList,
-        onAddOption: onAddCategory,
-        addLabel: "Add category"
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginBottom: 18
-      },
-      children: [/*#__PURE__*/_jsxDEV(Lbl, {
-        t: "Program type"
-      }, void 0, false), /*#__PURE__*/_jsxDEV(AddableSelect, {
-        value: form.type,
-        onChange: v => upd("type", v),
-        options: progTypeList,
-        onAddOption: onAddProgType,
-        addLabel: "Add program type"
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV(SecLabel, {
-      text: "Exercises"
-    }, void 0, false), /*#__PURE__*/_jsxDEV(ExerciseBuilder, {
-      exercises: exercises,
-      setExercises: setExercises,
-      exList: exList,
-      equipList: equipList,
-      latList: latList,
-      onAddEx: onAddEx,
-      onAddEquip: onAddEquip,
-      onAddLat: onAddLat
-    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        display: "flex",
-        gap: 10,
-        marginTop: 18
-      },
-      children: [/*#__PURE__*/_jsxDEV("button", {
-        onClick: onClose,
-        style: {
-          flex: 1,
-          background: "none",
-          border: `1px solid ${C.border}`,
-          borderRadius: 10,
-          padding: "13px",
-          color: C.sub,
-          cursor: "pointer",
-          fontSize: 14,
-          fontWeight: 700
-        },
-        children: "Cancel"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-        onClick: submit,
-        style: {
-          flex: 2,
-          background: C.accent,
-          color: "#001A12",
-          border: "none",
-          borderRadius: 10,
-          padding: "13px",
-          fontFamily: "'Bebas Neue',cursive",
-          fontSize: 20,
-          letterSpacing: 2,
-          cursor: "pointer"
-        },
-        children: "SAVE CHANGES"
-      }, void 0, false)]
-    }, void 0, true)]
-  }, void 0, true);
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Program name"
+  }), /*#__PURE__*/React.createElement("input", {
+    value: form.name,
+    onChange: e => upd("name", e.target.value),
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Category"
+  }), /*#__PURE__*/React.createElement(AddableSelect, {
+    value: form.category,
+    onChange: v => upd("category", v),
+    options: categoryList,
+    onAddOption: onAddCategory,
+    addLabel: "Add category"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 18
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Program type"
+  }), /*#__PURE__*/React.createElement(AddableSelect, {
+    value: form.type,
+    onChange: v => upd("type", v),
+    options: progTypeList,
+    onAddOption: onAddProgType,
+    addLabel: "Add program type"
+  })), /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Exercises"
+  }), /*#__PURE__*/React.createElement(ExerciseBuilder, {
+    exercises: exercises,
+    setExercises: setExercises,
+    exList: exList,
+    equipList: equipList,
+    latList: latList,
+    onAddEx: onAddEx,
+    onAddEquip: onAddEquip,
+    onAddLat: onAddLat
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 18
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      flex: 1,
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      padding: "13px",
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 14,
+      fontWeight: 700
+    }
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    style: {
+      flex: 2,
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 10,
+      padding: "13px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      letterSpacing: 2,
+      cursor: "pointer"
+    }
+  }, "SAVE CHANGES")));
 }
 
 // ─── Programs Tab ─────────────────────────────────────────────────────────────
@@ -2727,231 +2575,213 @@ function ProgramsTab({
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editProg, setEditProg] = useState(null);
-  return /*#__PURE__*/_jsxDEV("div", {
+  return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "16px 14px"
-    },
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        background: C.card2,
-        borderRadius: 16,
-        padding: "16px 18px",
-        marginBottom: 18,
-        border: `1px solid ${C.border}`,
-        display: "flex",
-        alignItems: "center",
-        gap: 14
-      },
-      children: [/*#__PURE__*/_jsxDEV(Avatar, {
-        name: client.name,
-        idx: clientIdx,
-        size: 54
-      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          flex: 1
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontFamily: "'Bebas Neue',cursive",
-            fontSize: 26,
-            letterSpacing: 2.5
-          },
-          children: client.name
-        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            gap: 6,
-            flexWrap: "wrap",
-            marginTop: 5
-          },
-          children: [client.bw && /*#__PURE__*/_jsxDEV(Tag, {
-            text: `${client.bw} kg BW`,
-            color: C.blue
-          }, void 0, false), client.height && /*#__PURE__*/_jsxDEV(Tag, {
-            text: `${client.height} m`,
-            color: C.gold
-          }, void 0, false), /*#__PURE__*/_jsxDEV(Tag, {
-            text: `${client.programs.length} program${client.programs.length !== 1 ? "s" : ""}`,
-            color: C.sub
-          }, void 0, false)]
-        }, void 0, true)]
-      }, void 0, true)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV(SecLabel, {
-      text: "Programs"
-    }, void 0, false), client.programs.length === 0 && /*#__PURE__*/_jsxDEV("div", {
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 16,
+      padding: "16px 18px",
+      marginBottom: 18,
+      border: `1px solid ${C.border}`,
+      display: "flex",
+      alignItems: "center",
+      gap: 14
+    }
+  }, /*#__PURE__*/React.createElement(Avatar, {
+    name: client.name,
+    idx: clientIdx,
+    size: 54
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 26,
+      letterSpacing: 2.5
+    }
+  }, client.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      marginTop: 5
+    }
+  }, client.bw && /*#__PURE__*/React.createElement(Tag, {
+    text: `${client.bw} kg BW`,
+    color: C.blue
+  }), client.height && /*#__PURE__*/React.createElement(Tag, {
+    text: `${client.height} m`,
+    color: C.gold
+  }), /*#__PURE__*/React.createElement(Tag, {
+    text: `${client.programs.length} program${client.programs.length !== 1 ? "s" : ""}`,
+    color: C.sub
+  })))), /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Programs"
+  }), client.programs.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 14,
+      padding: "28px 20px",
+      textAlign: "center",
+      border: `1px dashed ${C.border}`,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 36,
+      marginBottom: 10
+    }
+  }, "🏋️"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.sub,
+      fontSize: 14
+    }
+  }, "No programs yet.", /*#__PURE__*/React.createElement("br", null), "Create the first one below.")), client.programs.map(prog => {
+    const active = prog.id === activeProgramId;
+    return /*#__PURE__*/React.createElement("div", {
+      key: prog.id,
       style: {
         background: C.card,
         borderRadius: 14,
-        padding: "28px 20px",
-        textAlign: "center",
-        border: `1px dashed ${C.border}`,
-        marginBottom: 12
+        padding: "14px 16px",
+        marginBottom: 10,
+        border: `2px solid ${active ? C.accent : C.border}`,
+        position: "relative",
+        cursor: "pointer"
       },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontSize: 36,
-          marginBottom: 10
-        },
-        children: "🏋️"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          color: C.sub,
-          fontSize: 14
-        },
-        children: ["No programs yet.", /*#__PURE__*/_jsxDEV("br", {}, void 0, false), "Create the first one below."]
-      }, void 0, true)]
-    }, void 0, true), client.programs.map(prog => {
-      const active = prog.id === activeProgramId;
-      return /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.card,
-          borderRadius: 14,
-          padding: "14px 16px",
-          marginBottom: 10,
-          border: `2px solid ${active ? C.accent : C.border}`,
-          position: "relative",
-          cursor: "pointer"
-        },
-        onClick: () => onSetActive(prog.id),
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 4
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontWeight: 700,
-              fontSize: 16,
-              paddingRight: 8,
-              flex: 1
-            },
-            children: prog.name
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 6
-            },
-            children: [active && /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                background: C.accent + "20",
-                border: `1px solid ${C.accent + "55"}`,
-                borderRadius: 20,
-                padding: "2px 10px",
-                fontSize: 10,
-                color: C.accent,
-                fontWeight: 700,
-                letterSpacing: 1
-              },
-              children: "ACTIVE"
-            }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-              onClick: e => {
-                e.stopPropagation();
-                setEditProg(prog);
-              },
-              style: {
-                background: C.card2,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                color: C.sub,
-                cursor: "pointer",
-                fontSize: 13,
-                padding: "5px 11px",
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: 5
-              },
-              children: "✎ Edit"
-            }, void 0, false)]
-          }, void 0, true)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 12,
-            color: C.sub,
-            marginBottom: 8
-          },
-          children: [prog.category, " · ", prog.type]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            gap: 6,
-            flexWrap: "wrap"
-          },
-          children: [/*#__PURE__*/_jsxDEV(Tag, {
-            text: `${prog.exercises.length} exercise${prog.exercises.length !== 1 ? "s" : ""}`,
-            color: C.blue
-          }, void 0, false), /*#__PURE__*/_jsxDEV(Tag, {
-            text: `${prog.sessions.length} session${prog.sessions.length !== 1 ? "s" : ""}`,
-            color: active ? C.accent : C.sub
-          }, void 0, false)]
-        }, void 0, true), prog.exercises.length > 0 && /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            marginTop: 10,
-            paddingTop: 8,
-            borderTop: `1px solid ${C.border}`
-          },
-          children: /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.muted
-            },
-            children: prog.exercises.map(e => e.name).join(" · ")
-          }, void 0, false)
-        }, void 0, false)]
-      }, prog.id, true);
-    }), /*#__PURE__*/_jsxDEV("button", {
-      onClick: () => setShowAdd(true),
+      onClick: () => onSetActive(prog.id)
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
-        width: "100%",
-        background: "none",
-        border: `1px dashed ${C.accent + "55"}`,
-        borderRadius: 12,
-        padding: "14px",
-        color: C.accent,
-        cursor: "pointer",
-        fontSize: 14,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
         fontWeight: 700,
-        marginTop: 4
+        fontSize: 16,
+        paddingRight: 8,
+        flex: 1
+      }
+    }, prog.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, active && /*#__PURE__*/React.createElement("span", {
+      style: {
+        background: C.accent + "20",
+        border: `1px solid ${C.accent + "55"}`,
+        borderRadius: 20,
+        padding: "2px 10px",
+        fontSize: 10,
+        color: C.accent,
+        fontWeight: 700,
+        letterSpacing: 1
+      }
+    }, "ACTIVE"), /*#__PURE__*/React.createElement("button", {
+      onClick: e => {
+        e.stopPropagation();
+        setEditProg(prog);
       },
-      children: "+ New Program"
-    }, void 0, false), showAdd && /*#__PURE__*/_jsxDEV(AddProgramModal, {
-      onAdd: p => {
-        onAddProgram(p);
-        setShowAdd(false);
-      },
-      onClose: () => setShowAdd(false),
-      exList: exList,
-      equipList: equipList,
-      latList: latList,
-      categoryList: categoryList,
-      progTypeList: progTypeList,
-      onAddEx: onAddEx,
-      onAddEquip: onAddEquip,
-      onAddLat: onAddLat,
-      onAddCategory: onAddCategory,
-      onAddProgType: onAddProgType
-    }, void 0, false), editProg && /*#__PURE__*/_jsxDEV(EditProgramModal, {
-      program: editProg,
-      onSave: p => {
-        onEditProgram(p);
-        setEditProg(null);
-      },
-      onClose: () => setEditProg(null),
-      exList: exList,
-      equipList: equipList,
-      latList: latList,
-      categoryList: categoryList,
-      progTypeList: progTypeList,
-      onAddEx: onAddEx,
-      onAddEquip: onAddEquip,
-      onAddLat: onAddLat,
-      onAddCategory: onAddCategory,
-      onAddProgType: onAddProgType
-    }, void 0, false)]
-  }, void 0, true);
+      style: {
+        background: C.card2,
+        border: `1px solid ${C.border}`,
+        borderRadius: 8,
+        color: C.sub,
+        cursor: "pointer",
+        fontSize: 13,
+        padding: "5px 11px",
+        fontWeight: 700,
+        display: "flex",
+        alignItems: "center",
+        gap: 5
+      }
+    }, "✎ Edit"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.sub,
+        marginBottom: 8
+      }
+    }, prog.category, " · ", prog.type), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, /*#__PURE__*/React.createElement(Tag, {
+      text: `${prog.exercises.length} exercise${prog.exercises.length !== 1 ? "s" : ""}`,
+      color: C.blue
+    }), /*#__PURE__*/React.createElement(Tag, {
+      text: `${prog.sessions.length} session${prog.sessions.length !== 1 ? "s" : ""}`,
+      color: active ? C.accent : C.sub
+    })), prog.exercises.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 10,
+        paddingTop: 8,
+        borderTop: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.muted
+      }
+    }, prog.exercises.map(e => e.name).join(" · "))));
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAdd(true),
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px dashed ${C.accent + "55"}`,
+      borderRadius: 12,
+      padding: "14px",
+      color: C.accent,
+      cursor: "pointer",
+      fontSize: 14,
+      fontWeight: 700,
+      marginTop: 4
+    }
+  }, "+ New Program"), showAdd && /*#__PURE__*/React.createElement(AddProgramModal, {
+    onAdd: p => {
+      onAddProgram(p);
+      setShowAdd(false);
+    },
+    onClose: () => setShowAdd(false),
+    exList: exList,
+    equipList: equipList,
+    latList: latList,
+    categoryList: categoryList,
+    progTypeList: progTypeList,
+    onAddEx: onAddEx,
+    onAddEquip: onAddEquip,
+    onAddLat: onAddLat,
+    onAddCategory: onAddCategory,
+    onAddProgType: onAddProgType
+  }), editProg && /*#__PURE__*/React.createElement(EditProgramModal, {
+    program: editProg,
+    onSave: p => {
+      onEditProgram(p);
+      setEditProg(null);
+    },
+    onClose: () => setEditProg(null),
+    exList: exList,
+    equipList: equipList,
+    latList: latList,
+    categoryList: categoryList,
+    progTypeList: progTypeList,
+    onAddEx: onAddEx,
+    onAddEquip: onAddEquip,
+    onAddLat: onAddLat,
+    onAddCategory: onAddCategory,
+    onAddProgType: onAddProgType
+  }));
 }
 
 // ─── Log Tab ──────────────────────────────────────────────────────────────────
@@ -2988,7 +2818,8 @@ function LogTab({
     force: "",
     bandLength: "",
     bandStrength: "",
-    bandUsage: "resisted"
+    bandUsage: "resisted",
+    bandLoadKg: ""
   });
   const [showBand, setShowBand] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -3021,7 +2852,8 @@ function LogTab({
       force: "",
       bandLength: "",
       bandStrength: "",
-      bandUsage: "resisted"
+      bandUsage: "resisted",
+      bandLoadKg: ""
     });
     setShowBand(false);
     setTempoOverride({
@@ -3045,7 +2877,8 @@ function LogTab({
       force: "",
       bandLength: "",
       bandStrength: "",
-      bandUsage: "resisted"
+      bandUsage: "resisted",
+      bandLoadKg: ""
     }));
     setShowBand(false);
     setTempoOverride({
@@ -3055,7 +2888,10 @@ function LogTab({
     setEditingTempo(false);
     setSaved(false);
   };
-  const vol = form.reps && form.load ? +form.reps * +form.load : 0;
+  const bandKgLive = showBand && form.bandLoadKg ? +form.bandLoadKg : 0;
+  const bandSignedLive = bandKgLive ? form.bandUsage === "assisted" ? -bandKgLive : bandKgLive : 0;
+  const effLoadLive = Math.max(0, (form.load ? +form.load : 0) + bandSignedLive);
+  const vol = form.reps && effLoadLive ? +form.reps * effLoadLive : 0;
   const sessions = program?.sessions || [];
   // Group recent history by session (last 5 sessions that have this exercise)
   const recentSessions = sessions.filter(s => s.entries.some(e => e.ex === activeEx)).slice(-5).reverse().map(s => ({
@@ -3064,11 +2900,16 @@ function LogTab({
     sets: s.entries.filter(e => e.ex === activeEx)
   }));
   const submit = () => {
-    if (!form.reps || !form.load || !program) return;
-    const oneRM = est1RM(+form.load, +form.reps);
+    if (!form.reps || !program) return;
+    const rawLoad = form.load ? +form.load : 0;
+    const bandKg = showBand && form.bandLoadKg ? +form.bandLoadKg : 0;
+    const bandSigned = bandKg ? form.bandUsage === "assisted" ? -bandKg : bandKg : 0;
+    const effLoad = Math.max(0, rawLoad + bandSigned);
+    if (!effLoad && !isOvrcIso(form.type)) return; // need some load unless overcoming iso
+    const oneRM = est1RM(effLoad, +form.reps);
     const velFromRepT_ = form.repTime ? +(0.45 / +form.repTime).toFixed(2) : null;
-    const vel = form.velocity ? +form.velocity : velFromRepT_ ? velFromRepT_ : estVelocity(+form.load, oneRM);
-    const power = calcPower(+form.load, vel);
+    const vel = form.velocity ? +form.velocity : velFromRepT_ ? velFromRepT_ : estVelocity(effLoad, oneRM);
+    const power = calcPower(effLoad, vel);
     // Effective tempo: session override > program-prescribed default
     const exDefSub = program?.exercises.find(e => e.name === activeEx);
     const eccUsed = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDefSub?.eccSecs || null;
@@ -3078,7 +2919,8 @@ function LogTab({
       ...form,
       reps: +form.reps,
       setNo: +form.setNo,
-      load: isOvrcIso(form.type) ? 0 : +form.load,
+      load: isOvrcIso(form.type) ? 0 : effLoad,
+      rawLoad: isOvrcIso(form.type) ? null : rawLoad,
       velocity: isOvrcIso(form.type) ? 0 : +vel.toFixed(2),
       power: isOvrcIso(form.type) ? 0 : power,
       repTime: form.repTime ? +form.repTime : null,
@@ -3090,6 +2932,7 @@ function LogTab({
       bandLength: showBand && form.bandLength ? form.bandLength : null,
       bandStrength: showBand && form.bandStrength ? form.bandStrength : null,
       bandUsage: showBand ? form.bandUsage : null,
+      bandLoadKg: bandKg || null,
       date: today
     });
     setForm(f => ({
@@ -3103,1424 +2946,1272 @@ function LogTab({
       force: "",
       bandLength: "",
       bandStrength: "",
-      bandUsage: "resisted"
+      bandUsage: "resisted",
+      bandLoadKg: ""
     }));
     setShowBand(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
-  if (!program) return /*#__PURE__*/_jsxDEV("div", {
+  if (!program) return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "48px 24px",
       textAlign: "center"
-    },
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        fontSize: 42,
-        marginBottom: 14
-      },
-      children: "📋"
-    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        color: C.sub,
-        fontSize: 14,
-        lineHeight: 1.6
-      },
-      children: ["No active program.", /*#__PURE__*/_jsxDEV("br", {}, void 0, false), "Go to Programs to create or select one."]
-    }, void 0, true)]
-  }, void 0, true);
-  return /*#__PURE__*/_jsxDEV("div", {
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 42,
+      marginBottom: 14
+    }
+  }, "📋"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.sub,
+      fontSize: 14,
+      lineHeight: 1.6
+    }
+  }, "No active program.", /*#__PURE__*/React.createElement("br", null), "Go to Programs to create or select one."));
+  return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "16px 14px"
-    },
-    children: [/*#__PURE__*/_jsxDEV("div", {
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Exercise — tap to switch"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 7,
+      overflowX: "auto",
+      paddingBottom: 6,
+      scrollbarWidth: "none",
+      msOverflowStyle: "none"
+    }
+  }, progExNames.map(name => {
+    const isActive = name === activeEx;
+    // count today's sets already logged for this exercise
+    const todaySets = sessions.at(-1)?.date === today ? sessions.at(-1).entries.filter(e => e.ex === name).length : 0;
+    return /*#__PURE__*/React.createElement("button", {
+      key: name,
+      onClick: () => switchEx(name),
       style: {
-        marginBottom: 14
+        background: isActive ? C.accent : C.card2,
+        color: isActive ? "#001A12" : C.sub,
+        border: `1.5px solid ${isActive ? C.accent : C.border}`,
+        borderRadius: 22,
+        padding: "8px 14px",
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: "pointer",
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 2,
+        minWidth: 80,
+        position: "relative"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12
+      }
+    }, name), todaySets > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        opacity: 0.8
+      }
+    }, todaySets, " set", todaySets !== 1 ? "s" : ""));
+  }), progExNames.length > 1 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowSupersetInfo(true),
+    style: {
+      background: C.gold + "15",
+      border: `1px dashed ${C.gold + "55"}`,
+      borderRadius: 22,
+      padding: "8px 12px",
+      fontSize: 11,
+      color: C.gold,
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      gap: 4,
+      cursor: "pointer"
+    }
+  }, "⚡ Complex sets"))), showSupersetInfo && /*#__PURE__*/React.createElement(Sheet, {
+    title: "⚡ COMPLEX SETS GUIDE",
+    onClose: () => setShowSupersetInfo(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: C.sub,
+      lineHeight: 1.7,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: C.text
+    }
+  }, "Complex sets"), " means performing two or more exercises back-to-back with little or no rest between them, then resting before repeating. They save time, increase training density and metabolic demand."), /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Types of complex sets"
+  }), [{
+    icon: "2️⃣",
+    name: "Superset",
+    def: "2 exercises back-to-back",
+    ex: "Squat → Chest Press, rest, repeat.",
+    tip: "Most common. Can target same muscle (intensity) or opposing muscles (efficiency)."
+  }, {
+    icon: "3️⃣",
+    name: "Tri-set",
+    def: "3 exercises back-to-back",
+    ex: "Squat → Chest Press → Row, rest, repeat.",
+    tip: "Higher density. Great for time-efficient full-body or hypertrophy blocks."
+  }, {
+    icon: "4️⃣",
+    name: "Giant set",
+    def: "4 or more exercises back-to-back",
+    ex: "Squat → Chest Press → Row → Lunge, rest, repeat.",
+    tip: "Maximum density. Challenging metabolically — use with moderate loads and experienced clients."
+  }].map(t => /*#__PURE__*/React.createElement("div", {
+    key: t.name,
+    style: {
+      background: C.card2,
+      borderRadius: 12,
+      padding: "12px 14px",
+      border: `1px solid ${C.border}`,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 20
+    }
+  }, t.icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 14,
+      color: C.text
+    }
+  }, t.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted
+    }
+  }, t.def))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: C.text
+    }
+  }, "Example:"), " ", t.ex), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      fontStyle: "italic"
+    }
+  }, t.tip))), /*#__PURE__*/React.createElement(SecLabel, {
+    text: "How to log in Forge"
+  }), [{
+    n: "1",
+    t: "Log Exercise A",
+    d: `Tap ${progExNames[0] || "Exercise A"} in the pill bar, enter reps/load and tap LOG SET.`
+  }, {
+    n: "2",
+    t: "Switch immediately",
+    d: `Tap the next exercise pill — the form switches instantly. No rest between exercises.`
+  }, {
+    n: "3",
+    t: "Log Exercise B (and C, D…)",
+    d: "Enter reps/load and tap LOG SET. Continue through all exercises in the complex."
+  }, {
+    n: "4",
+    t: "Rest, then repeat",
+    d: "Rest as prescribed, then go back to step 1 for the next round."
+  }].map(s => /*#__PURE__*/React.createElement("div", {
+    key: s.n,
+    style: {
+      display: "flex",
+      gap: 12,
+      marginBottom: 10,
+      background: C.card2,
+      borderRadius: 12,
+      padding: "12px 14px",
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 26,
+      height: 26,
+      borderRadius: "50%",
+      background: C.gold,
+      color: "#001A12",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 16,
+      flexShrink: 0
+    }
+  }, s.n), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13,
+      marginBottom: 3
+    }
+  }, s.t), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      lineHeight: 1.5
+    }
+  }, s.d)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.gold + "15",
+      border: `1px solid ${C.gold + "44"}`,
+      borderRadius: 10,
+      padding: "12px 14px",
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.gold,
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, "💡 Your program"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      lineHeight: 1.5
+    }
+  }, "You have ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: C.text
+    }
+  }, progExNames.length, " exercises"), " available — enough for a ", progExNames.length === 2 ? "superset" : progExNames.length === 3 ? "tri-set" : "giant set", ". Chain any combination using the pill bar above."))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 16,
+      padding: "16px",
+      marginBottom: 16,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 22,
+      letterSpacing: 2,
+      color: C.accent
+    }
+  }, activeEx), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub
+    }
+  }, today, " · ", program.name)), /*#__PURE__*/React.createElement(Tag, {
+    text: program.name,
+    color: C.blue
+  })), isIsoType(form.type) && (() => {
+    const m = ISO_META[form.type];
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10,
+        alignItems: "flex-start",
+        padding: "10px 12px",
+        background: m.color + "18",
+        borderRadius: 10,
+        border: `1px solid ${m.color + "44"}`,
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 20
+      }
+    }, m.icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: m.color,
+        marginBottom: 2
+      }
+    }, m.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.sub,
+        lineHeight: 1.5
+      }
+    }, m.desc), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: m.color,
+        marginTop: 4,
+        fontWeight: 700
+      }
+    }, "Target: ", m.holdTarget, " hold · ", m.setsReps)));
+  })(), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: isIsoType(form.type) ? "Contractions" : "Reps"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "1",
+    placeholder: isOvrcIso(form.type) ? "3" : isYieldIso(form.type) ? "1" : "8",
+    value: form.reps,
+    onChange: e => upd("reps", e.target.value),
+    style: ss
+  })), isOvrcIso(form.type) ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Hold Duration (s)"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.holdDuration,
+    onChange: e => upd("holdDuration", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select…"), form.type === "Ovrc Iso-Ballistic" ? [0.5, 1].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "s")) : [3].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "s")))) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Load (kg)"
+  }), clientBW && /*#__PURE__*/React.createElement("button", {
+    onClick: () => upd("load", clientBW),
+    style: {
+      background: C.accent + "22",
+      border: `1px solid ${C.accent + "44"}`,
+      borderRadius: 6,
+      padding: "2px 8px",
+      fontSize: 10,
+      color: C.accent,
+      fontWeight: 700,
+      cursor: "pointer",
+      lineHeight: 1.6
+    }
+  }, "= BW (", clientBW, " kg)")), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0",
+    step: "0.5",
+    placeholder: "100",
+    value: form.load,
+    onChange: e => upd("load", e.target.value),
+    style: ss
+  }))), isIsoType(form.type) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 10,
+      padding: "12px 14px",
+      border: `1px solid ${C.border}`,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      fontWeight: 700,
+      marginBottom: 10
+    }
+  }, "⚡ Force measurement", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.muted + "88",
+      fontWeight: 400,
+      textTransform: "none",
+      letterSpacing: 0
+    }
+  }, " — optional, requires a device")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Force (N)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0",
+    step: "1",
+    placeholder: "e.g. 450",
+    value: form.force,
+    onChange: e => upd("force", e.target.value),
+    style: ss
+  })), form.force && /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "= kgf"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "10px 12px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 22,
+      color: C.accent,
+      letterSpacing: 1
+    }
+  }, (+form.force / 9.81).toFixed(1), " kgf"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted,
+      lineHeight: 1.5
+    }
+  }, "Enter peak force from a force plate, dynamometer or load cell.", isYieldIso(form.type) && form.mvic && form.force ? ` Estimated 100% MVIC ≈ ${(+form.force / (+form.mvic / 100)).toFixed(0)} N (${(+form.force / (+form.mvic / 100) / 9.81).toFixed(1)} kgf).` : "")), isYieldIso(form.type) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Hold Duration (s)"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.holdDuration,
+    onChange: e => upd("holdDuration", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select…"), form.type === "Yielding Iso-GPP" ? Array.from({
+    length: 13
+  }, (_, i) => 60 + i * 10).map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "s (", Math.floor(v / 60), ":", String(v % 60).padStart(2, "0"), " min)")) : [30, 35, 40, 45].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "s")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "% MVIC"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.mvic,
+    onChange: e => upd("mvic", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select…"), Array.from({
+    length: 26
+  }, (_, i) => 60 + i).map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "%"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: C.muted,
+      marginTop: 2
+    }
+  }, "% max voluntary contraction"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.blue + "15",
+      borderRadius: 10,
+      padding: "12px 14px",
+      border: `1px solid ${C.blue + "33"}`,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.blue,
+      marginBottom: 6
+    }
+  }, "What is MVIC?"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub,
+      lineHeight: 1.6,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: C.text
+    }
+  }, "MVIC = Maximum Voluntary Isometric Contraction"), " — the absolute maximum force a muscle can produce in a static (non-moving) contraction. Essentially your ceiling for isometric strength. When you prescribe 60–85% MVIC you are telling the client to hold at that percentage of their maximum possible isometric effort for that position."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub,
+      lineHeight: 1.8
+    }
+  }, /*#__PURE__*/React.createElement("div", null, "🔵 ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: C.text
+    }
+  }, "60% MVIC"), " — moderate effort, sustainable for longer holds, good for beginners or acute tendinopathy"), /*#__PURE__*/React.createElement("div", null, "🟡 ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: C.text
+    }
+  }, "70–75% MVIC"), " — typical sweet spot for tendon adaptation"), /*#__PURE__*/React.createElement("div", null, "🔴 ", /*#__PURE__*/React.createElement("strong", {
+    style: {
+      color: C.text
+    }
+  }, "85% MVIC"), " — near-maximal, shorter sustainable duration, more advanced")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginTop: 8,
+      fontStyle: "italic"
+    }
+  }, "Estimated subjectively (similar to RPE) unless you have force measurement equipment. Guide: 60% = moderately challenging · 75% = hard but holdable · 85% = very difficult."))), !isOvrcIso(form.type) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowBand(b => !b),
+    style: {
+      background: showBand ? C.warn + "18" : "none",
+      border: `1px ${showBand ? "solid" : "dashed"} ${C.warn + (showBand ? "55" : "33")}`,
+      borderRadius: 8,
+      padding: "7px 14px",
+      fontSize: 12,
+      color: C.warn,
+      fontWeight: 700,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "🔴"), " ", showBand ? "Remove band" : "+ Add band"), showBand && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      padding: "12px 14px",
+      background: C.card2,
+      borderRadius: 10,
+      border: `1px solid ${C.warn + "33"}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.warn,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      fontWeight: 700,
+      marginBottom: 10
+    }
+  }, "Band details"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Length"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.bandLength,
+    onChange: e => upd("bandLength", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select…"), ["Short (Mini)", "Long", "Thera Band"].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Strength"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.bandStrength,
+    onChange: e => {
+      upd("bandStrength", e.target.value);
+      upd("bandLoadKg", "");
+    },
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select…"), ["Extra Light", "Light", "Medium", "Heavy", "Extra Heavy"].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v))))), form.bandStrength && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: `Band load (kg) — ${BAND_RANGES[form.bandStrength][0]}–${BAND_RANGES[form.bandStrength][1]}kg range`
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.bandLoadKg,
+    onChange: e => upd("bandLoadKg", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select…"), bandRangeOptions(form.bandStrength).map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, " kg"))), form.bandLoadKg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.warn,
+      marginTop: 6,
+      fontWeight: 600
+    }
+  }, form.load || 0, "kg plate ", form.bandUsage === "assisted" ? "−" : "+", " ", form.bandLoadKg, "kg band", " = ", /*#__PURE__*/React.createElement("strong", null, Math.max(0, (form.load ? +form.load : 0) + (form.bandUsage === "assisted" ? -+form.bandLoadKg : +form.bandLoadKg)), "kg effective load"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Usage"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 4
+    }
+  }, [["resisted", "🔴 Resisted", "adds load"], ["assisted", "🟢 Assisted", "reduces load"]].map(([val, label, sub]) => /*#__PURE__*/React.createElement("button", {
+    key: val,
+    onClick: () => upd("bandUsage", val),
+    style: {
+      flex: 1,
+      background: form.bandUsage === val ? C.card : C.card2,
+      border: `1.5px solid ${form.bandUsage === val ? C.warn : C.border}`,
+      borderRadius: 8,
+      padding: "8px 6px",
+      cursor: "pointer",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: form.bandUsage === val ? C.warn : C.text
+    }
+  }, label), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted
+    }
+  }, sub))))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Set #"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "1",
+    value: form.setNo,
+    onChange: e => upd("setNo", e.target.value),
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 2
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Set type"
+  }), /*#__PURE__*/React.createElement(AddableSelect, {
+    value: form.type,
+    onChange: v => upd("type", v),
+    options: setTypeList,
+    onAddOption: onAddSetType,
+    addLabel: "Add set type"
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, !isOvrcIso(form.type) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "RIR"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.rir,
+    onChange: e => upd("rir", +e.target.value),
+    style: ss
+  }, [0, 1, 2, 3, 4].map(r => /*#__PURE__*/React.createElement("option", {
+    key: r
+  }, r)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "RPE"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.rpe,
+    onChange: e => upd("rpe", +e.target.value),
+    style: ss
+  }, [4, 5, 6, 7, 8, 9, 10].map(r => /*#__PURE__*/React.createElement("option", {
+    key: r,
+    value: r
+  }, r, " – ", RPE_DESC[r]))))), (() => {
+    const exDef = program?.exercises.find(e => e.name === activeEx);
+    const hasTempo = exDef?.eccSecs || exDef?.conSecs;
+    // Effective tempo: session override (if set) > program default
+    const effEcc = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDef?.eccSecs || null;
+    const effCon = tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDef?.conSecs || null;
+    const isOverridden = tempoOverride.eccSecs !== "" || tempoOverride.conSecs !== "";
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card2 + "88",
+        borderRadius: 10,
+        padding: "10px 12px",
+        border: `1px dashed ${C.border}`,
+        marginBottom: 12
+      }
+    }, hasTempo && !editingTempo && /*#__PURE__*/React.createElement("div", {
+      onClick: () => {
+        setTempoOverride({
+          eccSecs: effEcc ?? "",
+          conSecs: effCon ?? ""
+        });
+        setEditingTempo(true);
       },
-      children: [/*#__PURE__*/_jsxDEV(SecLabel, {
-        text: "Exercise — tap to switch"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          gap: 7,
-          overflowX: "auto",
-          paddingBottom: 6,
-          scrollbarWidth: "none",
-          msOverflowStyle: "none"
-        },
-        children: [progExNames.map(name => {
-          const isActive = name === activeEx;
-          // count today's sets already logged for this exercise
-          const todaySets = sessions.at(-1)?.date === today ? sessions.at(-1).entries.filter(e => e.ex === name).length : 0;
-          return /*#__PURE__*/_jsxDEV("button", {
-            onClick: () => switchEx(name),
-            style: {
-              background: isActive ? C.accent : C.card2,
-              color: isActive ? "#001A12" : C.sub,
-              border: `1.5px solid ${isActive ? C.accent : C.border}`,
-              borderRadius: 22,
-              padding: "8px 14px",
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-              flexShrink: 0,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 2,
-              minWidth: 80,
-              position: "relative"
-            },
-            children: [/*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 12
-              },
-              children: name
-            }, void 0, false), todaySets > 0 && /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 10,
-                opacity: 0.8
-              },
-              children: [todaySets, " set", todaySets !== 1 ? "s" : ""]
-            }, void 0, true)]
-          }, name, true);
-        }), progExNames.length > 1 && /*#__PURE__*/_jsxDEV("button", {
-          onClick: () => setShowSupersetInfo(true),
-          style: {
-            background: C.gold + "15",
-            border: `1px dashed ${C.gold + "55"}`,
-            borderRadius: 22,
-            padding: "8px 12px",
-            fontSize: 11,
-            color: C.gold,
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            cursor: "pointer"
-          },
-          children: "⚡ Complex sets"
-        }, void 0, false)]
-      }, void 0, true)]
-    }, void 0, true), showSupersetInfo && /*#__PURE__*/_jsxDEV(Sheet, {
-      title: "⚡ COMPLEX SETS GUIDE",
-      onClose: () => setShowSupersetInfo(false),
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontSize: 13,
-          color: C.sub,
-          lineHeight: 1.7,
-          marginBottom: 14
-        },
-        children: [/*#__PURE__*/_jsxDEV("strong", {
-          style: {
-            color: C.text
-          },
-          children: "Complex sets"
-        }, void 0, false), " means performing two or more exercises back-to-back with little or no rest between them, then resting before repeating. They save time, increase training density and metabolic demand."]
-      }, void 0, true), /*#__PURE__*/_jsxDEV(SecLabel, {
-        text: "Types of complex sets"
-      }, void 0, false), [{
-        icon: "2️⃣",
-        name: "Superset",
-        def: "2 exercises back-to-back",
-        ex: "Squat → Chest Press, rest, repeat.",
-        tip: "Most common. Can target same muscle (intensity) or opposing muscles (efficiency)."
-      }, {
-        icon: "3️⃣",
-        name: "Tri-set",
-        def: "3 exercises back-to-back",
-        ex: "Squat → Chest Press → Row, rest, repeat.",
-        tip: "Higher density. Great for time-efficient full-body or hypertrophy blocks."
-      }, {
-        icon: "4️⃣",
-        name: "Giant set",
-        def: "4 or more exercises back-to-back",
-        ex: "Squat → Chest Press → Row → Lunge, rest, repeat.",
-        tip: "Maximum density. Challenging metabolically — use with moderate loads and experienced clients."
-      }].map(t => /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.card2,
-          borderRadius: 12,
-          padding: "12px 14px",
-          border: `1px solid ${C.border}`,
-          marginBottom: 10
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 6
-          },
-          children: [/*#__PURE__*/_jsxDEV("span", {
-            style: {
-              fontSize: 20
-            },
-            children: t.icon
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            children: [/*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontWeight: 700,
-                fontSize: 14,
-                color: C.text
-              },
-              children: t.name
-            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontSize: 11,
-                color: C.muted
-              },
-              children: t.def
-            }, void 0, false)]
-          }, void 0, true)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 12,
-            color: C.sub,
-            marginBottom: 4
-          },
-          children: [/*#__PURE__*/_jsxDEV("strong", {
-            style: {
-              color: C.text
-            },
-            children: "Example:"
-          }, void 0, false), " ", t.ex]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 12,
-            color: C.sub,
-            fontStyle: "italic"
-          },
-          children: t.tip
-        }, void 0, false)]
-      }, t.name, true)), /*#__PURE__*/_jsxDEV(SecLabel, {
-        text: "How to log in Forge"
-      }, void 0, false), [{
-        n: "1",
-        t: "Log Exercise A",
-        d: `Tap ${progExNames[0] || "Exercise A"} in the pill bar, enter reps/load and tap LOG SET.`
-      }, {
-        n: "2",
-        t: "Switch immediately",
-        d: `Tap the next exercise pill — the form switches instantly. No rest between exercises.`
-      }, {
-        n: "3",
-        t: "Log Exercise B (and C, D…)",
-        d: "Enter reps/load and tap LOG SET. Continue through all exercises in the complex."
-      }, {
-        n: "4",
-        t: "Rest, then repeat",
-        d: "Rest as prescribed, then go back to step 1 for the next round."
-      }].map(s => /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          gap: 12,
-          marginBottom: 10,
-          background: C.card2,
-          borderRadius: 12,
-          padding: "12px 14px",
-          border: `1px solid ${C.border}`
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            width: 26,
-            height: 26,
-            borderRadius: "50%",
-            background: C.gold,
-            color: "#001A12",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "'Bebas Neue',cursive",
-            fontSize: 16,
-            flexShrink: 0
-          },
-          children: s.n
-        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontWeight: 700,
-              fontSize: 13,
-              marginBottom: 3
-            },
-            children: s.t
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 12,
-              color: C.sub,
-              lineHeight: 1.5
-            },
-            children: s.d
-          }, void 0, false)]
-        }, void 0, true)]
-      }, s.n, true)), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.gold + "15",
-          border: `1px solid ${C.gold + "44"}`,
-          borderRadius: 10,
-          padding: "12px 14px",
-          marginTop: 4
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 11,
-            color: C.gold,
-            fontWeight: 700,
-            marginBottom: 4
-          },
-          children: "💡 Your program"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 12,
-            color: C.sub,
-            lineHeight: 1.5
-          },
-          children: ["You have ", /*#__PURE__*/_jsxDEV("strong", {
-            style: {
-              color: C.text
-            },
-            children: [progExNames.length, " exercises"]
-          }, void 0, true), " available — enough for a ", progExNames.length === 2 ? "superset" : progExNames.length === 3 ? "tri-set" : "giant set", ". Chain any combination using the pill bar above."]
-        }, void 0, true)]
-      }, void 0, true)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 10,
+        padding: "6px 10px",
+        background: C.accent + "15",
+        borderRadius: 8,
+        border: `1px solid ${C.accent + "33"}`,
+        cursor: "pointer"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 16
+      }
+    }, "⏱"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        fontWeight: 700,
+        letterSpacing: 1,
+        textTransform: "uppercase"
+      }
+    }, isOverridden ? "Tempo (adjusted this session)" : "Prescribed Tempo", " ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        opacity: 0.6,
+        fontWeight: 400
+      }
+    }, "· tap to adjust")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: C.accent,
+        fontWeight: 700
+      }
+    }, effEcc || "?", "s eccentric / ", effCon || "?", "s concentric", /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.sub,
+        fontWeight: 400
+      }
+    }, " — target TUT: ", form.reps ? Math.round(+form.reps * ((effEcc || 2) + (effCon || 1))) : "–", form.reps ? "s" : ""))), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 14,
+        color: C.muted
+      }
+    }, "✎")), hasTempo && editingTempo && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 10,
+        padding: "10px 12px",
+        background: C.accent + "10",
+        borderRadius: 8,
+        border: `1px solid ${C.accent + "33"}`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        fontWeight: 700,
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        marginBottom: 8
+      }
+    }, "Adjust tempo for this session"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Eccentric (s)"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0.5",
+      step: "0.5",
+      value: tempoOverride.eccSecs,
+      onChange: e => setTempoOverride(t => ({
+        ...t,
+        eccSecs: e.target.value
+      })),
+      style: ss
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Concentric (s)"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0.5",
+      step: "0.5",
+      value: tempoOverride.conSecs,
+      onChange: e => setTempoOverride(t => ({
+        ...t,
+        conSecs: e.target.value
+      })),
+      style: ss
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setTempoOverride({
+          eccSecs: "",
+          conSecs: ""
+        });
+        setEditingTempo(false);
+      },
+      style: {
+        flex: 1,
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 8,
+        padding: "8px",
+        color: C.sub,
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 700
+      }
+    }, "Reset to default (", exDef.eccSecs || "?", "/", exDef.conSecs || "?", "s)"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditingTempo(false),
+      style: {
+        flex: 1,
+        background: C.accent,
+        border: "none",
+        borderRadius: 8,
+        padding: "8px",
+        color: "#001A12",
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 700
+      }
+    }, "Done"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: hasTempo ? 10 : 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        letterSpacing: 1.5,
+        textTransform: "uppercase",
+        fontWeight: 700,
+        marginBottom: 8
+      }
+    }, "Power measurement"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10,
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Rep time (s)"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0.1",
+      step: "0.1",
+      placeholder: "e.g. 0.5",
+      value: form.repTime,
+      onChange: e => upd("repTime", e.target.value),
+      style: ss
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        marginTop: 3
+      }
+    }, "⏱ Manual — stopwatch")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Bar speed (m/s)"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0.1",
+      step: "0.01",
+      placeholder: "e.g. 0.85",
+      value: form.velocity,
+      onChange: e => upd("velocity", e.target.value),
+      style: ss
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        marginTop: 3
+      }
+    }, "📡 Device — overrides rep time"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        lineHeight: 1.4
+      }
+    }, "Enter one or neither. Device reading takes priority over rep time.")));
+  })(), vol > 0 && (() => {
+    const oneRM = est1RM(effLoadLive, +form.reps);
+    // velocity: measured > derived from conSecs > estimated from load/1RM
+    // Velocity: measured > from rep time > estimated
+    const velFromRepT = form.repTime ? +(0.45 / +form.repTime).toFixed(2) : null;
+    const vel = form.velocity ? +form.velocity : velFromRepT ? velFromRepT : estVelocity(effLoadLive, oneRM);
+    const power = calcPower(effLoadLive, vel);
+    const velLabel = form.velocity ? "m/s (measured)" : velFromRepT ? "m/s (from rep time)" : "m/s (estimated)";
+    // TUT from effective tempo (session override > prescribed default)
+    const exDef2 = program?.exercises.find(e => e.name === activeEx);
+    const eccS = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDef2?.eccSecs || null;
+    const conS = tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDef2?.conSecs || null;
+    // For isometrics, TUT = holdDuration × reps
+    const tut = isIsoType(form.type) && form.holdDuration && form.reps ? Math.round(+form.holdDuration * +form.reps) : (eccS || conS) && form.reps ? Math.round(+form.reps * ((eccS || 2) + (conS || 1))) : null;
+    const tutZone = !tut ? null : tut >= 40 && tut <= 70 ? {
+      label: "Optimal TUT ✓",
+      color: C.accent
+    } : tut < 40 ? {
+      label: "Below optimal",
+      color: "#FFB020"
+    } : {
+      label: "Extended TUT",
+      color: C.blue
+    };
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement(StatCard, {
+      label: "Volume",
+      value: vol,
+      unit: " kg",
+      color: C.blue
+    }), /*#__PURE__*/React.createElement(StatCard, {
+      label: "Est. 1RM",
+      value: oneRM,
+      unit: " kg",
+      color: C.accent
+    })), !isIsoType(form.type) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: tut ? 8 : 14
+      }
+    }, /*#__PURE__*/React.createElement(StatCard, {
+      label: "Power",
+      value: power,
+      unit: " W",
+      color: C.gold
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card2,
+        borderRadius: 10,
+        padding: "10px 12px",
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        letterSpacing: 1.5,
+        textTransform: "uppercase",
+        marginBottom: 3,
+        fontWeight: 700
+      }
+    }, "Velocity"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 22,
+        fontFamily: "'Bebas Neue',cursive",
+        letterSpacing: 1,
+        color: C.gold,
+        lineHeight: 1.2
+      }
+    }, vel.toFixed(2)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        marginTop: 1
+      }
+    }, velLabel))), tut && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(StatCard, {
+      label: "TUT this set",
+      value: tut,
+      unit: "s",
+      color: tutZone.color
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card2,
+        borderRadius: 10,
+        padding: "10px 12px",
+        flex: 1,
+        display: "flex",
+        alignItems: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        letterSpacing: 1.5,
+        textTransform: "uppercase",
+        marginBottom: 3,
+        fontWeight: 700
+      }
+    }, "Hypertrophy"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 700,
+        color: tutZone.color
+      }
+    }, tutZone.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        marginTop: 1
+      }
+    }, "Target: 40–70s")))));
+  })(), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    style: {
+      width: "100%",
+      background: saved ? C.accent + "CC" : C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 10,
+      padding: "14px",
+      cursor: "pointer",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      letterSpacing: 2
+    }
+  }, saved ? `✓  ${activeEx.toUpperCase()} LOGGED!` : "LOG SET")), sessions.at(-1)?.date === today && sessions.at(-1).entries.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Today's session"
+  }), progExNames.map(name => {
+    const todayEntries = sessions.at(-1).entries.filter(e => e.ex === name);
+    if (!todayEntries.length) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: name,
       style: {
         background: C.card,
-        borderRadius: 16,
-        padding: "16px",
-        marginBottom: 16,
+        borderRadius: 10,
+        padding: "10px 14px",
+        marginBottom: 8,
+        border: `1px solid ${name === activeEx ? C.accent + "44" : C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 13,
+        marginBottom: 6,
+        color: name === activeEx ? C.accent : C.text
+      }
+    }, name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6
+      }
+    }, todayEntries.map((e, i) => /*#__PURE__*/React.createElement("span", {
+      key: i,
+      style: {
+        background: C.card2,
+        borderRadius: 6,
+        padding: "4px 10px",
+        fontSize: 12,
         border: `1px solid ${C.border}`
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontFamily: "'Bebas Neue',cursive",
-              fontSize: 22,
-              letterSpacing: 2,
-              color: C.accent
-            },
-            children: activeEx
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.sub
-            },
-            children: [today, " · ", program.name]
-          }, void 0, true)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV(Tag, {
-          text: program.name,
-          color: C.blue
-        }, void 0, false)]
-      }, void 0, true), isIsoType(form.type) && (() => {
-        const m = ISO_META[form.type];
-        return /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            gap: 10,
-            alignItems: "flex-start",
-            padding: "10px 12px",
-            background: m.color + "18",
-            borderRadius: 10,
-            border: `1px solid ${m.color + "44"}`,
-            marginBottom: 12
-          },
-          children: [/*#__PURE__*/_jsxDEV("span", {
-            style: {
-              fontSize: 20
-            },
-            children: m.icon
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            children: [/*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontSize: 11,
-                fontWeight: 700,
-                color: m.color,
-                marginBottom: 2
-              },
-              children: m.label
-            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontSize: 11,
-                color: C.sub,
-                lineHeight: 1.5
-              },
-              children: m.desc
-            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontSize: 11,
-                color: m.color,
-                marginTop: 4,
-                fontWeight: 700
-              },
-              children: ["Target: ", m.holdTarget, " hold · ", m.setsReps]
-            }, void 0, true)]
-          }, void 0, true)]
-        }, void 0, true);
-      })(), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          gap: 10,
-          marginBottom: 12
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 1
-          },
-          children: [/*#__PURE__*/_jsxDEV(Lbl, {
-            t: isIsoType(form.type) ? "Contractions" : "Reps"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-            type: "number",
-            min: "1",
-            placeholder: isOvrcIso(form.type) ? "3" : isYieldIso(form.type) ? "1" : "8",
-            value: form.reps,
-            onChange: e => upd("reps", e.target.value),
-            style: ss
-          }, void 0, false)]
-        }, void 0, true), isOvrcIso(form.type) ? /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 1
-          },
-          children: [/*#__PURE__*/_jsxDEV(Lbl, {
-            t: "Hold Duration (s)"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
-            value: form.holdDuration,
-            onChange: e => upd("holdDuration", e.target.value),
-            style: ss,
-            children: [/*#__PURE__*/_jsxDEV("option", {
-              value: "",
-              children: "Select…"
-            }, void 0, false), form.type === "Ovrc Iso-Ballistic" ? [0.5, 1].map(v => /*#__PURE__*/_jsxDEV("option", {
-              value: v,
-              children: [v, "s"]
-            }, v, true)) : [3].map(v => /*#__PURE__*/_jsxDEV("option", {
-              value: v,
-              children: [v, "s"]
-            }, v, true))]
-          }, void 0, true)]
-        }, void 0, true) : /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 1
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 4
-            },
-            children: [/*#__PURE__*/_jsxDEV(Lbl, {
-              t: "Load (kg)"
-            }, void 0, false), clientBW && /*#__PURE__*/_jsxDEV("button", {
-              onClick: () => upd("load", clientBW),
-              style: {
-                background: C.accent + "22",
-                border: `1px solid ${C.accent + "44"}`,
-                borderRadius: 6,
-                padding: "2px 8px",
-                fontSize: 10,
-                color: C.accent,
-                fontWeight: 700,
-                cursor: "pointer",
-                lineHeight: 1.6
-              },
-              children: ["= BW (", clientBW, " kg)"]
-            }, void 0, true)]
-          }, void 0, true), /*#__PURE__*/_jsxDEV("input", {
-            type: "number",
-            min: "0",
-            step: "0.5",
-            placeholder: "100",
-            value: form.load,
-            onChange: e => upd("load", e.target.value),
-            style: ss
-          }, void 0, false)]
-        }, void 0, true)]
-      }, void 0, true), isIsoType(form.type) && /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.card2,
-          borderRadius: 10,
-          padding: "12px 14px",
-          border: `1px solid ${C.border}`,
-          marginBottom: 12
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 10,
-            color: C.muted,
-            letterSpacing: 1.5,
-            textTransform: "uppercase",
-            fontWeight: 700,
-            marginBottom: 10
-          },
-          children: ["⚡ Force measurement", /*#__PURE__*/_jsxDEV("span", {
-            style: {
-              color: C.muted + "88",
-              fontWeight: 400,
-              textTransform: "none",
-              letterSpacing: 0
-            },
-            children: " — optional, requires a device"
-          }, void 0, false)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            gap: 10,
-            marginBottom: 8
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              flex: 1
-            },
-            children: [/*#__PURE__*/_jsxDEV(Lbl, {
-              t: "Force (N)"
-            }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-              type: "number",
-              min: "0",
-              step: "1",
-              placeholder: "e.g. 450",
-              value: form.force,
-              onChange: e => upd("force", e.target.value),
-              style: ss
-            }, void 0, false)]
-          }, void 0, true), form.force && /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              flex: 1
-            },
-            children: [/*#__PURE__*/_jsxDEV(Lbl, {
-              t: "= kgf"
-            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                background: C.card,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                padding: "10px 12px",
-                fontFamily: "'Bebas Neue',cursive",
-                fontSize: 22,
-                color: C.accent,
-                letterSpacing: 1
-              },
-              children: [(+form.force / 9.81).toFixed(1), " kgf"]
-            }, void 0, true)]
-          }, void 0, true)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 11,
-            color: C.muted,
-            lineHeight: 1.5
-          },
-          children: ["Enter peak force from a force plate, dynamometer or load cell.", isYieldIso(form.type) && form.mvic && form.force ? ` Estimated 100% MVIC ≈ ${(+form.force / (+form.mvic / 100)).toFixed(0)} N (${(+form.force / (+form.mvic / 100) / 9.81).toFixed(1)} kgf).` : ""]
-        }, void 0, true)]
-      }, void 0, true), isYieldIso(form.type) && /*#__PURE__*/_jsxDEV(_Fragment, {
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            gap: 10,
-            marginBottom: 12
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              flex: 1
-            },
-            children: [/*#__PURE__*/_jsxDEV(Lbl, {
-              t: "Hold Duration (s)"
-            }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
-              value: form.holdDuration,
-              onChange: e => upd("holdDuration", e.target.value),
-              style: ss,
-              children: [/*#__PURE__*/_jsxDEV("option", {
-                value: "",
-                children: "Select…"
-              }, void 0, false), form.type === "Yielding Iso-GPP" ? Array.from({
-                length: 13
-              }, (_, i) => 60 + i * 10).map(v => /*#__PURE__*/_jsxDEV("option", {
-                value: v,
-                children: [v, "s (", Math.floor(v / 60), ":", String(v % 60).padStart(2, "0"), " min)"]
-              }, v, true)) : [30, 35, 40, 45].map(v => /*#__PURE__*/_jsxDEV("option", {
-                value: v,
-                children: [v, "s"]
-              }, v, true))]
-            }, void 0, true)]
-          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              flex: 1
-            },
-            children: [/*#__PURE__*/_jsxDEV(Lbl, {
-              t: "% MVIC"
-            }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
-              value: form.mvic,
-              onChange: e => upd("mvic", e.target.value),
-              style: ss,
-              children: [/*#__PURE__*/_jsxDEV("option", {
-                value: "",
-                children: "Select…"
-              }, void 0, false), Array.from({
-                length: 26
-              }, (_, i) => 60 + i).map(v => /*#__PURE__*/_jsxDEV("option", {
-                value: v,
-                children: [v, "%"]
-              }, v, true))]
-            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontSize: 9,
-                color: C.muted,
-                marginTop: 2
-              },
-              children: "% max voluntary contraction"
-            }, void 0, false)]
-          }, void 0, true)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            background: C.blue + "15",
-            borderRadius: 10,
-            padding: "12px 14px",
-            border: `1px solid ${C.blue + "33"}`,
-            marginBottom: 12
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              fontWeight: 700,
-              color: C.blue,
-              marginBottom: 6
-            },
-            children: "What is MVIC?"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.sub,
-              lineHeight: 1.6,
-              marginBottom: 8
-            },
-            children: [/*#__PURE__*/_jsxDEV("strong", {
-              style: {
-                color: C.text
-              },
-              children: "MVIC = Maximum Voluntary Isometric Contraction"
-            }, void 0, false), " — the absolute maximum force a muscle can produce in a static (non-moving) contraction. Essentially your ceiling for isometric strength. When you prescribe 60–85% MVIC you are telling the client to hold at that percentage of their maximum possible isometric effort for that position."]
-          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.sub,
-              lineHeight: 1.8
-            },
-            children: [/*#__PURE__*/_jsxDEV("div", {
-              children: ["🔵 ", /*#__PURE__*/_jsxDEV("strong", {
-                style: {
-                  color: C.text
-                },
-                children: "60% MVIC"
-              }, void 0, false), " — moderate effort, sustainable for longer holds, good for beginners or acute tendinopathy"]
-            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-              children: ["🟡 ", /*#__PURE__*/_jsxDEV("strong", {
-                style: {
-                  color: C.text
-                },
-                children: "70–75% MVIC"
-              }, void 0, false), " — typical sweet spot for tendon adaptation"]
-            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-              children: ["🔴 ", /*#__PURE__*/_jsxDEV("strong", {
-                style: {
-                  color: C.text
-                },
-                children: "85% MVIC"
-              }, void 0, false), " — near-maximal, shorter sustainable duration, more advanced"]
-            }, void 0, true)]
-          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 10,
-              color: C.muted,
-              marginTop: 8,
-              fontStyle: "italic"
-            },
-            children: "Estimated subjectively (similar to RPE) unless you have force measurement equipment. Guide: 60% = moderately challenging · 75% = hard but holdable · 85% = very difficult."
-          }, void 0, false)]
-        }, void 0, true)]
-      }, void 0, true), !isOvrcIso(form.type) && /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          marginBottom: 12
-        },
-        children: [/*#__PURE__*/_jsxDEV("button", {
-          onClick: () => setShowBand(b => !b),
-          style: {
-            background: showBand ? C.warn + "18" : "none",
-            border: `1px ${showBand ? "solid" : "dashed"} ${C.warn + (showBand ? "55" : "33")}`,
-            borderRadius: 8,
-            padding: "7px 14px",
-            fontSize: 12,
-            color: C.warn,
-            fontWeight: 700,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 6
-          },
-          children: [/*#__PURE__*/_jsxDEV("span", {
-            children: "🔴"
-          }, void 0, false), " ", showBand ? "Remove band" : "+ Add band"]
-        }, void 0, true), showBand && /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            marginTop: 10,
-            padding: "12px 14px",
-            background: C.card2,
-            borderRadius: 10,
-            border: `1px solid ${C.warn + "33"}`
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 10,
-              color: C.warn,
-              letterSpacing: 1.5,
-              textTransform: "uppercase",
-              fontWeight: 700,
-              marginBottom: 10
-            },
-            children: "Band details"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              display: "flex",
-              gap: 8,
-              marginBottom: 10
-            },
-            children: [/*#__PURE__*/_jsxDEV("div", {
-              style: {
-                flex: 1
-              },
-              children: [/*#__PURE__*/_jsxDEV(Lbl, {
-                t: "Length"
-              }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
-                value: form.bandLength,
-                onChange: e => upd("bandLength", e.target.value),
-                style: ss,
-                children: [/*#__PURE__*/_jsxDEV("option", {
-                  value: "",
-                  children: "Select…"
-                }, void 0, false), ["Short (Mini)", "Long", "Thera Band"].map(v => /*#__PURE__*/_jsxDEV("option", {
-                  value: v,
-                  children: v
-                }, v, false))]
-              }, void 0, true)]
-            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                flex: 1
-              },
-              children: [/*#__PURE__*/_jsxDEV(Lbl, {
-                t: "Strength"
-              }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
-                value: form.bandStrength,
-                onChange: e => upd("bandStrength", e.target.value),
-                style: ss,
-                children: [/*#__PURE__*/_jsxDEV("option", {
-                  value: "",
-                  children: "Select…"
-                }, void 0, false), ["Extra Light", "Light", "Medium", "Heavy", "Extra Heavy"].map(v => /*#__PURE__*/_jsxDEV("option", {
-                  value: v,
-                  children: v
-                }, v, false))]
-              }, void 0, true)]
-            }, void 0, true)]
-          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-            children: [/*#__PURE__*/_jsxDEV(Lbl, {
-              t: "Usage"
-            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                display: "flex",
-                gap: 8,
-                marginTop: 4
-              },
-              children: [["resisted", "🔴 Resisted", "adds load"], ["assisted", "🟢 Assisted", "reduces load"]].map(([val, label, sub]) => /*#__PURE__*/_jsxDEV("button", {
-                onClick: () => upd("bandUsage", val),
-                style: {
-                  flex: 1,
-                  background: form.bandUsage === val ? C.card : C.card2,
-                  border: `1.5px solid ${form.bandUsage === val ? C.warn : C.border}`,
-                  borderRadius: 8,
-                  padding: "8px 6px",
-                  cursor: "pointer",
-                  textAlign: "center"
-                },
-                children: [/*#__PURE__*/_jsxDEV("div", {
-                  style: {
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: form.bandUsage === val ? C.warn : C.text
-                  },
-                  children: label
-                }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-                  style: {
-                    fontSize: 10,
-                    color: C.muted
-                  },
-                  children: sub
-                }, void 0, false)]
-              }, val, true))
-            }, void 0, false)]
-          }, void 0, true)]
-        }, void 0, true)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          gap: 10,
-          marginBottom: 12
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 1
-          },
-          children: [/*#__PURE__*/_jsxDEV(Lbl, {
-            t: "Set #"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-            type: "number",
-            min: "1",
-            value: form.setNo,
-            onChange: e => upd("setNo", e.target.value),
-            style: ss
-          }, void 0, false)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 2
-          },
-          children: [/*#__PURE__*/_jsxDEV(Lbl, {
-            t: "Set type"
-          }, void 0, false), /*#__PURE__*/_jsxDEV(AddableSelect, {
-            value: form.type,
-            onChange: v => upd("type", v),
-            options: setTypeList,
-            onAddOption: onAddSetType,
-            addLabel: "Add set type"
-          }, void 0, false)]
-        }, void 0, true)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          gap: 10,
-          marginBottom: 12
-        },
-        children: [!isOvrcIso(form.type) && /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 1
-          },
-          children: [/*#__PURE__*/_jsxDEV(Lbl, {
-            t: "RIR"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
-            value: form.rir,
-            onChange: e => upd("rir", +e.target.value),
-            style: ss,
-            children: [0, 1, 2, 3, 4].map(r => /*#__PURE__*/_jsxDEV("option", {
-              children: r
-            }, r, false))
-          }, void 0, false)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            flex: 1
-          },
-          children: [/*#__PURE__*/_jsxDEV(Lbl, {
-            t: "RPE"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("select", {
-            value: form.rpe,
-            onChange: e => upd("rpe", +e.target.value),
-            style: ss,
-            children: [4, 5, 6, 7, 8, 9, 10].map(r => /*#__PURE__*/_jsxDEV("option", {
-              value: r,
-              children: [r, " – ", RPE_DESC[r]]
-            }, r, true))
-          }, void 0, false)]
-        }, void 0, true)]
-      }, void 0, true), (() => {
-        const exDef = program?.exercises.find(e => e.name === activeEx);
-        const hasTempo = exDef?.eccSecs || exDef?.conSecs;
-        // Effective tempo: session override (if set) > program default
-        const effEcc = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDef?.eccSecs || null;
-        const effCon = tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDef?.conSecs || null;
-        const isOverridden = tempoOverride.eccSecs !== "" || tempoOverride.conSecs !== "";
-        return /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            background: C.card2 + "88",
-            borderRadius: 10,
-            padding: "10px 12px",
-            border: `1px dashed ${C.border}`,
-            marginBottom: 12
-          },
-          children: [hasTempo && !editingTempo && /*#__PURE__*/_jsxDEV("div", {
-            onClick: () => {
-              setTempoOverride({
-                eccSecs: effEcc ?? "",
-                conSecs: effCon ?? ""
-              });
-              setEditingTempo(true);
-            },
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 10,
-              padding: "6px 10px",
-              background: C.accent + "15",
-              borderRadius: 8,
-              border: `1px solid ${C.accent + "33"}`,
-              cursor: "pointer"
-            },
-            children: [/*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 16
-              },
-              children: "⏱"
-            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                flex: 1
-              },
-              children: [/*#__PURE__*/_jsxDEV("div", {
-                style: {
-                  fontSize: 10,
-                  color: C.muted,
-                  fontWeight: 700,
-                  letterSpacing: 1,
-                  textTransform: "uppercase"
-                },
-                children: [isOverridden ? "Tempo (adjusted this session)" : "Prescribed Tempo", " ", /*#__PURE__*/_jsxDEV("span", {
-                  style: {
-                    opacity: 0.6,
-                    fontWeight: 400
-                  },
-                  children: "· tap to adjust"
-                }, void 0, false)]
-              }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-                style: {
-                  fontSize: 13,
-                  color: C.accent,
-                  fontWeight: 700
-                },
-                children: [effEcc || "?", "s eccentric / ", effCon || "?", "s concentric", /*#__PURE__*/_jsxDEV("span", {
-                  style: {
-                    color: C.sub,
-                    fontWeight: 400
-                  },
-                  children: [" — target TUT: ", form.reps ? Math.round(+form.reps * ((effEcc || 2) + (effCon || 1))) : "–", form.reps ? "s" : ""]
-                }, void 0, true)]
-              }, void 0, true)]
-            }, void 0, true), /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 14,
-                color: C.muted
-              },
-              children: "✎"
-            }, void 0, false)]
-          }, void 0, true), hasTempo && editingTempo && /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              marginBottom: 10,
-              padding: "10px 12px",
-              background: C.accent + "10",
-              borderRadius: 8,
-              border: `1px solid ${C.accent + "33"}`
-            },
-            children: [/*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontSize: 10,
-                color: C.muted,
-                fontWeight: 700,
-                letterSpacing: 1,
-                textTransform: "uppercase",
-                marginBottom: 8
-              },
-              children: "Adjust tempo for this session"
-            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                display: "flex",
-                gap: 8,
-                marginBottom: 8
-              },
-              children: [/*#__PURE__*/_jsxDEV("div", {
-                style: {
-                  flex: 1
-                },
-                children: [/*#__PURE__*/_jsxDEV(Lbl, {
-                  t: "Eccentric (s)"
-                }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-                  type: "number",
-                  min: "0.5",
-                  step: "0.5",
-                  value: tempoOverride.eccSecs,
-                  onChange: e => setTempoOverride(t => ({
-                    ...t,
-                    eccSecs: e.target.value
-                  })),
-                  style: ss
-                }, void 0, false)]
-              }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-                style: {
-                  flex: 1
-                },
-                children: [/*#__PURE__*/_jsxDEV(Lbl, {
-                  t: "Concentric (s)"
-                }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-                  type: "number",
-                  min: "0.5",
-                  step: "0.5",
-                  value: tempoOverride.conSecs,
-                  onChange: e => setTempoOverride(t => ({
-                    ...t,
-                    conSecs: e.target.value
-                  })),
-                  style: ss
-                }, void 0, false)]
-              }, void 0, true)]
-            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                display: "flex",
-                gap: 8
-              },
-              children: [/*#__PURE__*/_jsxDEV("button", {
-                onClick: () => {
-                  setTempoOverride({
-                    eccSecs: "",
-                    conSecs: ""
-                  });
-                  setEditingTempo(false);
-                },
-                style: {
-                  flex: 1,
-                  background: "none",
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 8,
-                  padding: "8px",
-                  color: C.sub,
-                  cursor: "pointer",
-                  fontSize: 12,
-                  fontWeight: 700
-                },
-                children: ["Reset to default (", exDef.eccSecs || "?", "/", exDef.conSecs || "?", "s)"]
-              }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
-                onClick: () => setEditingTempo(false),
-                style: {
-                  flex: 1,
-                  background: C.accent,
-                  border: "none",
-                  borderRadius: 8,
-                  padding: "8px",
-                  color: "#001A12",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  fontWeight: 700
-                },
-                children: "Done"
-              }, void 0, false)]
-            }, void 0, true)]
-          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              marginTop: hasTempo ? 10 : 0
-            },
-            children: [/*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontSize: 10,
-                color: C.muted,
-                letterSpacing: 1.5,
-                textTransform: "uppercase",
-                fontWeight: 700,
-                marginBottom: 8
-              },
-              children: "Power measurement"
-            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                display: "flex",
-                gap: 10,
-                marginBottom: 6
-              },
-              children: [/*#__PURE__*/_jsxDEV("div", {
-                style: {
-                  flex: 1
-                },
-                children: [/*#__PURE__*/_jsxDEV(Lbl, {
-                  t: "Rep time (s)"
-                }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-                  type: "number",
-                  min: "0.1",
-                  step: "0.1",
-                  placeholder: "e.g. 0.5",
-                  value: form.repTime,
-                  onChange: e => upd("repTime", e.target.value),
-                  style: ss
-                }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-                  style: {
-                    fontSize: 9,
-                    color: C.muted,
-                    marginTop: 3
-                  },
-                  children: "⏱ Manual — stopwatch"
-                }, void 0, false)]
-              }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-                style: {
-                  flex: 1
-                },
-                children: [/*#__PURE__*/_jsxDEV(Lbl, {
-                  t: "Bar speed (m/s)"
-                }, void 0, false), /*#__PURE__*/_jsxDEV("input", {
-                  type: "number",
-                  min: "0.1",
-                  step: "0.01",
-                  placeholder: "e.g. 0.85",
-                  value: form.velocity,
-                  onChange: e => upd("velocity", e.target.value),
-                  style: ss
-                }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-                  style: {
-                    fontSize: 9,
-                    color: C.muted,
-                    marginTop: 3
-                  },
-                  children: "📡 Device — overrides rep time"
-                }, void 0, false)]
-              }, void 0, true)]
-            }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontSize: 10,
-                color: C.muted,
-                lineHeight: 1.4
-              },
-              children: "Enter one or neither. Device reading takes priority over rep time."
-            }, void 0, false)]
-          }, void 0, true)]
-        }, void 0, true);
-      })(), vol > 0 && (() => {
-        const oneRM = est1RM(+form.load, +form.reps);
-        // velocity: measured > derived from conSecs > estimated from load/1RM
-        // Velocity: measured > from rep time > estimated
-        const velFromRepT = form.repTime ? +(0.45 / +form.repTime).toFixed(2) : null;
-        const vel = form.velocity ? +form.velocity : velFromRepT ? velFromRepT : estVelocity(+form.load, oneRM);
-        const power = calcPower(+form.load, vel);
-        const velLabel = form.velocity ? "m/s (measured)" : velFromRepT ? "m/s (from rep time)" : "m/s (estimated)";
-        // TUT from effective tempo (session override > prescribed default)
-        const exDef2 = program?.exercises.find(e => e.name === activeEx);
-        const eccS = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDef2?.eccSecs || null;
-        const conS = tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDef2?.conSecs || null;
-        // For isometrics, TUT = holdDuration × reps
-        const tut = isIsoType(form.type) && form.holdDuration && form.reps ? Math.round(+form.holdDuration * +form.reps) : (eccS || conS) && form.reps ? Math.round(+form.reps * ((eccS || 2) + (conS || 1))) : null;
-        const tutZone = !tut ? null : tut >= 40 && tut <= 70 ? {
-          label: "Optimal TUT ✓",
-          color: C.accent
-        } : tut < 40 ? {
-          label: "Below optimal",
-          color: "#FFB020"
-        } : {
-          label: "Extended TUT",
-          color: C.blue
-        };
-        return /*#__PURE__*/_jsxDEV(_Fragment, {
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              display: "flex",
-              gap: 8,
-              marginBottom: 8
-            },
-            children: [/*#__PURE__*/_jsxDEV(StatCard, {
-              label: "Volume",
-              value: vol,
-              unit: " kg",
-              color: C.blue
-            }, void 0, false), /*#__PURE__*/_jsxDEV(StatCard, {
-              label: "Est. 1RM",
-              value: oneRM,
-              unit: " kg",
-              color: C.accent
-            }, void 0, false)]
-          }, void 0, true), !isIsoType(form.type) && /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              display: "flex",
-              gap: 8,
-              marginBottom: tut ? 8 : 14
-            },
-            children: [/*#__PURE__*/_jsxDEV(StatCard, {
-              label: "Power",
-              value: power,
-              unit: " W",
-              color: C.gold
-            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                background: C.card2,
-                borderRadius: 10,
-                padding: "10px 12px",
-                flex: 1
-              },
-              children: [/*#__PURE__*/_jsxDEV("div", {
-                style: {
-                  fontSize: 10,
-                  color: C.muted,
-                  letterSpacing: 1.5,
-                  textTransform: "uppercase",
-                  marginBottom: 3,
-                  fontWeight: 700
-                },
-                children: "Velocity"
-              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-                style: {
-                  fontSize: 22,
-                  fontFamily: "'Bebas Neue',cursive",
-                  letterSpacing: 1,
-                  color: C.gold,
-                  lineHeight: 1.2
-                },
-                children: vel.toFixed(2)
-              }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-                style: {
-                  fontSize: 10,
-                  color: C.muted,
-                  marginTop: 1
-                },
-                children: velLabel
-              }, void 0, false)]
-            }, void 0, true)]
-          }, void 0, true), tut && /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              display: "flex",
-              gap: 8,
-              marginBottom: 14
-            },
-            children: [/*#__PURE__*/_jsxDEV(StatCard, {
-              label: "TUT this set",
-              value: tut,
-              unit: "s",
-              color: tutZone.color
-            }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                background: C.card2,
-                borderRadius: 10,
-                padding: "10px 12px",
-                flex: 1,
-                display: "flex",
-                alignItems: "center"
-              },
-              children: /*#__PURE__*/_jsxDEV("div", {
-                children: [/*#__PURE__*/_jsxDEV("div", {
-                  style: {
-                    fontSize: 10,
-                    color: C.muted,
-                    letterSpacing: 1.5,
-                    textTransform: "uppercase",
-                    marginBottom: 3,
-                    fontWeight: 700
-                  },
-                  children: "Hypertrophy"
-                }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-                  style: {
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: tutZone.color
-                  },
-                  children: tutZone.label
-                }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-                  style: {
-                    fontSize: 10,
-                    color: C.muted,
-                    marginTop: 1
-                  },
-                  children: "Target: 40–70s"
-                }, void 0, false)]
-              }, void 0, true)
-            }, void 0, false)]
-          }, void 0, true)]
-        }, void 0, true);
-      })(), /*#__PURE__*/_jsxDEV("button", {
-        onClick: submit,
-        style: {
-          width: "100%",
-          background: saved ? C.accent + "CC" : C.accent,
-          color: "#001A12",
-          border: "none",
-          borderRadius: 10,
-          padding: "14px",
-          cursor: "pointer",
-          fontFamily: "'Bebas Neue',cursive",
-          fontSize: 20,
-          letterSpacing: 2
-        },
-        children: saved ? `✓  ${activeEx.toUpperCase()} LOGGED!` : "LOG SET"
-      }, void 0, false)]
-    }, void 0, true), sessions.at(-1)?.date === today && sessions.at(-1).entries.length > 0 && /*#__PURE__*/_jsxDEV(_Fragment, {
-      children: [/*#__PURE__*/_jsxDEV(SecLabel, {
-        text: "Today's session"
-      }, void 0, false), progExNames.map(name => {
-        const todayEntries = sessions.at(-1).entries.filter(e => e.ex === name);
-        if (!todayEntries.length) return null;
-        return /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            background: C.card,
-            borderRadius: 10,
-            padding: "10px 14px",
-            marginBottom: 8,
-            border: `1px solid ${name === activeEx ? C.accent + "44" : C.border}`
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontWeight: 700,
-              fontSize: 13,
-              marginBottom: 6,
-              color: name === activeEx ? C.accent : C.text
-            },
-            children: name
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 6
-            },
-            children: todayEntries.map((e, i) => /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                background: C.card2,
-                borderRadius: 6,
-                padding: "4px 10px",
-                fontSize: 12,
-                border: `1px solid ${C.border}`
-              },
-              children: ["Set ", e.set, ": ", e.reps, "×", e.load, "kg"]
-            }, i, true))
-          }, void 0, false)]
-        }, name, true);
-      })]
-    }, void 0, true), recentSessions.length > 0 && /*#__PURE__*/_jsxDEV(_Fragment, {
-      children: [/*#__PURE__*/_jsxDEV(SecLabel, {
-        text: `History — ${activeEx}`
-      }, void 0, false), recentSessions.map((s, si) => /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.card,
-          borderRadius: 12,
-          padding: "12px 14px",
-          marginBottom: 10,
-          border: `1px solid ${C.border}`
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 10
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 8
-            },
-            children: [/*#__PURE__*/_jsxDEV(Tag, {
-              text: s.sid,
-              color: C.blue
-            }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 12,
-                color: C.sub
-              },
-              children: s.date
-            }, void 0, false)]
-          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.muted
-            },
-            children: [s.sets.length, " set", s.sets.length !== 1 ? "s" : ""]
-          }, void 0, true)]
-        }, void 0, true), s.sets.map((e, i) => /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "7px 0",
-            borderTop: `1px solid ${C.border}`
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            children: [/*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 11,
-                color: C.muted,
-                marginRight: 8
-              },
-              children: ["Set ", e.set]
-            }, void 0, true), /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 13
-              },
-              children: [e.reps, " reps"]
-            }, void 0, true), e.holdDuration && /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 12,
-                color: "#5060FF"
-              },
-              children: [" · ⏱ ", e.holdDuration, "s"]
-            }, void 0, true), e.mvic && /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 12,
-                color: "#5060FF"
-              },
-              children: [" · ", e.mvic, "% MVIC"]
-            }, void 0, true), e.force && /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 12,
-                color: C.gold
-              },
-              children: [" · ", e.force, "N"]
-            }, void 0, true), e.bandStrength && /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 12,
-                color: C.warn
-              },
-              children: [" · 🔴 ", e.bandLength, " ", e.bandStrength, " (", e.bandUsage, ")"]
-            }, void 0, true), /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 12,
-                color: C.muted
-              },
-              children: [" · ", e.type]
-            }, void 0, true), /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                fontSize: 12,
-                color: C.sub
-              },
-              children: [" · RPE ", e.rpe, !isOvrcIso(e.type) ? ` · RIR ${e.rir}` : ""]
-            }, void 0, true)]
-          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              textAlign: "right",
-              flexShrink: 0
-            },
-            children: !isOvrcIso(e.type) ? /*#__PURE__*/_jsxDEV(_Fragment, {
-              children: [/*#__PURE__*/_jsxDEV("div", {
-                style: {
-                  fontFamily: "'Bebas Neue',cursive",
-                  fontSize: 22,
-                  color: C.accent,
-                  lineHeight: 1
-                },
-                children: [e.load, /*#__PURE__*/_jsxDEV("span", {
-                  style: {
-                    fontSize: 10,
-                    opacity: 0.6
-                  },
-                  children: " kg"
-                }, void 0, false)]
-              }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-                style: {
-                  fontSize: 10,
-                  color: C.sub
-                },
-                children: ["~", est1RM(e.load, e.reps), " 1RM"]
-              }, void 0, true)]
-            }, void 0, true) : /*#__PURE__*/_jsxDEV("div", {
-              style: {
-                fontSize: 11,
-                color: C.warn,
-                fontWeight: 700
-              },
-              children: "Max effort"
-            }, void 0, false)
-          }, void 0, false)]
-        }, i, true))]
-      }, si, true))]
-    }, void 0, true)]
-  }, void 0, true);
+      }
+    }, "Set ", e.set, ": ", e.reps, "×", e.load, "kg"))));
+  })), recentSessions.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SecLabel, {
+    text: `History — ${activeEx}`
+  }), recentSessions.map((s, si) => /*#__PURE__*/React.createElement("div", {
+    key: si,
+    style: {
+      background: C.card,
+      borderRadius: 12,
+      padding: "12px 14px",
+      marginBottom: 10,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement(Tag, {
+    text: s.sid,
+    color: C.blue
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.sub
+    }
+  }, s.date)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted
+    }
+  }, s.sets.length, " set", s.sets.length !== 1 ? "s" : "")), s.sets.map((e, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "7px 0",
+      borderTop: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: C.muted,
+      marginRight: 8
+    }
+  }, "Set ", e.set), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13
+    }
+  }, e.reps, " reps"), e.holdDuration && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#5060FF"
+    }
+  }, " · ⏱ ", e.holdDuration, "s"), e.mvic && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "#5060FF"
+    }
+  }, " · ", e.mvic, "% MVIC"), e.force && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.gold
+    }
+  }, " · ", e.force, "N"), e.bandStrength && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.warn
+    }
+  }, " · 🔴 ", e.bandLength, " ", e.bandStrength, " ", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", "(", e.bandUsage, ")"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.muted
+    }
+  }, " · ", e.type), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.sub
+    }
+  }, " · RPE ", e.rpe, !isOvrcIso(e.type) ? ` · RIR ${e.rir}` : "")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "right",
+      flexShrink: 0
+    }
+  }, !isOvrcIso(e.type) ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 22,
+      color: C.accent,
+      lineHeight: 1
+    }
+  }, e.load, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      opacity: 0.6
+    }
+  }, " kg")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.sub
+    }
+  }, "~", est1RM(e.load, e.reps), " 1RM")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.warn,
+      fontWeight: 700
+    }
+  }, "Max effort"))))))));
 }
 
 // ─── Progress Tab ─────────────────────────────────────────────────────────────
@@ -4636,332 +4327,308 @@ function ProgressTab({
     unit: "",
     color: "#AA44FF"
   }];
-  if (!program) return /*#__PURE__*/_jsxDEV("div", {
+  if (!program) return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "48px 24px",
       textAlign: "center"
-    },
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        fontSize: 42,
-        marginBottom: 14
-      },
-      children: "📈"
-    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        color: C.sub,
-        fontSize: 14
-      },
-      children: "No active program selected."
-    }, void 0, false)]
-  }, void 0, true);
-  if (!exercises.length || !sessions.length) return /*#__PURE__*/_jsxDEV("div", {
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 42,
+      marginBottom: 14
+    }
+  }, "📈"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.sub,
+      fontSize: 14
+    }
+  }, "No active program selected."));
+  if (!exercises.length || !sessions.length) return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "48px 24px",
       textAlign: "center"
-    },
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        fontSize: 42,
-        marginBottom: 14
-      },
-      children: "📈"
-    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        color: C.sub,
-        fontSize: 14
-      },
-      children: ["No session data yet.", /*#__PURE__*/_jsxDEV("br", {}, void 0, false), "Start logging in the Log tab."]
-    }, void 0, true)]
-  }, void 0, true);
-  return /*#__PURE__*/_jsxDEV("div", {
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 42,
+      marginBottom: 14
+    }
+  }, "📈"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.sub,
+      fontSize: 14
+    }
+  }, "No session data yet.", /*#__PURE__*/React.createElement("br", null), "Start logging in the Log tab."));
+  return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "16px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Select exercise"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 7,
+      flexWrap: "wrap"
+    }
+  }, exercises.map(ex => /*#__PURE__*/React.createElement("button", {
+    key: ex.name,
+    onClick: () => setSel(ex.name),
+    style: {
+      background: sel === ex.name ? C.accent : C.card2,
+      color: sel === ex.name ? "#001A12" : C.sub,
+      border: `1px solid ${sel === ex.name ? C.accent : C.border}`,
+      borderRadius: 20,
+      padding: "7px 14px",
+      fontSize: 12,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, ex.name)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(StatCard, {
+    label: "Current",
+    value: last ?? "–",
+    unit: ` ${METRIC_OPTS.find(m => m.key === metric)?.unit}`,
+    color: C.accent
+  }), /*#__PURE__*/React.createElement(StatCard, {
+    label: "Best 1RM",
+    value: best1RM || "–",
+    unit: " kg",
+    color: C.blue
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(StatCard, {
+    label: "Peak Power",
+    value: bestPower || "–",
+    unit: " W",
+    color: C.gold
+  }), metric === "ACWR" || ["Hyp Index", "Max Str Index", "Str End Index", "Power Index"].includes(metric) ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 10,
+      padding: "10px 12px",
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      marginBottom: 3,
+      fontWeight: 700
+    }
+  }, "Zone"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: metric === "ACWR" ? acwrZone(last).color : trainingZone(metric, last).color
+    }
+  }, metric === "ACWR" ? acwrZone(last).label : trainingZone(metric, last).label)) : /*#__PURE__*/React.createElement(StatCard, {
+    label: metric === "Reps" ? "Best Reps" : metric === "Injury Index" ? "Peak Risk" : "Total gain",
+    value: metric === "Reps" ? bestReps || "–" : metric === "Injury Index" ? peakInjury : first && last ? `+${pct}` : "–",
+    unit: metric === "Reps" ? " reps" : metric === "Injury Index" ? "%" : first && last ? "%" : "",
+    color: "#FF8020"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 7,
+      marginBottom: 14
+    }
+  }, METRIC_OPTS.map(m => /*#__PURE__*/React.createElement("button", {
+    key: m.key,
+    onClick: () => setMetric(m.key),
+    style: {
+      background: metric === m.key ? m.color : C.card2,
+      color: metric === m.key ? "#001A12" : C.sub,
+      border: `1px solid ${metric === m.key ? m.color : C.border}`,
+      borderRadius: 20,
+      padding: "6px 14px",
+      fontSize: 12,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, m.label))), chartData.length > 1 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 16,
+      padding: "16px 6px 12px",
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      paddingLeft: 12,
+      marginBottom: 12
+    }
+  }, sel, " — ", metric, " progression"), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: chartData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, {
+      ...props,
+      dateMap: dateMap
+    })
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fill: C.muted,
+      fontSize: 11
     },
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginBottom: 14
-      },
-      children: [/*#__PURE__*/_jsxDEV(SecLabel, {
-        text: "Select exercise"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          gap: 7,
-          flexWrap: "wrap"
-        },
-        children: exercises.map(ex => /*#__PURE__*/_jsxDEV("button", {
-          onClick: () => setSel(ex.name),
-          style: {
-            background: sel === ex.name ? C.accent : C.card2,
-            color: sel === ex.name ? "#001A12" : C.sub,
-            border: `1px solid ${sel === ex.name ? C.accent : C.border}`,
-            borderRadius: 20,
-            padding: "7px 14px",
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: "pointer"
-          },
-          children: ex.name
-        }, ex.name, false))
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        marginBottom: 8
-      },
-      children: [/*#__PURE__*/_jsxDEV(StatCard, {
-        label: "Current",
-        value: last ?? "–",
-        unit: ` ${METRIC_OPTS.find(m => m.key === metric)?.unit}`,
-        color: C.accent
-      }, void 0, false), /*#__PURE__*/_jsxDEV(StatCard, {
-        label: "Best 1RM",
-        value: best1RM || "–",
-        unit: " kg",
-        color: C.blue
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        marginBottom: 14
-      },
-      children: [/*#__PURE__*/_jsxDEV(StatCard, {
-        label: "Peak Power",
-        value: bestPower || "–",
-        unit: " W",
-        color: C.gold
-      }, void 0, false), metric === "ACWR" || ["Hyp Index", "Max Str Index", "Str End Index", "Power Index"].includes(metric) ? /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.card2,
-          borderRadius: 10,
-          padding: "10px 12px",
-          flex: 1
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 10,
-            color: C.muted,
-            letterSpacing: 1.5,
-            textTransform: "uppercase",
-            marginBottom: 3,
-            fontWeight: 700
-          },
-          children: "Zone"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontSize: 14,
-            fontWeight: 700,
-            color: metric === "ACWR" ? acwrZone(last).color : trainingZone(metric, last).color
-          },
-          children: metric === "ACWR" ? acwrZone(last).label : trainingZone(metric, last).label
-        }, void 0, false)]
-      }, void 0, true) : /*#__PURE__*/_jsxDEV(StatCard, {
-        label: metric === "Reps" ? "Best Reps" : metric === "Injury Index" ? "Peak Risk" : "Total gain",
-        value: metric === "Reps" ? bestReps || "–" : metric === "Injury Index" ? peakInjury : first && last ? `+${pct}` : "–",
-        unit: metric === "Reps" ? " reps" : metric === "Injury Index" ? "%" : first && last ? "%" : "",
-        color: "#FF8020"
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        display: "flex",
-        gap: 7,
-        marginBottom: 14
-      },
-      children: METRIC_OPTS.map(m => /*#__PURE__*/_jsxDEV("button", {
-        onClick: () => setMetric(m.key),
-        style: {
-          background: metric === m.key ? m.color : C.card2,
-          color: metric === m.key ? "#001A12" : C.sub,
-          border: `1px solid ${metric === m.key ? m.color : C.border}`,
-          borderRadius: 20,
-          padding: "6px 14px",
-          fontSize: 12,
-          fontWeight: 700,
-          cursor: "pointer"
-        },
-        children: m.label
-      }, m.key, false))
-    }, void 0, false), chartData.length > 1 && /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        background: C.card,
-        borderRadius: 16,
-        padding: "16px 6px 12px",
-        border: `1px solid ${C.border}`
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontSize: 13,
-          fontWeight: 700,
-          paddingLeft: 12,
-          marginBottom: 12
-        },
-        children: [sel, " — ", metric, " progression"]
-      }, void 0, true), /*#__PURE__*/_jsxDEV(ResponsiveContainer, {
-        width: "100%",
-        height: 200,
-        children: /*#__PURE__*/_jsxDEV(LineChart, {
-          data: chartData,
-          margin: {
-            top: 4,
-            right: 14,
-            bottom: 4,
-            left: 0
-          },
-          children: [/*#__PURE__*/_jsxDEV(CartesianGrid, {
-            stroke: C.border,
-            strokeDasharray: "3 3"
-          }, void 0, false), /*#__PURE__*/_jsxDEV(XAxis, {
-            dataKey: "session",
-            axisLine: false,
-            tickLine: false,
-            height: 34,
-            tick: props => /*#__PURE__*/_jsxDEV(SessionXTick, {
-              ...props,
-              dateMap: dateMap
-            }, void 0, false)
-          }, void 0, false), /*#__PURE__*/_jsxDEV(YAxis, {
-            tick: {
-              fill: C.muted,
-              fontSize: 11
-            },
-            axisLine: false,
-            tickLine: false,
-            width: 42,
-            unit: METRIC_OPTS.find(m => m.key === metric)?.unit
-          }, void 0, false), /*#__PURE__*/_jsxDEV(Tooltip, {
-            contentStyle: {
-              background: C.card2,
-              border: `1px solid ${C.border}`,
-              borderRadius: 8,
-              color: C.text,
-              fontSize: 12
-            }
-          }, void 0, false), metric === "Injury Index" && /*#__PURE__*/_jsxDEV(ReferenceLine, {
-            y: 10,
-            stroke: C.warn,
-            strokeDasharray: "4 3",
-            strokeOpacity: 0.6,
-            label: {
-              value: "High risk >10%",
-              position: "insideTopRight",
-              fill: C.warn,
-              fontSize: 10
-            }
-          }, void 0, false), metric === "ACWR" && /*#__PURE__*/_jsxDEV(_Fragment, {
-            children: [/*#__PURE__*/_jsxDEV(ReferenceLine, {
-              y: 0.8,
-              stroke: C.blue,
-              strokeDasharray: "4 3",
-              strokeOpacity: 0.6,
-              label: {
-                value: "0.8 Low",
-                position: "insideBottomRight",
-                fill: C.blue,
-                fontSize: 9
-              }
-            }, void 0, false), /*#__PURE__*/_jsxDEV(ReferenceLine, {
-              y: 1.3,
-              stroke: "#FFB020",
-              strokeDasharray: "4 3",
-              strokeOpacity: 0.6,
-              label: {
-                value: "1.3 Caution",
-                position: "insideTopRight",
-                fill: "#FFB020",
-                fontSize: 9
-              }
-            }, void 0, false), /*#__PURE__*/_jsxDEV(ReferenceLine, {
-              y: 1.5,
-              stroke: C.warn,
-              strokeDasharray: "4 3",
-              strokeOpacity: 0.6,
-              label: {
-                value: "1.5 High risk",
-                position: "insideTopRight",
-                fill: C.warn,
-                fontSize: 9
-              }
-            }, void 0, false)]
-          }, void 0, true), metric === "Max Str Index" && /*#__PURE__*/_jsxDEV(_Fragment, {
-            children: [/*#__PURE__*/_jsxDEV(ReferenceLine, {
-              y: 65,
-              stroke: C.blue,
-              strokeDasharray: "4 3",
-              strokeOpacity: 0.6,
-              label: {
-                value: "65% Strength zone",
-                position: "insideTopRight",
-                fill: C.blue,
-                fontSize: 9
-              }
-            }, void 0, false), /*#__PURE__*/_jsxDEV(ReferenceLine, {
-              y: 80,
-              stroke: "#FF8020",
-              strokeDasharray: "4 3",
-              strokeOpacity: 0.6,
-              label: {
-                value: "80% Max strength",
-                position: "insideTopRight",
-                fill: "#FF8020",
-                fontSize: 9
-              }
-            }, void 0, false), /*#__PURE__*/_jsxDEV(ReferenceLine, {
-              y: 90,
-              stroke: C.warn,
-              strokeDasharray: "4 3",
-              strokeOpacity: 0.6,
-              label: {
-                value: "90% Peaking",
-                position: "insideTopRight",
-                fill: C.warn,
-                fontSize: 9
-              }
-            }, void 0, false)]
-          }, void 0, true), /*#__PURE__*/_jsxDEV(Line, {
-            type: "monotone",
-            dataKey: metric,
-            stroke: METRIC_OPTS.find(m => m.key === metric)?.color,
-            strokeWidth: 2.5,
-            dot: {
-              fill: METRIC_OPTS.find(m => m.key === metric)?.color,
-              r: 4,
-              strokeWidth: 0
-            }
-          }, void 0, false)]
-        }, void 0, true)
-      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          justifyContent: "center",
-          gap: 18,
-          marginTop: 8
-        },
-        children: METRIC_OPTS.map(m => /*#__PURE__*/_jsxDEV("div", {
-          onClick: () => setMetric(m.key),
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-            fontSize: 11,
-            color: metric === m.key ? m.color : C.muted,
-            cursor: "pointer"
-          },
-          children: [/*#__PURE__*/_jsxDEV("span", {
-            style: {
-              width: 14,
-              height: 3,
-              background: m.color,
-              display: "inline-block",
-              borderRadius: 2
-            }
-          }, void 0, false), m.label]
-        }, m.key, true))
-      }, void 0, false)]
-    }, void 0, true)]
-  }, void 0, true);
+    axisLine: false,
+    tickLine: false,
+    width: 42,
+    unit: METRIC_OPTS.find(m => m.key === metric)?.unit
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    }
+  }), metric === "Injury Index" && /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 10,
+    stroke: C.warn,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "High risk >10%",
+      position: "insideTopRight",
+      fill: C.warn,
+      fontSize: 10
+    }
+  }), metric === "ACWR" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 0.8,
+    stroke: C.blue,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "0.8 Low",
+      position: "insideBottomRight",
+      fill: C.blue,
+      fontSize: 9
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 1.3,
+    stroke: "#FFB020",
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "1.3 Caution",
+      position: "insideTopRight",
+      fill: "#FFB020",
+      fontSize: 9
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 1.5,
+    stroke: C.warn,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "1.5 High risk",
+      position: "insideTopRight",
+      fill: C.warn,
+      fontSize: 9
+    }
+  })), metric === "Max Str Index" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 65,
+    stroke: C.blue,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "65% Strength zone",
+      position: "insideTopRight",
+      fill: C.blue,
+      fontSize: 9
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 80,
+    stroke: "#FF8020",
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "80% Max strength",
+      position: "insideTopRight",
+      fill: "#FF8020",
+      fontSize: 9
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 90,
+    stroke: C.warn,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "90% Peaking",
+      position: "insideTopRight",
+      fill: C.warn,
+      fontSize: 9
+    }
+  })), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: metric,
+    stroke: METRIC_OPTS.find(m => m.key === metric)?.color,
+    strokeWidth: 2.5,
+    dot: {
+      fill: METRIC_OPTS.find(m => m.key === metric)?.color,
+      r: 4,
+      strokeWidth: 0
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "center",
+      gap: 18,
+      marginTop: 8
+    }
+  }, METRIC_OPTS.map(m => /*#__PURE__*/React.createElement("div", {
+    key: m.key,
+    onClick: () => setMetric(m.key),
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 11,
+      color: metric === m.key ? m.color : C.muted,
+      cursor: "pointer"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 14,
+      height: 3,
+      background: m.color,
+      display: "inline-block",
+      borderRadius: 2
+    }
+  }), m.label)))));
 }
 
 // ─── Print Preview Overlay ────────────────────────────────────────────────────
@@ -5008,28 +4675,25 @@ function PrintPreview({
       } catch {}
     };
   }, []);
-  const pRow = (label, value, color = "#111827") => /*#__PURE__*/_jsxDEV("div", {
+  const pRow = (label, value, color = "#111827") => /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       justifyContent: "space-between",
       padding: "8px 0",
       borderBottom: "1px solid #f3f4f6",
       fontSize: 13
-    },
-    children: [/*#__PURE__*/_jsxDEV("span", {
-      style: {
-        color: "#6b7280",
-        fontWeight: 600
-      },
-      children: label
-    }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
-      style: {
-        fontWeight: 700,
-        color
-      },
-      children: value
-    }, void 0, false)]
-  }, void 0, true);
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#6b7280",
+      fontWeight: 600
+    }
+  }, label), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 700,
+      color
+    }
+  }, value));
   const SvgChartPrint = ({
     data,
     keys,
@@ -5054,98 +4718,95 @@ function PrintPreview({
     const cx = (i, n) => pL + (n <= 1 ? cw / 2 : i / (n - 1) * cw);
     const cy = v => pT + ch - (v - minV) / range * ch;
     const n = data.length;
-    return /*#__PURE__*/_jsxDEV("div", {
+    return /*#__PURE__*/React.createElement("div", {
       style: {
         marginBottom: 24
-      },
-      children: [/*#__PURE__*/_jsxDEV("svg", {
-        width: "100%",
-        viewBox: `0 0 ${w} ${h}`,
-        style: {
-          display: "block",
-          overflow: "visible"
-        },
-        children: [[0, 0.25, 0.5, 0.75, 1].map(f => {
-          const yy = pT + ch * (1 - f);
-          return /*#__PURE__*/_jsxDEV("g", {
-            children: [/*#__PURE__*/_jsxDEV("line", {
-              x1: pL,
-              y1: yy,
-              x2: w - pR,
-              y2: yy,
-              stroke: "#e5e7eb",
-              strokeWidth: "1"
-            }, void 0, false), /*#__PURE__*/_jsxDEV("text", {
-              x: pL - 5,
-              y: yy + 4,
-              textAnchor: "end",
-              fontSize: "10",
-              fill: "#9ca3af",
-              children: [(minV + f * range).toFixed(1), unit]
-            }, void 0, true)]
-          }, f, true);
-        }), data.map((d, i) => /*#__PURE__*/_jsxDEV("text", {
-          x: cx(i, n),
-          y: h - 6,
-          textAnchor: "middle",
-          fontSize: "10",
-          fill: "#9ca3af",
-          children: d.session
-        }, i, false)), keys.map((k, ki) => {
-          const pts = data.map((d, i) => ({
-            x: cx(i, n),
-            y: d[k] != null ? cy(d[k]) : null
-          })).filter(p => p.y != null);
-          if (!pts.length) return null;
-          const path = pts.map((p, pi) => `${pi === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-          return /*#__PURE__*/_jsxDEV("g", {
-            children: [/*#__PURE__*/_jsxDEV("path", {
-              d: path,
-              fill: "none",
-              stroke: colors[ki],
-              strokeWidth: "2.5",
-              strokeLinecap: "round",
-              strokeLinejoin: "round"
-            }, void 0, false), pts.map((p, pi) => /*#__PURE__*/_jsxDEV("circle", {
-              cx: p.x,
-              cy: p.y,
-              r: "3.5",
-              fill: colors[ki],
-              stroke: "white",
-              strokeWidth: "1.5"
-            }, pi, false))]
-          }, k, true);
-        })]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 12,
-          paddingLeft: pL,
-          marginTop: 6
-        },
-        children: keys.map((k, ki) => /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-            fontSize: 11,
-            color: "#374151"
-          },
-          children: [/*#__PURE__*/_jsxDEV("span", {
-            style: {
-              width: 14,
-              height: 3,
-              background: colors[ki],
-              display: "inline-block",
-              borderRadius: 2
-            }
-          }, void 0, false), names[ki]]
-        }, k, true))
-      }, void 0, false)]
-    }, void 0, true);
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      width: "100%",
+      viewBox: `0 0 ${w} ${h}`,
+      style: {
+        display: "block",
+        overflow: "visible"
+      }
+    }, [0, 0.25, 0.5, 0.75, 1].map(f => {
+      const yy = pT + ch * (1 - f);
+      return /*#__PURE__*/React.createElement("g", {
+        key: f
+      }, /*#__PURE__*/React.createElement("line", {
+        x1: pL,
+        y1: yy,
+        x2: w - pR,
+        y2: yy,
+        stroke: "#e5e7eb",
+        strokeWidth: "1"
+      }), /*#__PURE__*/React.createElement("text", {
+        x: pL - 5,
+        y: yy + 4,
+        textAnchor: "end",
+        fontSize: "10",
+        fill: "#9ca3af"
+      }, (minV + f * range).toFixed(1), unit));
+    }), data.map((d, i) => /*#__PURE__*/React.createElement("text", {
+      key: i,
+      x: cx(i, n),
+      y: h - 6,
+      textAnchor: "middle",
+      fontSize: "10",
+      fill: "#9ca3af"
+    }, d.session)), keys.map((k, ki) => {
+      const pts = data.map((d, i) => ({
+        x: cx(i, n),
+        y: d[k] != null ? cy(d[k]) : null
+      })).filter(p => p.y != null);
+      if (!pts.length) return null;
+      const path = pts.map((p, pi) => `${pi === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+      return /*#__PURE__*/React.createElement("g", {
+        key: k
+      }, /*#__PURE__*/React.createElement("path", {
+        d: path,
+        fill: "none",
+        stroke: colors[ki],
+        strokeWidth: "2.5",
+        strokeLinecap: "round",
+        strokeLinejoin: "round"
+      }), pts.map((p, pi) => /*#__PURE__*/React.createElement("circle", {
+        key: pi,
+        cx: p.x,
+        cy: p.y,
+        r: "3.5",
+        fill: colors[ki],
+        stroke: "white",
+        strokeWidth: "1.5"
+      })));
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 12,
+        paddingLeft: pL,
+        marginTop: 6
+      }
+    }, keys.map((k, ki) => /*#__PURE__*/React.createElement("div", {
+      key: k,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        fontSize: 11,
+        color: "#374151"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 14,
+        height: 3,
+        background: colors[ki],
+        display: "inline-block",
+        borderRadius: 2
+      }
+    }), names[ki]))));
   };
-  const secH = t => /*#__PURE__*/_jsxDEV("div", {
+  const secH = t => /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       fontWeight: 700,
@@ -5156,9 +4817,8 @@ function PrintPreview({
       paddingBottom: 6,
       marginBottom: 12,
       marginTop: 28
-    },
-    children: t
-  }, void 0, false);
+    }
+  }, t);
 
   // ── Generate PDF with jsPDF (tables + charts) ────────────────────────────
   const buildPDF = () => {
@@ -5511,7 +5171,7 @@ function PrintPreview({
       console.error("Save PDF error:", e);
     }
   };
-  return /*#__PURE__*/_jsxDEV("div", {
+  return /*#__PURE__*/React.createElement("div", {
     id: "forge-print-root",
     style: {
       position: "fixed",
@@ -5521,358 +5181,311 @@ function PrintPreview({
       overflowY: "auto",
       color: "#111827",
       fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif"
-    },
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      className: "no-print",
-      style: {
-        position: "sticky",
-        top: 0,
-        zIndex: 10,
-        background: "#f0fdf4",
-        borderBottom: "2px solid #bbf7d0",
-        padding: "12px 18px",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        flexWrap: "wrap"
-      },
-      children: [/*#__PURE__*/_jsxDEV("button", {
-        onClick: onClose,
-        style: {
-          background: "none",
-          border: "1px solid #d1fae5",
-          borderRadius: 8,
-          padding: "8px 14px",
-          cursor: "pointer",
-          fontSize: 13,
-          fontWeight: 700,
-          color: "#166534"
-        },
-        children: "← Back"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
-        style: {
-          flex: 1,
-          fontSize: 13,
-          color: "#166534",
-          fontWeight: 600,
-          minWidth: 120
-        },
-        children: "Report preview"
-      }, void 0, false), client.email && /*#__PURE__*/_jsxDEV("button", {
-        onClick: handleEmail,
-        style: {
-          background: "#059669",
-          color: "#fff",
-          border: "none",
-          borderRadius: 8,
-          padding: "9px 16px",
-          fontSize: 13,
-          fontWeight: 700,
-          cursor: "pointer",
-          whiteSpace: "nowrap"
-        },
-        children: "✉ Email PDF"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-        onClick: handlePrint,
-        style: {
-          background: "#1d4ed8",
-          color: "#fff",
-          border: "none",
-          borderRadius: 8,
-          padding: "9px 16px",
-          fontSize: 13,
-          fontWeight: 700,
-          cursor: "pointer",
-          whiteSpace: "nowrap"
-        },
-        children: "🖨 Print / Save PDF"
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      "data-report-body": "1",
-      style: {
-        maxWidth: 720,
-        margin: "0 auto",
-        padding: "32px 24px"
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          borderBottom: "2px solid #111827",
-          paddingBottom: 20,
-          marginBottom: 8
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 10,
-              textTransform: "uppercase",
-              letterSpacing: 2,
-              color: "#9ca3af",
-              marginBottom: 4
-            },
-            children: "Training Report"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 34,
-              fontWeight: 700,
-              letterSpacing: -0.5
-            },
-            children: client.name
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 13,
-              color: "#6b7280",
-              marginTop: 4
-            },
-            children: [program.name, " · ", program.type, " · ", program.category]
-          }, void 0, true)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            textAlign: "right"
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: "#9ca3af"
-            },
-            children: "Generated"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 13,
-              fontWeight: 600,
-              marginTop: 2
-            },
-            children: today
-          }, void 0, false), client.bw && /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: "#6b7280",
-              marginTop: 6
-            },
-            children: [client.bw, " kg BW", client.height ? ` · ${client.height} m` : ""]
-          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: "#6b7280",
-              marginTop: 2
-            },
-            children: [program.sessions.length, " sessions"]
-          }, void 0, true)]
-        }, void 0, true)]
-      }, void 0, true), bests.length > 0 && /*#__PURE__*/_jsxDEV(_Fragment, {
-        children: [secH("Best lifts summary"), /*#__PURE__*/_jsxDEV("table", {
-          style: {
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: 13,
-            marginBottom: 8
-          },
-          children: [/*#__PURE__*/_jsxDEV("thead", {
-            children: /*#__PURE__*/_jsxDEV("tr", {
-              style: {
-                background: "#f9fafb"
-              },
-              children: ["Exercise", "Best Load", "Est 1RM", "Peak Power", "Rel", "First", "Last", "Change"].map(h => /*#__PURE__*/_jsxDEV("th", {
-                style: {
-                  padding: "7px 10px",
-                  fontSize: 10,
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                  color: "#6b7280",
-                  textAlign: "left",
-                  fontWeight: 700,
-                  borderBottom: "1px solid #e5e7eb"
-                },
-                children: h
-              }, h, false))
-            }, void 0, false)
-          }, void 0, false), /*#__PURE__*/_jsxDEV("tbody", {
-            children: bests.map((b, i) => /*#__PURE__*/_jsxDEV("tr", {
-              style: {
-                borderBottom: "1px solid #f3f4f6"
-              },
-              children: [/*#__PURE__*/_jsxDEV("td", {
-                style: {
-                  padding: "8px 10px",
-                  fontWeight: 700
-                },
-                children: b.name
-              }, void 0, false), /*#__PURE__*/_jsxDEV("td", {
-                style: {
-                  padding: "8px 10px",
-                  fontWeight: 700,
-                  color: "#059669"
-                },
-                children: [b.bestLoad, " kg"]
-              }, void 0, true), /*#__PURE__*/_jsxDEV("td", {
-                style: {
-                  padding: "8px 10px",
-                  color: "#2563eb"
-                },
-                children: [b.b1RM, " kg"]
-              }, void 0, true), /*#__PURE__*/_jsxDEV("td", {
-                style: {
-                  padding: "8px 10px",
-                  color: "#d97706"
-                },
-                children: [b.bPow, " W"]
-              }, void 0, true), /*#__PURE__*/_jsxDEV("td", {
-                style: {
-                  padding: "8px 10px",
-                  color: "#d97706"
-                },
-                children: [b.rel, "×"]
-              }, void 0, true), /*#__PURE__*/_jsxDEV("td", {
-                style: {
-                  padding: "8px 10px",
-                  color: "#6b7280"
-                },
-                children: [b.first, " kg"]
-              }, void 0, true), /*#__PURE__*/_jsxDEV("td", {
-                style: {
-                  padding: "8px 10px"
-                },
-                children: [b.last, " kg"]
-              }, void 0, true), /*#__PURE__*/_jsxDEV("td", {
-                style: {
-                  padding: "8px 10px",
-                  fontWeight: 700,
-                  color: "#059669"
-                },
-                children: ["+", b.pct, "%"]
-              }, void 0, true)]
-            }, b.name, true))
-          }, void 0, false)]
-        }, void 0, true)]
-      }, void 0, true), hasSessions && /*#__PURE__*/_jsxDEV(_Fragment, {
-        children: [secH("Load progression"), /*#__PURE__*/_jsxDEV(SvgChartPrint, {
-          data: sessionData,
-          keys: exercises.map(e => `load_${e.name}`),
-          colors: exColors,
-          names: exercises.map(e => e.name),
-          unit: "kg"
-        }, void 0, false), secH("Estimated 1RM progression"), /*#__PURE__*/_jsxDEV(SvgChartPrint, {
-          data: sessionData,
-          keys: exercises.map(e => `onerm_${e.name}`),
-          colors: exColors,
-          names: exercises.map(e => e.name),
-          unit: "kg"
-        }, void 0, false), secH("Power progression"), /*#__PURE__*/_jsxDEV(SvgChartPrint, {
-          data: sessionData,
-          keys: exercises.map(e => `power_${e.name}`),
-          colors: exColors,
-          names: exercises.map(e => e.name),
-          unit: "W"
-        }, void 0, false), secH("Reps progression (max reps per session)"), /*#__PURE__*/_jsxDEV(SvgChartPrint, {
-          data: sessionData,
-          keys: exercises.map(e => `reps_${e.name}`),
-          colors: exColors,
-          names: exercises.map(e => e.name),
-          unit: " reps"
-        }, void 0, false), secH("Injury index (% load increase vs previous session)"), /*#__PURE__*/_jsxDEV(SvgChartPrint, {
-          data: sessionData,
-          keys: exercises.map(e => `injury_${e.name}`),
-          colors: exColors,
-          names: exercises.map(e => e.name),
-          unit: "%"
-        }, void 0, false), secH("ACWR — Acute:Chronic Workload Ratio (sweet spot 0.8–1.3)"), /*#__PURE__*/_jsxDEV(SvgChartPrint, {
-          data: sessionData,
-          keys: exercises.map(e => `acwr_${e.name}`),
-          colors: exColors,
-          names: exercises.map(e => e.name),
-          unit: "×"
-        }, void 0, false), exercises.map((ex, i) => /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            marginBottom: 8
-          },
-          children: [secH(`Training quality indices — ${ex.name}`), /*#__PURE__*/_jsxDEV(SvgChartPrint, {
-            data: sessionData,
-            keys: [`hyp_${ex.name}`, `msi_${ex.name}`, `sei_${ex.name}`, `pi_${ex.name}`],
-            colors: ["#10D4A0", "#FF8020", "#5060FF", "#AA44FF"],
-            names: ["Hyp Index", "Max Str", "Str End", "Power Index"],
-            unit: ""
-          }, void 0, false)]
-        }, ex.name, true)), hasBW && /*#__PURE__*/_jsxDEV(_Fragment, {
-          children: [secH("Relative strength progression (est 1RM ÷ BW)"), /*#__PURE__*/_jsxDEV(SvgChartPrint, {
-            data: sessionData,
-            keys: exercises.map(e => `rel_${e.name}`),
-            colors: exColors,
-            names: exercises.map(e => e.name),
-            unit: "×"
-          }, void 0, false)]
-        }, void 0, true), secH("Session intensity trend (avg RPE)"), /*#__PURE__*/_jsxDEV(SvgChartPrint, {
-          data: sessionData,
-          keys: ["avgRPE"],
-          colors: ["#FF5060"],
-          names: ["Avg RPE"]
-        }, void 0, false)]
-      }, void 0, true), ["strength", "relative", "technique", "fatigue", "focus"].some(k => fb[k]) && /*#__PURE__*/_jsxDEV(_Fragment, {
-        children: [secH("Trainer's feedback"), [{
-          k: "strength",
-          l: "Strength progress"
-        }, {
-          k: "relative",
-          l: "Relative strength"
-        }, {
-          k: "technique",
-          l: "Technique notes"
-        }, {
-          k: "fatigue",
-          l: "Workload / Fatigue"
-        }, {
-          k: "focus",
-          l: "Next focus"
-        }].filter(({
-          k
-        }) => fb[k]).map(({
-          k,
-          l
-        }) => /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            marginBottom: 14
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: 1,
-              color: "#6b7280",
-              marginBottom: 5
-            },
-            children: l
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 13,
-              lineHeight: 1.6,
-              padding: "10px 12px",
-              background: "#f9fafb",
-              borderRadius: 8,
-              border: "1px solid #f3f4f6"
-            },
-            children: fb[k]
-          }, void 0, false)]
-        }, k, true))]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          marginTop: 40,
-          paddingTop: 14,
-          borderTop: "1px solid #f3f4f6",
-          display: "flex",
-          justifyContent: "space-between",
-          fontSize: 11,
-          color: "#9ca3af"
-        },
-        children: [/*#__PURE__*/_jsxDEV("span", {
-          children: ["Forge Training · ", client.name]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("span", {
-          children: today
-        }, void 0, false)]
-      }, void 0, true)]
-    }, void 0, true)]
-  }, void 0, true);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "no-print",
+    style: {
+      position: "sticky",
+      top: 0,
+      zIndex: 10,
+      background: "#f0fdf4",
+      borderBottom: "2px solid #bbf7d0",
+      padding: "12px 18px",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      background: "none",
+      border: "1px solid #d1fae5",
+      borderRadius: 8,
+      padding: "8px 14px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700,
+      color: "#166534"
+    }
+  }, "← Back"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      fontSize: 13,
+      color: "#166534",
+      fontWeight: 600,
+      minWidth: 120
+    }
+  }, "Report preview"), client.email && /*#__PURE__*/React.createElement("button", {
+    onClick: handleEmail,
+    style: {
+      background: "#059669",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "9px 16px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      whiteSpace: "nowrap"
+    }
+  }, "✉ Email PDF"), /*#__PURE__*/React.createElement("button", {
+    onClick: handlePrint,
+    style: {
+      background: "#1d4ed8",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "9px 16px",
+      fontSize: 13,
+      fontWeight: 700,
+      cursor: "pointer",
+      whiteSpace: "nowrap"
+    }
+  }, "🖨 Print / Save PDF")), /*#__PURE__*/React.createElement("div", {
+    "data-report-body": "1",
+    style: {
+      maxWidth: 720,
+      margin: "0 auto",
+      padding: "32px 24px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      borderBottom: "2px solid #111827",
+      paddingBottom: 20,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      textTransform: "uppercase",
+      letterSpacing: 2,
+      color: "#9ca3af",
+      marginBottom: 4
+    }
+  }, "Training Report"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 34,
+      fontWeight: 700,
+      letterSpacing: -0.5
+    }
+  }, client.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#6b7280",
+      marginTop: 4
+    }
+  }, program.name, " · ", program.type, " · ", program.category)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "right"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#9ca3af"
+    }
+  }, "Generated"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      marginTop: 2
+    }
+  }, today), client.bw && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#6b7280",
+      marginTop: 6
+    }
+  }, client.bw, " kg BW", client.height ? ` · ${client.height} m` : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#6b7280",
+      marginTop: 2
+    }
+  }, program.sessions.length, " sessions"))), bests.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, secH("Best lifts summary"), /*#__PURE__*/React.createElement("table", {
+    style: {
+      width: "100%",
+      borderCollapse: "collapse",
+      fontSize: 13,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+    style: {
+      background: "#f9fafb"
+    }
+  }, ["Exercise", "Best Load", "Est 1RM", "Peak Power", "Rel", "First", "Last", "Change"].map(h => /*#__PURE__*/React.createElement("th", {
+    key: h,
+    style: {
+      padding: "7px 10px",
+      fontSize: 10,
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      color: "#6b7280",
+      textAlign: "left",
+      fontWeight: 700,
+      borderBottom: "1px solid #e5e7eb"
+    }
+  }, h)))), /*#__PURE__*/React.createElement("tbody", null, bests.map((b, i) => /*#__PURE__*/React.createElement("tr", {
+    key: b.name,
+    style: {
+      borderBottom: "1px solid #f3f4f6"
+    }
+  }, /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "8px 10px",
+      fontWeight: 700
+    }
+  }, b.name), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "8px 10px",
+      fontWeight: 700,
+      color: "#059669"
+    }
+  }, b.bestLoad, " kg"), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "8px 10px",
+      color: "#2563eb"
+    }
+  }, b.b1RM, " kg"), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "8px 10px",
+      color: "#d97706"
+    }
+  }, b.bPow, " W"), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "8px 10px",
+      color: "#d97706"
+    }
+  }, b.rel, "×"), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "8px 10px",
+      color: "#6b7280"
+    }
+  }, b.first, " kg"), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "8px 10px"
+    }
+  }, b.last, " kg"), /*#__PURE__*/React.createElement("td", {
+    style: {
+      padding: "8px 10px",
+      fontWeight: 700,
+      color: "#059669"
+    }
+  }, "+", b.pct, "%")))))), hasSessions && /*#__PURE__*/React.createElement(React.Fragment, null, secH("Load progression"), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: exercises.map(e => `load_${e.name}`),
+    colors: exColors,
+    names: exercises.map(e => e.name),
+    unit: "kg"
+  }), secH("Estimated 1RM progression"), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: exercises.map(e => `onerm_${e.name}`),
+    colors: exColors,
+    names: exercises.map(e => e.name),
+    unit: "kg"
+  }), secH("Power progression"), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: exercises.map(e => `power_${e.name}`),
+    colors: exColors,
+    names: exercises.map(e => e.name),
+    unit: "W"
+  }), secH("Reps progression (max reps per session)"), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: exercises.map(e => `reps_${e.name}`),
+    colors: exColors,
+    names: exercises.map(e => e.name),
+    unit: " reps"
+  }), secH("Injury index (% load increase vs previous session)"), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: exercises.map(e => `injury_${e.name}`),
+    colors: exColors,
+    names: exercises.map(e => e.name),
+    unit: "%"
+  }), secH("ACWR — Acute:Chronic Workload Ratio (sweet spot 0.8–1.3)"), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: exercises.map(e => `acwr_${e.name}`),
+    colors: exColors,
+    names: exercises.map(e => e.name),
+    unit: "×"
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement("div", {
+    key: ex.name,
+    style: {
+      marginBottom: 8
+    }
+  }, secH(`Training quality indices — ${ex.name}`), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: [`hyp_${ex.name}`, `msi_${ex.name}`, `sei_${ex.name}`, `pi_${ex.name}`],
+    colors: ["#10D4A0", "#FF8020", "#5060FF", "#AA44FF"],
+    names: ["Hyp Index", "Max Str", "Str End", "Power Index"],
+    unit: ""
+  }))), hasBW && /*#__PURE__*/React.createElement(React.Fragment, null, secH("Relative strength progression (est 1RM ÷ BW)"), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: exercises.map(e => `rel_${e.name}`),
+    colors: exColors,
+    names: exercises.map(e => e.name),
+    unit: "×"
+  })), secH("Session intensity trend (avg RPE)"), /*#__PURE__*/React.createElement(SvgChartPrint, {
+    data: sessionData,
+    keys: ["avgRPE"],
+    colors: ["#FF5060"],
+    names: ["Avg RPE"]
+  })), ["strength", "relative", "technique", "fatigue", "focus"].some(k => fb[k]) && /*#__PURE__*/React.createElement(React.Fragment, null, secH("Trainer's feedback"), [{
+    k: "strength",
+    l: "Strength progress"
+  }, {
+    k: "relative",
+    l: "Relative strength"
+  }, {
+    k: "technique",
+    l: "Technique notes"
+  }, {
+    k: "fatigue",
+    l: "Workload / Fatigue"
+  }, {
+    k: "focus",
+    l: "Next focus"
+  }].filter(({
+    k
+  }) => fb[k]).map(({
+    k,
+    l
+  }) => /*#__PURE__*/React.createElement("div", {
+    key: k,
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      color: "#6b7280",
+      marginBottom: 5
+    }
+  }, l), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      lineHeight: 1.6,
+      padding: "10px 12px",
+      background: "#f9fafb",
+      borderRadius: 8,
+      border: "1px solid #f3f4f6"
+    }
+  }, fb[k])))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 40,
+      paddingTop: 14,
+      borderTop: "1px solid #f3f4f6",
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: 11,
+      color: "#9ca3af"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "Forge Training · ", client.name), /*#__PURE__*/React.createElement("span", null, today))));
 }
 
 // ─── Report Tab ───────────────────────────────────────────────────────────────
@@ -5972,25 +5585,22 @@ function ReportTab({
     };
   }), [exercises, sessions, client.bw]);
   const [showPreview, setShowPreview] = useState(false);
-  if (!program) return /*#__PURE__*/_jsxDEV("div", {
+  if (!program) return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "48px 24px",
       textAlign: "center"
-    },
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        fontSize: 42,
-        marginBottom: 14
-      },
-      children: "📊"
-    }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        color: C.sub,
-        fontSize: 14
-      },
-      children: "No active program selected."
-    }, void 0, false)]
-  }, void 0, true);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 42,
+      marginBottom: 14
+    }
+  }, "📊"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.sub,
+      fontSize: 14
+    }
+  }, "No active program selected."));
   const ta = {
     width: "100%",
     background: C.card2,
@@ -6008,1037 +5618,974 @@ function ReportTab({
   const GH = ({
     cols,
     headers
-  }) => /*#__PURE__*/_jsxDEV("div", {
+  }) => /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: cols,
       background: C.card2,
       borderBottom: `1px solid ${C.border}`
-    },
-    children: headers.map(h => /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        fontSize: 10,
-        color: C.muted,
-        letterSpacing: 1.5,
-        textTransform: "uppercase",
-        padding: "7px 10px",
-        fontWeight: 700
-      },
-      children: h
-    }, h, false))
-  }, void 0, false);
+    }
+  }, headers.map(h => /*#__PURE__*/React.createElement("div", {
+    key: h,
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      padding: "7px 10px",
+      fontWeight: 700
+    }
+  }, h)));
 
   // Chart colours per exercise
   const exColors = exercises.map((_, i) => AV_COLS[i % AV_COLS.length]);
-  const ChartLegend = () => /*#__PURE__*/_jsxDEV("div", {
+  const ChartLegend = () => /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexWrap: "wrap",
       gap: 10,
       padding: "8px 12px 4px"
-    },
-    children: exercises.map((ex, i) => /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 5,
-        fontSize: 11,
-        color: C.sub
-      },
-      children: [/*#__PURE__*/_jsxDEV("span", {
-        style: {
-          width: 14,
-          height: 3,
-          background: exColors[i],
-          display: "inline-block",
-          borderRadius: 2
-        }
-      }, void 0, false), ex.name]
-    }, ex.name, true))
-  }, void 0, false);
+    }
+  }, exercises.map((ex, i) => /*#__PURE__*/React.createElement("div", {
+    key: ex.name,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 11,
+      color: C.sub
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 14,
+      height: 3,
+      background: exColors[i],
+      display: "inline-block",
+      borderRadius: 2
+    }
+  }), ex.name)));
   const ChartCard = ({
     title,
     children
-  }) => /*#__PURE__*/_jsxDEV("div", {
+  }) => /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card,
       borderRadius: 14,
       border: `1px solid ${C.border}`,
       overflow: "hidden",
       marginBottom: 16
-    },
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        padding: "12px 14px 4px"
-      },
-      children: /*#__PURE__*/_jsxDEV(SecLabel, {
-        text: title
-      }, void 0, false)
-    }, void 0, false), children, exercises.length > 1 && /*#__PURE__*/_jsxDEV(ChartLegend, {}, void 0, false)]
-  }, void 0, true);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px 4px"
+    }
+  }, /*#__PURE__*/React.createElement(SecLabel, {
+    text: title
+  })), children, exercises.length > 1 && /*#__PURE__*/React.createElement(ChartLegend, null));
   const hasSessions = sessionData.length > 1;
   const hasBW = !!client.bw;
   const dateMap = useMemo(() => Object.fromEntries(sessionData.map(d => [d.session, d.date])), [sessionData]);
-  return /*#__PURE__*/_jsxDEV("div", {
+  return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "16px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card2,
+      borderRadius: 16,
+      padding: "16px 18px",
+      marginBottom: 18,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      letterSpacing: 2,
+      textTransform: "uppercase"
+    }
+  }, "Client report"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 26,
+      letterSpacing: 2.5,
+      marginTop: 4
+    }
+  }, client.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      marginTop: 2
+    }
+  }, program.name, " · ", program.type)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowPreview(true),
+    style: {
+      background: C.blue,
+      color: "#fff",
+      border: "none",
+      borderRadius: 10,
+      padding: "10px 14px",
+      cursor: "pointer",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 3,
+      flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 18
+    }
+  }, "📧"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: 0.5
+    }
+  }, "PDF / EMAIL")))), bests.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Best lifts"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 12,
+      border: `1px solid ${C.border}`,
+      overflow: "hidden",
+      marginBottom: 18
+    }
+  }, /*#__PURE__*/React.createElement(GH, {
+    cols: "1fr 62px 62px 52px 52px",
+    headers: ["Exercise", "Best", "Est 1RM", "Power", "Rel"]
+  }), bests.map((b, i) => /*#__PURE__*/React.createElement("div", {
+    key: b.name,
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 62px 62px 52px 52px",
+      borderBottom: i < bests.length - 1 ? `1px solid ${C.border}` : "none",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "10px",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, b.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 10px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 17,
+      color: C.accent
+    }
+  }, b.bestLoad, "kg"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 10px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 17,
+      color: C.blue
+    }
+  }, b.b1RM), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "8px 10px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 17,
+      color: C.gold
+    }
+  }, b.bPow, "W"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "10px",
+      fontSize: 13,
+      color: C.gold
+    }
+  }, b.rel, "×"))))), hasSessions ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(ChartCard, {
+    title: "Load progression"
+  }, /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, {
+      ...props,
+      dateMap: dateMap
+    })
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fill: C.muted,
+      fontSize: 11
     },
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        background: C.card2,
-        borderRadius: 16,
-        padding: "16px 18px",
-        marginBottom: 18,
-        border: `1px solid ${C.border}`
-      },
-      children: /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start"
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 10,
-              color: C.muted,
-              letterSpacing: 2,
-              textTransform: "uppercase"
-            },
-            children: "Client report"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontFamily: "'Bebas Neue',cursive",
-              fontSize: 26,
-              letterSpacing: 2.5,
-              marginTop: 4
-            },
-            children: client.name
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 12,
-              color: C.sub,
-              marginTop: 2
-            },
-            children: [program.name, " · ", program.type]
-          }, void 0, true)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
-          onClick: () => setShowPreview(true),
-          style: {
-            background: C.blue,
-            color: "#fff",
-            border: "none",
-            borderRadius: 10,
-            padding: "10px 14px",
-            cursor: "pointer",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 3,
-            flexShrink: 0
-          },
-          children: [/*#__PURE__*/_jsxDEV("span", {
-            style: {
-              fontSize: 18
-            },
-            children: "📧"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
-            style: {
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: 0.5
-            },
-            children: "PDF / EMAIL"
-          }, void 0, false)]
-        }, void 0, true)]
-      }, void 0, true)
-    }, void 0, false), bests.length > 0 && /*#__PURE__*/_jsxDEV(_Fragment, {
-      children: [/*#__PURE__*/_jsxDEV(SecLabel, {
-        text: "Best lifts"
-      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.card,
-          borderRadius: 12,
-          border: `1px solid ${C.border}`,
-          overflow: "hidden",
-          marginBottom: 18
-        },
-        children: [/*#__PURE__*/_jsxDEV(GH, {
-          cols: "1fr 62px 62px 52px 52px",
-          headers: ["Exercise", "Best", "Est 1RM", "Power", "Rel"]
-        }, void 0, false), bests.map((b, i) => /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "grid",
-            gridTemplateColumns: "1fr 62px 62px 52px 52px",
-            borderBottom: i < bests.length - 1 ? `1px solid ${C.border}` : "none",
-            alignItems: "center"
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              padding: "10px",
-              fontSize: 13,
-              fontWeight: 700
-            },
-            children: b.name
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              padding: "8px 10px",
-              fontFamily: "'Bebas Neue',cursive",
-              fontSize: 17,
-              color: C.accent
-            },
-            children: [b.bestLoad, "kg"]
-          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              padding: "8px 10px",
-              fontFamily: "'Bebas Neue',cursive",
-              fontSize: 17,
-              color: C.blue
-            },
-            children: b.b1RM
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              padding: "8px 10px",
-              fontFamily: "'Bebas Neue',cursive",
-              fontSize: 17,
-              color: C.gold
-            },
-            children: [b.bPow, "W"]
-          }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              padding: "10px",
-              fontSize: 13,
-              color: C.gold
-            },
-            children: [b.rel, "×"]
-          }, void 0, true)]
-        }, b.name, true))]
-      }, void 0, true)]
-    }, void 0, true), hasSessions ? /*#__PURE__*/_jsxDEV(_Fragment, {
-      children: [/*#__PURE__*/_jsxDEV(ChartCard, {
-        title: "Load progression",
-        children: /*#__PURE__*/_jsxDEV(ResponsiveContainer, {
-          width: "100%",
-          height: 200,
-          children: /*#__PURE__*/_jsxDEV(LineChart, {
-            data: sessionData,
-            margin: {
-              top: 4,
-              right: 14,
-              bottom: 4,
-              left: 0
-            },
-            children: [/*#__PURE__*/_jsxDEV(CartesianGrid, {
-              stroke: C.border,
-              strokeDasharray: "3 3"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(XAxis, {
-              dataKey: "session",
-              axisLine: false,
-              tickLine: false,
-              height: 34,
-              tick: props => /*#__PURE__*/_jsxDEV(SessionXTick, {
-                ...props,
-                dateMap: dateMap
-              }, void 0, false)
-            }, void 0, false), /*#__PURE__*/_jsxDEV(YAxis, {
-              tick: {
-                fill: C.muted,
-                fontSize: 11
-              },
-              axisLine: false,
-              tickLine: false,
-              width: 34,
-              unit: "kg"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(Tooltip, {
-              contentStyle: {
-                background: C.card2,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                color: C.text,
-                fontSize: 12
-              }
-            }, void 0, false), exercises.map((ex, i) => /*#__PURE__*/_jsxDEV(Line, {
-              type: "monotone",
-              dataKey: `load_${ex.name}`,
-              name: ex.name,
-              stroke: exColors[i],
-              strokeWidth: 2.5,
-              dot: {
-                fill: exColors[i],
-                r: 3,
-                strokeWidth: 0
-              },
-              connectNulls: true
-            }, ex.name, false))]
-          }, void 0, true)
-        }, void 0, false)
-      }, void 0, false), /*#__PURE__*/_jsxDEV(ChartCard, {
-        title: "Estimated 1RM progression",
-        children: /*#__PURE__*/_jsxDEV(ResponsiveContainer, {
-          width: "100%",
-          height: 200,
-          children: /*#__PURE__*/_jsxDEV(LineChart, {
-            data: sessionData,
-            margin: {
-              top: 4,
-              right: 14,
-              bottom: 4,
-              left: 0
-            },
-            children: [/*#__PURE__*/_jsxDEV(CartesianGrid, {
-              stroke: C.border,
-              strokeDasharray: "3 3"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(XAxis, {
-              dataKey: "session",
-              axisLine: false,
-              tickLine: false,
-              height: 34,
-              tick: props => /*#__PURE__*/_jsxDEV(SessionXTick, {
-                ...props,
-                dateMap: dateMap
-              }, void 0, false)
-            }, void 0, false), /*#__PURE__*/_jsxDEV(YAxis, {
-              tick: {
-                fill: C.muted,
-                fontSize: 11
-              },
-              axisLine: false,
-              tickLine: false,
-              width: 34,
-              unit: "kg"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(Tooltip, {
-              contentStyle: {
-                background: C.card2,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                color: C.text,
-                fontSize: 12
-              }
-            }, void 0, false), exercises.map((ex, i) => /*#__PURE__*/_jsxDEV(Line, {
-              type: "monotone",
-              dataKey: `onerm_${ex.name}`,
-              name: ex.name,
-              stroke: exColors[i],
-              strokeWidth: 2.5,
-              strokeDasharray: "5 3",
-              dot: {
-                fill: exColors[i],
-                r: 3,
-                strokeWidth: 0
-              },
-              connectNulls: true
-            }, ex.name, false))]
-          }, void 0, true)
-        }, void 0, false)
-      }, void 0, false), /*#__PURE__*/_jsxDEV(ChartCard, {
-        title: "Power progression (W)",
-        children: /*#__PURE__*/_jsxDEV(ResponsiveContainer, {
-          width: "100%",
-          height: 200,
-          children: /*#__PURE__*/_jsxDEV(LineChart, {
-            data: sessionData,
-            margin: {
-              top: 4,
-              right: 14,
-              bottom: 4,
-              left: 0
-            },
-            children: [/*#__PURE__*/_jsxDEV(CartesianGrid, {
-              stroke: C.border,
-              strokeDasharray: "3 3"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(XAxis, {
-              dataKey: "session",
-              axisLine: false,
-              tickLine: false,
-              height: 34,
-              tick: props => /*#__PURE__*/_jsxDEV(SessionXTick, {
-                ...props,
-                dateMap: dateMap
-              }, void 0, false)
-            }, void 0, false), /*#__PURE__*/_jsxDEV(YAxis, {
-              tick: {
-                fill: C.muted,
-                fontSize: 11
-              },
-              axisLine: false,
-              tickLine: false,
-              width: 42,
-              unit: "W"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(Tooltip, {
-              contentStyle: {
-                background: C.card2,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                color: C.text,
-                fontSize: 12
-              }
-            }, void 0, false), exercises.map((ex, i) => /*#__PURE__*/_jsxDEV(Line, {
-              type: "monotone",
-              dataKey: `power_${ex.name}`,
-              name: ex.name,
-              stroke: exColors[i],
-              strokeWidth: 2.5,
-              dot: {
-                fill: exColors[i],
-                r: 3,
-                strokeWidth: 0
-              },
-              connectNulls: true
-            }, ex.name, false))]
-          }, void 0, true)
-        }, void 0, false)
-      }, void 0, false), /*#__PURE__*/_jsxDEV(ChartCard, {
-        title: "Reps progression (max reps per session)",
-        children: /*#__PURE__*/_jsxDEV(ResponsiveContainer, {
-          width: "100%",
-          height: 200,
-          children: /*#__PURE__*/_jsxDEV(LineChart, {
-            data: sessionData,
-            margin: {
-              top: 4,
-              right: 14,
-              bottom: 4,
-              left: 0
-            },
-            children: [/*#__PURE__*/_jsxDEV(CartesianGrid, {
-              stroke: C.border,
-              strokeDasharray: "3 3"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(XAxis, {
-              dataKey: "session",
-              axisLine: false,
-              tickLine: false,
-              height: 34,
-              tick: props => /*#__PURE__*/_jsxDEV(SessionXTick, {
-                ...props,
-                dateMap: dateMap
-              }, void 0, false)
-            }, void 0, false), /*#__PURE__*/_jsxDEV(YAxis, {
-              tick: {
-                fill: C.muted,
-                fontSize: 11
-              },
-              axisLine: false,
-              tickLine: false,
-              width: 34,
-              unit: " reps"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(Tooltip, {
-              contentStyle: {
-                background: C.card2,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                color: C.text,
-                fontSize: 12
-              }
-            }, void 0, false), exercises.map((ex, i) => /*#__PURE__*/_jsxDEV(Line, {
-              type: "monotone",
-              dataKey: `reps_${ex.name}`,
-              name: ex.name,
-              stroke: exColors[i],
-              strokeWidth: 2.5,
-              strokeDasharray: "4 2",
-              dot: {
-                fill: exColors[i],
-                r: 3,
-                strokeWidth: 0
-              },
-              connectNulls: true
-            }, ex.name, false))]
-          }, void 0, true)
-        }, void 0, false)
-      }, void 0, false), /*#__PURE__*/_jsxDEV(ChartCard, {
-        title: "Injury index (% load increase vs previous session)",
-        children: [/*#__PURE__*/_jsxDEV(ResponsiveContainer, {
-          width: "100%",
-          height: 200,
-          children: /*#__PURE__*/_jsxDEV(LineChart, {
-            data: sessionData,
-            margin: {
-              top: 4,
-              right: 14,
-              bottom: 4,
-              left: 0
-            },
-            children: [/*#__PURE__*/_jsxDEV(CartesianGrid, {
-              stroke: C.border,
-              strokeDasharray: "3 3"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(XAxis, {
-              dataKey: "session",
-              axisLine: false,
-              tickLine: false,
-              height: 34,
-              tick: props => /*#__PURE__*/_jsxDEV(SessionXTick, {
-                ...props,
-                dateMap: dateMap
-              }, void 0, false)
-            }, void 0, false), /*#__PURE__*/_jsxDEV(YAxis, {
-              tick: {
-                fill: C.muted,
-                fontSize: 11
-              },
-              axisLine: false,
-              tickLine: false,
-              width: 34,
-              unit: "%"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(Tooltip, {
-              contentStyle: {
-                background: C.card2,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                color: C.text,
-                fontSize: 12
-              }
-            }, void 0, false), /*#__PURE__*/_jsxDEV(ReferenceLine, {
-              y: 10,
-              stroke: C.warn,
-              strokeDasharray: "4 3",
-              strokeOpacity: 0.6,
-              label: {
-                value: "High risk >10%",
-                position: "insideTopRight",
-                fill: C.warn,
-                fontSize: 10
-              }
-            }, void 0, false), exercises.map((ex, i) => /*#__PURE__*/_jsxDEV(Line, {
-              type: "monotone",
-              dataKey: `injury_${ex.name}`,
-              name: ex.name,
-              stroke: exColors[i],
-              strokeWidth: 2.5,
-              dot: {
-                fill: exColors[i],
-                r: 3,
-                strokeWidth: 0
-              },
-              connectNulls: true
-            }, ex.name, false))]
-          }, void 0, true)
-        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            padding: "0 14px 12px",
-            fontSize: 11,
-            color: C.sub,
-            lineHeight: 1.5
-          },
-          children: "Steeper upward slopes indicate larger week-to-week load jumps and higher injury risk. Values above the dashed 10% line warrant caution."
-        }, void 0, false)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.card,
-          borderRadius: 14,
-          border: `1px solid ${C.border}`,
-          overflow: "hidden",
-          marginBottom: 16
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            padding: "12px 14px 4px"
-          },
-          children: [/*#__PURE__*/_jsxDEV(SecLabel, {
-            text: "ACWR — Acute:Chronic Workload Ratio"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.sub,
-              marginBottom: 6,
-              lineHeight: 1.5
-            },
-            children: ["Acute (last session volume) ÷ Chronic (avg of previous 4 sessions). Sweet spot: ", /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                color: "#10D4A0",
-                fontWeight: 700
-              },
-              children: "0.8–1.3"
-            }, void 0, false), " · Caution: ", /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                color: "#FFB020",
-                fontWeight: 700
-              },
-              children: "1.3–1.5"
-            }, void 0, false), " · High risk: ", /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                color: C.warn,
-                fontWeight: 700
-              },
-              children: ">1.5"
-            }, void 0, false)]
-          }, void 0, true)]
-        }, void 0, true), /*#__PURE__*/_jsxDEV(ResponsiveContainer, {
-          width: "100%",
-          height: 210,
-          children: /*#__PURE__*/_jsxDEV(LineChart, {
-            data: sessionData,
-            margin: {
-              top: 4,
-              right: 14,
-              bottom: 4,
-              left: 0
-            },
-            children: [/*#__PURE__*/_jsxDEV(CartesianGrid, {
-              stroke: C.border,
-              strokeDasharray: "3 3"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(XAxis, {
-              dataKey: "session",
-              axisLine: false,
-              tickLine: false,
-              height: 34,
-              tick: props => /*#__PURE__*/_jsxDEV(SessionXTick, {
-                ...props,
-                dateMap: dateMap
-              }, void 0, false)
-            }, void 0, false), /*#__PURE__*/_jsxDEV(YAxis, {
-              tick: {
-                fill: C.muted,
-                fontSize: 11
-              },
-              axisLine: false,
-              tickLine: false,
-              width: 34,
-              unit: "×",
-              domain: [0, "auto"]
-            }, void 0, false), /*#__PURE__*/_jsxDEV(Tooltip, {
-              contentStyle: {
-                background: C.card2,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                color: C.text,
-                fontSize: 12
-              }
-            }, void 0, false), /*#__PURE__*/_jsxDEV(ReferenceLine, {
-              y: 0.8,
-              stroke: C.blue,
-              strokeDasharray: "4 3",
-              strokeOpacity: 0.5,
-              label: {
-                value: "0.8 Low",
-                position: "insideBottomRight",
-                fill: C.blue,
-                fontSize: 9
-              }
-            }, void 0, false), /*#__PURE__*/_jsxDEV(ReferenceLine, {
-              y: 1.3,
-              stroke: "#FFB020",
-              strokeDasharray: "4 3",
-              strokeOpacity: 0.5,
-              label: {
-                value: "1.3 Caution",
-                position: "insideTopRight",
-                fill: "#FFB020",
-                fontSize: 9
-              }
-            }, void 0, false), /*#__PURE__*/_jsxDEV(ReferenceLine, {
-              y: 1.5,
-              stroke: C.warn,
-              strokeDasharray: "4 3",
-              strokeOpacity: 0.5,
-              label: {
-                value: "1.5 High risk",
-                position: "insideTopRight",
-                fill: C.warn,
-                fontSize: 9
-              }
-            }, void 0, false), exercises.map((ex, i) => /*#__PURE__*/_jsxDEV(Line, {
-              type: "monotone",
-              dataKey: `acwr_${ex.name}`,
-              name: ex.name,
-              stroke: exColors[i],
-              strokeWidth: 2.5,
-              dot: {
-                fill: exColors[i],
-                r: 3,
-                strokeWidth: 0
-              },
-              connectNulls: true
-            }, ex.name, false))]
-          }, void 0, true)
-        }, void 0, false), exercises.length > 1 && /*#__PURE__*/_jsxDEV(ChartLegend, {}, void 0, false)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.card,
-          borderRadius: 14,
-          border: `1px solid ${C.border}`,
-          overflow: "hidden",
-          marginBottom: 16
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            padding: "12px 14px 4px"
-          },
-          children: [/*#__PURE__*/_jsxDEV(SecLabel, {
-            text: "Training quality indices (0–100 scale)"
-          }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.sub,
-              marginBottom: 6,
-              lineHeight: 1.5
-            },
-            children: [/*#__PURE__*/_jsxDEV("span", {
-              style: {
-                color: "#10D4A0",
-                fontWeight: 700
-              },
-              children: "Hyp"
-            }, void 0, false), "=Hypertrophy · ", /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                color: "#FF8020",
-                fontWeight: 700
-              },
-              children: "Max Str"
-            }, void 0, false), "=Max Strength · ", /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                color: "#5060FF",
-                fontWeight: 700
-              },
-              children: "Str End"
-            }, void 0, false), "=Strength Endurance · ", /*#__PURE__*/_jsxDEV("span", {
-              style: {
-                color: "#AA44FF",
-                fontWeight: 700
-              },
-              children: "Power"
-            }, void 0, false), "=Power Index"]
-          }, void 0, true)]
-        }, void 0, true), exercises.map((ex, i) => /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            padding: "0 14px 12px"
-          },
-          children: [/*#__PURE__*/_jsxDEV("div", {
-            style: {
-              fontSize: 11,
-              color: C.sub,
-              fontWeight: 700,
-              marginBottom: 4
-            },
-            children: ex.name
-          }, void 0, false), /*#__PURE__*/_jsxDEV(ResponsiveContainer, {
-            width: "100%",
-            height: 160,
-            children: /*#__PURE__*/_jsxDEV(LineChart, {
-              data: sessionData,
-              margin: {
-                top: 4,
-                right: 14,
-                bottom: 4,
-                left: 0
-              },
-              children: [/*#__PURE__*/_jsxDEV(CartesianGrid, {
-                stroke: C.border,
-                strokeDasharray: "3 3"
-              }, void 0, false), /*#__PURE__*/_jsxDEV(XAxis, {
-                dataKey: "session",
-                axisLine: false,
-                tickLine: false,
-                height: 34,
-                tick: props => /*#__PURE__*/_jsxDEV(SessionXTick, {
-                  ...props,
-                  dateMap: dateMap
-                }, void 0, false)
-              }, void 0, false), /*#__PURE__*/_jsxDEV(YAxis, {
-                domain: [0, 100],
-                tick: {
-                  fill: C.muted,
-                  fontSize: 10
-                },
-                axisLine: false,
-                tickLine: false,
-                width: 28
-              }, void 0, false), /*#__PURE__*/_jsxDEV(Tooltip, {
-                contentStyle: {
-                  background: C.card2,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 8,
-                  color: C.text,
-                  fontSize: 11
-                }
-              }, void 0, false), /*#__PURE__*/_jsxDEV(Line, {
-                type: "monotone",
-                dataKey: `hyp_${ex.name}`,
-                name: "Hyp Index",
-                stroke: "#10D4A0",
-                strokeWidth: 2,
-                dot: {
-                  fill: "#10D4A0",
-                  r: 3,
-                  strokeWidth: 0
-                },
-                connectNulls: true
-              }, void 0, false), /*#__PURE__*/_jsxDEV(Line, {
-                type: "monotone",
-                dataKey: `msi_${ex.name}`,
-                name: "Max Str",
-                stroke: "#FF8020",
-                strokeWidth: 2,
-                dot: {
-                  fill: "#FF8020",
-                  r: 3,
-                  strokeWidth: 0
-                },
-                connectNulls: true
-              }, void 0, false), /*#__PURE__*/_jsxDEV(Line, {
-                type: "monotone",
-                dataKey: `sei_${ex.name}`,
-                name: "Str End",
-                stroke: "#5060FF",
-                strokeWidth: 2,
-                dot: {
-                  fill: "#5060FF",
-                  r: 3,
-                  strokeWidth: 0
-                },
-                connectNulls: true
-              }, void 0, false), /*#__PURE__*/_jsxDEV(Line, {
-                type: "monotone",
-                dataKey: `pi_${ex.name}`,
-                name: "Power Index",
-                stroke: "#AA44FF",
-                strokeWidth: 2,
-                dot: {
-                  fill: "#AA44FF",
-                  r: 3,
-                  strokeWidth: 0
-                },
-                connectNulls: true
-              }, void 0, false)]
-            }, void 0, true)
-          }, void 0, false)]
-        }, ex.name, true)), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            gap: 14,
-            flexWrap: "wrap",
-            padding: "0 14px 12px"
-          },
-          children: [["Hyp Index", "#10D4A0"], ["Max Str", "#FF8020"], ["Str End", "#5060FF"], ["Power Index", "#AA44FF"]].map(([l, c]) => /*#__PURE__*/_jsxDEV("div", {
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              fontSize: 11,
-              color: C.sub
-            },
-            children: [/*#__PURE__*/_jsxDEV("span", {
-              style: {
-                width: 14,
-                height: 3,
-                background: c,
-                display: "inline-block",
-                borderRadius: 2
-              }
-            }, void 0, false), l]
-          }, l, true))
-        }, void 0, false)]
-      }, void 0, true), hasBW && /*#__PURE__*/_jsxDEV(ChartCard, {
-        title: "Relative strength progression (est 1RM ÷ BW)",
-        children: /*#__PURE__*/_jsxDEV(ResponsiveContainer, {
-          width: "100%",
-          height: 200,
-          children: /*#__PURE__*/_jsxDEV(LineChart, {
-            data: sessionData,
-            margin: {
-              top: 4,
-              right: 14,
-              bottom: 4,
-              left: 0
-            },
-            children: [/*#__PURE__*/_jsxDEV(CartesianGrid, {
-              stroke: C.border,
-              strokeDasharray: "3 3"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(XAxis, {
-              dataKey: "session",
-              axisLine: false,
-              tickLine: false,
-              height: 34,
-              tick: props => /*#__PURE__*/_jsxDEV(SessionXTick, {
-                ...props,
-                dateMap: dateMap
-              }, void 0, false)
-            }, void 0, false), /*#__PURE__*/_jsxDEV(YAxis, {
-              tick: {
-                fill: C.muted,
-                fontSize: 11
-              },
-              axisLine: false,
-              tickLine: false,
-              width: 34,
-              unit: "×"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(Tooltip, {
-              contentStyle: {
-                background: C.card2,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                color: C.text,
-                fontSize: 12
-              },
-              formatter: (v, name) => [`${v}×`, name]
-            }, void 0, false), exercises.map((ex, i) => /*#__PURE__*/_jsxDEV(Line, {
-              type: "monotone",
-              dataKey: `rel_${ex.name}`,
-              name: ex.name,
-              stroke: exColors[i],
-              strokeWidth: 2.5,
-              dot: {
-                fill: exColors[i],
-                r: 3,
-                strokeWidth: 0
-              },
-              connectNulls: true
-            }, ex.name, false))]
-          }, void 0, true)
-        }, void 0, false)
-      }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-        style: {
-          background: C.card,
-          borderRadius: 14,
-          border: `1px solid ${C.border}`,
-          overflow: "hidden",
-          marginBottom: 16
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            padding: "12px 14px 4px"
-          },
-          children: /*#__PURE__*/_jsxDEV(SecLabel, {
-            text: "Session intensity trend (avg RPE)"
-          }, void 0, false)
-        }, void 0, false), /*#__PURE__*/_jsxDEV(ResponsiveContainer, {
-          width: "100%",
-          height: 180,
-          children: /*#__PURE__*/_jsxDEV(LineChart, {
-            data: sessionData,
-            margin: {
-              top: 4,
-              right: 14,
-              bottom: 4,
-              left: 0
-            },
-            children: [/*#__PURE__*/_jsxDEV(CartesianGrid, {
-              stroke: C.border,
-              strokeDasharray: "3 3"
-            }, void 0, false), /*#__PURE__*/_jsxDEV(XAxis, {
-              dataKey: "session",
-              axisLine: false,
-              tickLine: false,
-              height: 34,
-              tick: props => /*#__PURE__*/_jsxDEV(SessionXTick, {
-                ...props,
-                dateMap: dateMap
-              }, void 0, false)
-            }, void 0, false), /*#__PURE__*/_jsxDEV(YAxis, {
-              domain: [4, 10],
-              tick: {
-                fill: C.muted,
-                fontSize: 11
-              },
-              axisLine: false,
-              tickLine: false,
-              width: 28
-            }, void 0, false), /*#__PURE__*/_jsxDEV(Tooltip, {
-              contentStyle: {
-                background: C.card2,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                color: C.text,
-                fontSize: 12
-              }
-            }, void 0, false), /*#__PURE__*/_jsxDEV(Line, {
-              type: "monotone",
-              dataKey: "avgRPE",
-              name: "Avg RPE",
-              stroke: C.warn,
-              strokeWidth: 2.5,
-              dot: {
-                fill: C.warn,
-                r: 4,
-                strokeWidth: 0
-              },
-              connectNulls: true
-            }, void 0, false)]
-          }, void 0, true)
-        }, void 0, false), /*#__PURE__*/_jsxDEV("div", {
-          style: {
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-            padding: "4px 14px 10px",
-            fontSize: 11,
-            color: C.sub
-          },
-          children: [/*#__PURE__*/_jsxDEV("span", {
-            style: {
-              width: 14,
-              height: 3,
-              background: C.warn,
-              display: "inline-block",
-              borderRadius: 2
-            }
-          }, void 0, false), "Average RPE per session"]
-        }, void 0, true)]
-      }, void 0, true)]
-    }, void 0, true) : sessions.length <= 1 && /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        background: C.card,
-        borderRadius: 12,
-        border: `1px solid ${C.border}`,
-        padding: "20px",
-        textAlign: "center",
-        marginBottom: 16,
-        color: C.sub,
-        fontSize: 13
-      },
-      children: "Log at least 2 sessions to see progression charts."
-    }, void 0, false), /*#__PURE__*/_jsxDEV(SecLabel, {
-      text: "Trainer's feedback"
-    }, void 0, false), [{
-      k: "strength",
-      l: "Strength progress"
-    }, {
-      k: "relative",
-      l: "Relative strength"
-    }, {
-      k: "technique",
-      l: "Technique notes"
-    }, {
-      k: "fatigue",
-      l: "Workload / Fatigue"
-    }, {
-      k: "focus",
-      l: "Next focus"
-    }].map(({
-      k,
-      l
-    }) => /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        marginBottom: 12
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          fontSize: 12,
-          color: C.sub,
-          fontWeight: 600,
-          marginBottom: 4
-        },
-        children: l
-      }, void 0, false), /*#__PURE__*/_jsxDEV("textarea", {
-        value: fb[k],
-        onChange: e => updFb(k, e.target.value),
-        placeholder: `${l}...`,
-        style: ta
-      }, void 0, false)]
-    }, k, true)), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        height: 24
-      }
-    }, void 0, false), showPreview && /*#__PURE__*/_jsxDEV(PrintPreview, {
-      client: client,
-      program: program,
-      bests: bests,
-      sessionData: sessionData,
-      fb: fb,
-      hasBW: hasBW,
-      exColors: exColors,
-      onClose: () => setShowPreview(false)
-    }, void 0, false)]
-  }, void 0, true);
+    axisLine: false,
+    tickLine: false,
+    width: 34,
+    unit: "kg"
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    }
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Line, {
+    key: ex.name,
+    type: "monotone",
+    dataKey: `load_${ex.name}`,
+    name: ex.name,
+    stroke: exColors[i],
+    strokeWidth: 2.5,
+    dot: {
+      fill: exColors[i],
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }))))), /*#__PURE__*/React.createElement(ChartCard, {
+    title: "Estimated 1RM progression"
+  }, /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, {
+      ...props,
+      dateMap: dateMap
+    })
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fill: C.muted,
+      fontSize: 11
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 34,
+    unit: "kg"
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    }
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Line, {
+    key: ex.name,
+    type: "monotone",
+    dataKey: `onerm_${ex.name}`,
+    name: ex.name,
+    stroke: exColors[i],
+    strokeWidth: 2.5,
+    strokeDasharray: "5 3",
+    dot: {
+      fill: exColors[i],
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }))))), /*#__PURE__*/React.createElement(ChartCard, {
+    title: "Power progression (W)"
+  }, /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, {
+      ...props,
+      dateMap: dateMap
+    })
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fill: C.muted,
+      fontSize: 11
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 42,
+    unit: "W"
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    }
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Line, {
+    key: ex.name,
+    type: "monotone",
+    dataKey: `power_${ex.name}`,
+    name: ex.name,
+    stroke: exColors[i],
+    strokeWidth: 2.5,
+    dot: {
+      fill: exColors[i],
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }))))), /*#__PURE__*/React.createElement(ChartCard, {
+    title: "Reps progression (max reps per session)"
+  }, /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, {
+      ...props,
+      dateMap: dateMap
+    })
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fill: C.muted,
+      fontSize: 11
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 34,
+    unit: " reps"
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    }
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Line, {
+    key: ex.name,
+    type: "monotone",
+    dataKey: `reps_${ex.name}`,
+    name: ex.name,
+    stroke: exColors[i],
+    strokeWidth: 2.5,
+    strokeDasharray: "4 2",
+    dot: {
+      fill: exColors[i],
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }))))), /*#__PURE__*/React.createElement(ChartCard, {
+    title: "Injury index (% load increase vs previous session)"
+  }, /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, {
+      ...props,
+      dateMap: dateMap
+    })
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fill: C.muted,
+      fontSize: 11
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 34,
+    unit: "%"
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 10,
+    stroke: C.warn,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.6,
+    label: {
+      value: "High risk >10%",
+      position: "insideTopRight",
+      fill: C.warn,
+      fontSize: 10
+    }
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Line, {
+    key: ex.name,
+    type: "monotone",
+    dataKey: `injury_${ex.name}`,
+    name: ex.name,
+    stroke: exColors[i],
+    strokeWidth: 2.5,
+    dot: {
+      fill: exColors[i],
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 14px 12px",
+      fontSize: 11,
+      color: C.sub,
+      lineHeight: 1.5
+    }
+  }, "Steeper upward slopes indicate larger week-to-week load jumps and higher injury risk. Values above the dashed 10% line warrant caution.")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 14,
+      border: `1px solid ${C.border}`,
+      overflow: "hidden",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px 4px"
+    }
+  }, /*#__PURE__*/React.createElement(SecLabel, {
+    text: "ACWR — Acute:Chronic Workload Ratio"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub,
+      marginBottom: 6,
+      lineHeight: 1.5
+    }
+  }, "Acute (last session volume) ÷ Chronic (avg of previous 4 sessions). Sweet spot: ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#10D4A0",
+      fontWeight: 700
+    }
+  }, "0.8–1.3"), " · Caution: ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#FFB020",
+      fontWeight: 700
+    }
+  }, "1.3–1.5"), " · High risk: ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.warn,
+      fontWeight: 700
+    }
+  }, ">1.5"))), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 210
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, {
+      ...props,
+      dateMap: dateMap
+    })
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fill: C.muted,
+      fontSize: 11
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 34,
+    unit: "×",
+    domain: [0, "auto"]
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 0.8,
+    stroke: C.blue,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.5,
+    label: {
+      value: "0.8 Low",
+      position: "insideBottomRight",
+      fill: C.blue,
+      fontSize: 9
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 1.3,
+    stroke: "#FFB020",
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.5,
+    label: {
+      value: "1.3 Caution",
+      position: "insideTopRight",
+      fill: "#FFB020",
+      fontSize: 9
+    }
+  }), /*#__PURE__*/React.createElement(ReferenceLine, {
+    y: 1.5,
+    stroke: C.warn,
+    strokeDasharray: "4 3",
+    strokeOpacity: 0.5,
+    label: {
+      value: "1.5 High risk",
+      position: "insideTopRight",
+      fill: C.warn,
+      fontSize: 9
+    }
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Line, {
+    key: ex.name,
+    type: "monotone",
+    dataKey: `acwr_${ex.name}`,
+    name: ex.name,
+    stroke: exColors[i],
+    strokeWidth: 2.5,
+    dot: {
+      fill: exColors[i],
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  })))), exercises.length > 1 && /*#__PURE__*/React.createElement(ChartLegend, null)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 14,
+      border: `1px solid ${C.border}`,
+      overflow: "hidden",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px 4px"
+    }
+  }, /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Training quality indices (0–100 scale)"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub,
+      marginBottom: 6,
+      lineHeight: 1.5
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#10D4A0",
+      fontWeight: 700
+    }
+  }, "Hyp"), "=Hypertrophy · ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#FF8020",
+      fontWeight: 700
+    }
+  }, "Max Str"), "=Max Strength · ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#5060FF",
+      fontWeight: 700
+    }
+  }, "Str End"), "=Strength Endurance · ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#AA44FF",
+      fontWeight: 700
+    }
+  }, "Power"), "=Power Index")), exercises.map((ex, i) => /*#__PURE__*/React.createElement("div", {
+    key: ex.name,
+    style: {
+      padding: "0 14px 12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub,
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, ex.name), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 160
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, {
+      ...props,
+      dateMap: dateMap
+    })
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    domain: [0, 100],
+    tick: {
+      fill: C.muted,
+      fontSize: 10
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 28
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 11
+    }
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: `hyp_${ex.name}`,
+    name: "Hyp Index",
+    stroke: "#10D4A0",
+    strokeWidth: 2,
+    dot: {
+      fill: "#10D4A0",
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: `msi_${ex.name}`,
+    name: "Max Str",
+    stroke: "#FF8020",
+    strokeWidth: 2,
+    dot: {
+      fill: "#FF8020",
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: `sei_${ex.name}`,
+    name: "Str End",
+    stroke: "#5060FF",
+    strokeWidth: 2,
+    dot: {
+      fill: "#5060FF",
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: `pi_${ex.name}`,
+    name: "Power Index",
+    stroke: "#AA44FF",
+    strokeWidth: 2,
+    dot: {
+      fill: "#AA44FF",
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 14,
+      flexWrap: "wrap",
+      padding: "0 14px 12px"
+    }
+  }, [["Hyp Index", "#10D4A0"], ["Max Str", "#FF8020"], ["Str End", "#5060FF"], ["Power Index", "#AA44FF"]].map(([l, c]) => /*#__PURE__*/React.createElement("div", {
+    key: l,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 11,
+      color: C.sub
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 14,
+      height: 3,
+      background: c,
+      display: "inline-block",
+      borderRadius: 2
+    }
+  }), l)))), hasBW && /*#__PURE__*/React.createElement(ChartCard, {
+    title: "Relative strength progression (est 1RM ÷ BW)"
+  }, /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, {
+      ...props,
+      dateMap: dateMap
+    })
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fill: C.muted,
+      fontSize: 11
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 34,
+    unit: "×"
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    },
+    formatter: (v, name) => [`${v}×`, name]
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Line, {
+    key: ex.name,
+    type: "monotone",
+    dataKey: `rel_${ex.name}`,
+    name: ex.name,
+    stroke: exColors[i],
+    strokeWidth: 2.5,
+    dot: {
+      fill: exColors[i],
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 14,
+      border: `1px solid ${C.border}`,
+      overflow: "hidden",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 14px 4px"
+    }
+  }, /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Session intensity trend (avg RPE)"
+  })), /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 180
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, {
+      ...props,
+      dateMap: dateMap
+    })
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    domain: [4, 10],
+    tick: {
+      fill: C.muted,
+      fontSize: 11
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 28
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    }
+  }), /*#__PURE__*/React.createElement(Line, {
+    type: "monotone",
+    dataKey: "avgRPE",
+    name: "Avg RPE",
+    stroke: C.warn,
+    strokeWidth: 2.5,
+    dot: {
+      fill: C.warn,
+      r: 4,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      padding: "4px 14px 10px",
+      fontSize: 11,
+      color: C.sub
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 14,
+      height: 3,
+      background: C.warn,
+      display: "inline-block",
+      borderRadius: 2
+    }
+  }), "Average RPE per session"))) : sessions.length <= 1 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 12,
+      border: `1px solid ${C.border}`,
+      padding: "20px",
+      textAlign: "center",
+      marginBottom: 16,
+      color: C.sub,
+      fontSize: 13
+    }
+  }, "Log at least 2 sessions to see progression charts."), /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Trainer's feedback"
+  }), [{
+    k: "strength",
+    l: "Strength progress"
+  }, {
+    k: "relative",
+    l: "Relative strength"
+  }, {
+    k: "technique",
+    l: "Technique notes"
+  }, {
+    k: "fatigue",
+    l: "Workload / Fatigue"
+  }, {
+    k: "focus",
+    l: "Next focus"
+  }].map(({
+    k,
+    l
+  }) => /*#__PURE__*/React.createElement("div", {
+    key: k,
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      fontWeight: 600,
+      marginBottom: 4
+    }
+  }, l), /*#__PURE__*/React.createElement("textarea", {
+    value: fb[k],
+    onChange: e => updFb(k, e.target.value),
+    placeholder: `${l}...`,
+    style: ta
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: 24
+    }
+  }), showPreview && /*#__PURE__*/React.createElement(PrintPreview, {
+    client: client,
+    program: program,
+    bests: bests,
+    sessionData: sessionData,
+    fb: fb,
+    hasBW: hasBW,
+    exColors: exColors,
+    onClose: () => setShowPreview(false)
+  }));
 }
 
 // ─── App Shell ────────────────────────────────────────────────────────────────
@@ -7216,6 +6763,7 @@ function App() {
     setNo,
     type,
     load,
+    rawLoad,
     rir,
     rpe,
     velocity,
@@ -7229,6 +6777,7 @@ function App() {
     bandLength,
     bandStrength,
     bandUsage,
+    bandLoadKg,
     date
   }) => {
     if (!activeProgram) return;
@@ -7238,6 +6787,7 @@ function App() {
       set: setNo,
       type,
       load,
+      rawLoad,
       rir,
       rpe,
       velocity,
@@ -7250,7 +6800,8 @@ function App() {
       force,
       bandLength,
       bandStrength,
-      bandUsage
+      bandUsage,
+      bandLoadKg
     };
     updClient(activeClientId, c => ({
       ...c,
@@ -7279,7 +6830,7 @@ function App() {
   };
   const screenW = useWindowWidth();
   const isTablet = screenW >= 640;
-  return /*#__PURE__*/_jsxDEV("div", {
+  return /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.bg,
       color: C.text,
@@ -7291,203 +6842,190 @@ function App() {
       display: "flex",
       flexDirection: "column",
       overflow: "hidden"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      padding: "12px 16px",
+      borderBottom: `1px solid ${C.border}`,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      position: "sticky",
+      top: 0,
+      zIndex: 50
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      letterSpacing: 4,
+      color: C.accent
+    }
+  }, "FORGE TRAINING"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowDataSync(true),
+    style: {
+      background: "none",
+      border: "none",
+      color: C.muted,
+      cursor: "pointer",
+      fontSize: 18,
+      padding: "2px 4px"
     },
-    children: [/*#__PURE__*/_jsxDEV("div", {
-      style: {
-        background: C.card,
-        padding: "12px 16px",
-        borderBottom: `1px solid ${C.border}`,
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        position: "sticky",
-        top: 0,
-        zIndex: 50
-      },
-      children: [/*#__PURE__*/_jsxDEV("div", {
-        style: {
-          display: "flex",
-          alignItems: "center",
-          gap: 8
-        },
-        children: [/*#__PURE__*/_jsxDEV("div", {
-          style: {
-            fontFamily: "'Bebas Neue',cursive",
-            fontSize: 20,
-            letterSpacing: 4,
-            color: C.accent
-          },
-          children: "FORGE TRAINING"
-        }, void 0, false), /*#__PURE__*/_jsxDEV("button", {
-          onClick: () => setShowDataSync(true),
-          style: {
-            background: "none",
-            border: "none",
-            color: C.muted,
-            cursor: "pointer",
-            fontSize: 18,
-            padding: "2px 4px"
-          },
-          title: "Data & Sync",
-          children: "⚙️"
-        }, void 0, false)]
-      }, void 0, true), /*#__PURE__*/_jsxDEV("button", {
-        onClick: () => setShowSwitcher(true),
-        style: {
-          background: C.card2,
-          border: `1px solid ${C.border}`,
-          borderRadius: 22,
-          padding: "7px 12px 7px 8px",
-          color: C.text,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          fontSize: 13,
-          fontWeight: 700
-        },
-        children: [activeClient && /*#__PURE__*/_jsxDEV(Avatar, {
-          name: activeClient.name,
-          idx: clientIdx,
-          size: 24
-        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
-          children: activeClient?.name.split(" ")[0]
-        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
-          style: {
-            color: C.muted,
-            fontSize: 11
-          },
-          children: "▾"
-        }, void 0, false)]
-      }, void 0, true)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        flex: 1,
-        overflowY: "auto",
-        paddingBottom: 70
-      },
-      children: [tab === "programs" && activeClient && /*#__PURE__*/_jsxDEV(ProgramsTab, {
-        client: activeClient,
-        clientIdx: clientIdx,
-        activeProgramId: activeClient.activeProgramId,
-        onSetActive: setActiveProgram,
-        onAddProgram: addProgram,
-        onEditProgram: editProgram,
-        exList: exList,
-        equipList: equipList,
-        latList: latList,
-        categoryList: categoryList,
-        progTypeList: progTypeList,
-        onAddEx: onAddEx,
-        onAddEquip: onAddEquip,
-        onAddLat: onAddLat,
-        onAddCategory: onAddCategory,
-        onAddProgType: onAddProgType
-      }, void 0, false), tab === "log" && /*#__PURE__*/_jsxDEV(LogTab, {
-        program: activeProgram,
-        onAddEntry: addEntry,
-        exList: exList,
-        onAddEx: onAddEx,
-        setTypeList: setTypeList,
-        onAddSetType: onAddSetType,
-        clientBW: activeClient?.bw
-      }, void 0, false), tab === "progress" && /*#__PURE__*/_jsxDEV(ProgressTab, {
-        program: activeProgram
-      }, void 0, false), tab === "report" && activeClient && /*#__PURE__*/_jsxDEV(ReportTab, {
-        client: activeClient,
-        program: activeProgram
-      }, void 0, false), tab === "calendar" && /*#__PURE__*/_jsxDEV(CalendarTab, {
-        client: activeClient,
-        onDeleteSession: deleteSession
-      }, void 0, false)]
-    }, void 0, true), /*#__PURE__*/_jsxDEV("div", {
-      style: {
-        background: C.card,
-        borderTop: `1px solid ${C.border}`,
-        display: "flex",
-        position: "sticky",
-        bottom: 0,
-        zIndex: 50
-      },
-      children: TABS.map(t => /*#__PURE__*/_jsxDEV("button", {
-        onClick: () => setTab(t.id),
-        style: {
-          flex: 1,
-          border: "none",
-          background: "transparent",
-          padding: "8px 0 5px",
-          cursor: "pointer",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 2
-        },
-        children: [/*#__PURE__*/_jsxDEV("span", {
-          style: {
-            fontSize: 20
-          },
-          children: t.icon
-        }, void 0, false), /*#__PURE__*/_jsxDEV("span", {
-          style: {
-            fontSize: 10,
-            fontWeight: 700,
-            color: tab === t.id ? C.accent : C.muted,
-            letterSpacing: 0.5
-          },
-          children: t.label.toUpperCase()
-        }, void 0, false), tab === t.id && /*#__PURE__*/_jsxDEV("span", {
-          style: {
-            width: 22,
-            height: 2.5,
-            background: C.accent,
-            borderRadius: 2
-          }
-        }, void 0, false)]
-      }, t.id, true))
-    }, void 0, false), showSwitcher && !showAddClient && /*#__PURE__*/_jsxDEV(ClientSwitcher, {
-      clients: clients,
-      activeId: activeClientId,
-      onSwitch: switchClient,
-      onClose: () => setShowSwitcher(false),
-      onAddClient: () => {
-        setShowSwitcher(false);
-        setShowAddClient(true);
-      },
-      onArchive: id => {
-        archiveClient(id);
-        if (id === activeClientId) {
-          const first = clients.find(c => !c.archived && c.id !== id);
-          if (first) switchClient(first.id);
-        }
-      },
-      onReinstate: reinstateClient,
-      onEditClient: c => {
-        setEditClientTarget(c);
-        setShowSwitcher(false);
+    title: "Data & Sync"
+  }, "⚙️")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowSwitcher(true),
+    style: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 22,
+      padding: "7px 12px 7px 8px",
+      color: C.text,
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, activeClient && /*#__PURE__*/React.createElement(Avatar, {
+    name: activeClient.name,
+    idx: clientIdx,
+    size: 24
+  }), /*#__PURE__*/React.createElement("span", null, activeClient?.name.split(" ")[0]), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.muted,
+      fontSize: 11
+    }
+  }, "▾"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      overflowY: "auto",
+      paddingBottom: 70
+    }
+  }, tab === "programs" && activeClient && /*#__PURE__*/React.createElement(ProgramsTab, {
+    client: activeClient,
+    clientIdx: clientIdx,
+    activeProgramId: activeClient.activeProgramId,
+    onSetActive: setActiveProgram,
+    onAddProgram: addProgram,
+    onEditProgram: editProgram,
+    exList: exList,
+    equipList: equipList,
+    latList: latList,
+    categoryList: categoryList,
+    progTypeList: progTypeList,
+    onAddEx: onAddEx,
+    onAddEquip: onAddEquip,
+    onAddLat: onAddLat,
+    onAddCategory: onAddCategory,
+    onAddProgType: onAddProgType
+  }), tab === "log" && /*#__PURE__*/React.createElement(LogTab, {
+    program: activeProgram,
+    onAddEntry: addEntry,
+    exList: exList,
+    onAddEx: onAddEx,
+    setTypeList: setTypeList,
+    onAddSetType: onAddSetType,
+    clientBW: activeClient?.bw
+  }), tab === "progress" && /*#__PURE__*/React.createElement(ProgressTab, {
+    program: activeProgram
+  }), tab === "report" && activeClient && /*#__PURE__*/React.createElement(ReportTab, {
+    client: activeClient,
+    program: activeProgram
+  }), tab === "calendar" && /*#__PURE__*/React.createElement(CalendarTab, {
+    client: activeClient,
+    onDeleteSession: deleteSession
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderTop: `1px solid ${C.border}`,
+      display: "flex",
+      position: "sticky",
+      bottom: 0,
+      zIndex: 50
+    }
+  }, TABS.map(t => /*#__PURE__*/React.createElement("button", {
+    key: t.id,
+    onClick: () => setTab(t.id),
+    style: {
+      flex: 1,
+      border: "none",
+      background: "transparent",
+      padding: "8px 0 5px",
+      cursor: "pointer",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 2
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 20
+    }
+  }, t.icon), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 700,
+      color: tab === t.id ? C.accent : C.muted,
+      letterSpacing: 0.5
+    }
+  }, t.label.toUpperCase()), tab === t.id && /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 22,
+      height: 2.5,
+      background: C.accent,
+      borderRadius: 2
+    }
+  })))), showSwitcher && !showAddClient && /*#__PURE__*/React.createElement(ClientSwitcher, {
+    clients: clients,
+    activeId: activeClientId,
+    onSwitch: switchClient,
+    onClose: () => setShowSwitcher(false),
+    onAddClient: () => {
+      setShowSwitcher(false);
+      setShowAddClient(true);
+    },
+    onArchive: id => {
+      archiveClient(id);
+      if (id === activeClientId) {
+        const first = clients.find(c => !c.archived && c.id !== id);
+        if (first) switchClient(first.id);
       }
-    }, void 0, false), showAddClient && /*#__PURE__*/_jsxDEV(AddClientModal, {
-      onAdd: c => {
-        addClient(c);
-        setShowAddClient(false);
-      },
-      onClose: () => setShowAddClient(false)
-    }, void 0, false), editClientTarget && /*#__PURE__*/_jsxDEV(EditClientModal, {
-      client: editClientTarget,
-      onSave: editClientProfile,
-      onClose: () => setEditClientTarget(null)
-    }, void 0, false), showDataSync && /*#__PURE__*/_jsxDEV(DataSyncSheet, {
-      clients: clients,
-      customData: {
-        exercises: customExercises,
-        equipment: customEquipment,
-        laterality: customLaterality,
-        categories: customCategories,
-        progTypes: customProgTypes,
-        setTypes: customSetTypes
-      },
-      onImport: importData,
-      onClose: () => setShowDataSync(false)
-    }, void 0, false)]
-  }, void 0, true);
+    },
+    onReinstate: reinstateClient,
+    onEditClient: c => {
+      setEditClientTarget(c);
+      setShowSwitcher(false);
+    }
+  }), showAddClient && /*#__PURE__*/React.createElement(AddClientModal, {
+    onAdd: c => {
+      addClient(c);
+      setShowAddClient(false);
+    },
+    onClose: () => setShowAddClient(false)
+  }), editClientTarget && /*#__PURE__*/React.createElement(EditClientModal, {
+    client: editClientTarget,
+    onSave: editClientProfile,
+    onClose: () => setEditClientTarget(null)
+  }), showDataSync && /*#__PURE__*/React.createElement(DataSyncSheet, {
+    clients: clients,
+    customData: {
+      exercises: customExercises,
+      equipment: customEquipment,
+      laterality: customLaterality,
+      categories: customCategories,
+      progTypes: customProgTypes,
+      setTypes: customSetTypes
+    },
+    onImport: importData,
+    onClose: () => setShowDataSync(false)
+  }));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
