@@ -875,7 +875,8 @@ function ExerciseBuilder({
     lat: "Bilateral",
     eccSecs: "",
     conSecs: "",
-    instructions: ""
+    instructions: "",
+    generalInstructions: ""
   });
   const [editIdx, setEditIdx] = useState(null); // index being edited inline
   const updEx = (k, v) => setExForm(f => ({
@@ -895,7 +896,8 @@ function ExerciseBuilder({
       lat: "Bilateral",
       eccSecs: "",
       conSecs: "",
-      instructions: ""
+      instructions: "",
+      generalInstructions: ""
     });
   };
   const removeEx = i => {
@@ -1091,12 +1093,12 @@ function ExerciseBuilder({
       marginBottom: 10
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
-    t: "Exercise instructions (optional)"
+    t: "General instructions (optional)"
   }), /*#__PURE__*/React.createElement("textarea", {
     rows: 3,
     placeholder: "e.g. Keep chest tall, control the descent, drive through heels...",
-    value: exForm.instructions,
-    onChange: e => updEx("instructions", e.target.value),
+    value: exForm.generalInstructions,
+    onChange: e => updEx("generalInstructions", e.target.value),
     style: {
       ...ss,
       resize: "vertical",
@@ -1138,7 +1140,8 @@ function ExRowEdit({
     lat: ex.lat,
     eccSecs: ex.eccSecs || "",
     conSecs: ex.conSecs || "",
-    instructions: ex.instructions || ""
+    instructions: ex.instructions || "",
+    generalInstructions: ex.generalInstructions || ""
   });
   const upd = (k, v) => setForm(f => ({
     ...f,
@@ -1231,12 +1234,12 @@ function ExRowEdit({
       marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
-    t: "Exercise instructions (optional)"
+    t: "General instructions (optional)"
   }), /*#__PURE__*/React.createElement("textarea", {
     rows: 3,
     placeholder: "e.g. Keep chest tall, control the descent...",
-    value: form.instructions,
-    onChange: e => upd("instructions", e.target.value),
+    value: form.generalInstructions,
+    onChange: e => upd("generalInstructions", e.target.value),
     style: {
       ...ss,
       resize: "vertical",
@@ -3748,8 +3751,42 @@ function LogTab({
     key: r,
     value: r
   }, r, " – ", RPE_DESC[r]))))), (() => {
-    const exInstr = program?.exercises.find(e => e.name === activeEx)?.instructions;
-    if (!exInstr && !editingInstr) return /*#__PURE__*/React.createElement("button", {
+    const exDef2 = program?.exercises.find(e => e.name === activeEx);
+    const genInstr = exDef2?.generalInstructions;
+    const exInstr = exDef2?.instructions;
+
+    // Shared general instructions header (always shown if exists)
+    const GenHeader = () => genInstr ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 10,
+        paddingBottom: 10,
+        borderBottom: `1px solid #5060FF33`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: "#5060FF88",
+        fontWeight: 700,
+        letterSpacing: 1.5,
+        textTransform: "uppercase",
+        marginBottom: 4
+      }
+    }, "General instructions"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.sub,
+        lineHeight: 1.6
+      }
+    }, genInstr)) : null;
+    if (!exInstr && !editingInstr) return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#5060FF12",
+        border: `1px dashed #5060FF44`,
+        borderRadius: 10,
+        padding: "12px 14px",
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement(GenHeader, null), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
         setInstrDraft("");
         setEditingInstr(true);
@@ -3758,16 +3795,15 @@ function LogTab({
         width: "100%",
         background: "none",
         border: `1px dashed #5060FF44`,
-        borderRadius: 10,
-        padding: "8px 14px",
-        marginBottom: 12,
+        borderRadius: 8,
+        padding: "7px 12px",
         cursor: "pointer",
         color: "#5060FF",
         fontSize: 11,
         fontWeight: 700,
         textAlign: "left"
       }
-    }, "📋 + Add exercise instructions");
+    }, "📋 + Add set instructions"));
     if (editingInstr) return /*#__PURE__*/React.createElement("div", {
       style: {
         background: "#5060FF12",
@@ -3778,23 +3814,44 @@ function LogTab({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
         fontSize: 10,
         color: "#5060FF",
         fontWeight: 700,
         letterSpacing: 1.5,
-        textTransform: "uppercase",
-        marginBottom: 8
+        textTransform: "uppercase"
       }
-    }, "📋 Exercise instructions"), /*#__PURE__*/React.createElement("textarea", {
-      rows: 3,
+    }, "📋 Set instructions"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        const stamp = `\n\n── Set ${form.setNo} · ${today} ──\n`;
+        setInstrDraft(d => d + stamp);
+      },
+      style: {
+        background: "#5060FF22",
+        border: `1px solid #5060FF44`,
+        borderRadius: 6,
+        padding: "3px 10px",
+        fontSize: 11,
+        color: "#5060FF",
+        fontWeight: 700,
+        cursor: "pointer"
+      }
+    }, "+ Set ", form.setNo, " · ", today)), /*#__PURE__*/React.createElement(GenHeader, null), /*#__PURE__*/React.createElement("textarea", {
+      rows: 5,
       value: instrDraft,
       onChange: e => setInstrDraft(e.target.value),
       placeholder: "e.g. Keep chest tall, control the descent, drive through heels...",
       style: {
         ...ss,
         resize: "vertical",
-        minHeight: 72,
-        lineHeight: 1.5,
+        minHeight: 100,
+        lineHeight: 1.6,
         marginBottom: 10
       }
     }), /*#__PURE__*/React.createElement("div", {
@@ -3848,7 +3905,7 @@ function LogTab({
         marginBottom: 12,
         cursor: "pointer"
       }
-    }, /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(GenHeader, null), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         justifyContent: "space-between",
@@ -3863,7 +3920,7 @@ function LogTab({
         letterSpacing: 1.5,
         textTransform: "uppercase"
       }
-    }, "📋 Exercise instructions"), /*#__PURE__*/React.createElement("span", {
+    }, "📋 Set instructions"), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         color: "#5060FF"
