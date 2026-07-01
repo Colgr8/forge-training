@@ -874,7 +874,8 @@ function ExerciseBuilder({
     eq: "Barbell",
     lat: "Bilateral",
     eccSecs: "",
-    conSecs: ""
+    conSecs: "",
+    instructions: ""
   });
   const [editIdx, setEditIdx] = useState(null); // index being edited inline
   const updEx = (k, v) => setExForm(f => ({
@@ -893,7 +894,8 @@ function ExerciseBuilder({
       eq: "Barbell",
       lat: "Bilateral",
       eccSecs: "",
-      conSecs: ""
+      conSecs: "",
+      instructions: ""
     });
   };
   const removeEx = i => {
@@ -1081,10 +1083,27 @@ function ExerciseBuilder({
     style: {
       fontSize: 10,
       color: C.muted,
-      marginBottom: 10,
+      marginBottom: 8,
       lineHeight: 1.4
     }
-  }, "Prescribed tempo — sets the TUT target for hypertrophy. Optional."), /*#__PURE__*/React.createElement("button", {
+  }, "Prescribed tempo — sets the TUT target for hypertrophy. Optional."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Exercise instructions (optional)"
+  }), /*#__PURE__*/React.createElement("textarea", {
+    rows: 3,
+    placeholder: "e.g. Keep chest tall, control the descent, drive through heels...",
+    value: exForm.instructions,
+    onChange: e => updEx("instructions", e.target.value),
+    style: {
+      ...ss,
+      resize: "vertical",
+      minHeight: 72,
+      lineHeight: 1.5
+    }
+  })), /*#__PURE__*/React.createElement("button", {
     onClick: addEx,
     disabled: !exForm.name,
     style: {
@@ -1118,7 +1137,8 @@ function ExRowEdit({
     eq: ex.eq,
     lat: ex.lat,
     eccSecs: ex.eccSecs || "",
-    conSecs: ex.conSecs || ""
+    conSecs: ex.conSecs || "",
+    instructions: ex.instructions || ""
   });
   const upd = (k, v) => setForm(f => ({
     ...f,
@@ -1207,6 +1227,23 @@ function ExRowEdit({
       marginBottom: 10
     }
   }, "Prescribed tempo for hypertrophy TUT"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Exercise instructions (optional)"
+  }), /*#__PURE__*/React.createElement("textarea", {
+    rows: 3,
+    placeholder: "e.g. Keep chest tall, control the descent...",
+    value: form.instructions,
+    onChange: e => upd("instructions", e.target.value),
+    style: {
+      ...ss,
+      resize: "vertical",
+      minHeight: 72,
+      lineHeight: 1.5
+    }
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8
@@ -1916,7 +1953,14 @@ function SessionDetailSheet({
       fontSize: 11,
       color: C.warn
     }
-  }, "🔴 ", e.bandLength, " ", e.bandStrength, " (", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", e.bandUsage, ")", e.rawLoad != null && e.bandLoadKg ? ` — ${e.rawLoad}kg plate ${e.bandUsage === "assisted" ? "−" : "+"} ${e.bandLoadKg}kg band = ${e.load}kg effective` : "")))))), /*#__PURE__*/React.createElement("div", {
+  }, "🔴 ", e.bandLength, " ", e.bandStrength, " (", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", e.bandUsage, ")", e.rawLoad != null && e.bandLoadKg ? ` — ${e.rawLoad}kg plate ${e.bandUsage === "assisted" ? "−" : "+"} ${e.bandLoadKg}kg band = ${e.load}kg effective` : ""), e.comment && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted,
+      fontStyle: "italic",
+      marginTop: 4
+    }
+  }, "💬 ", e.comment)))))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 18,
       paddingTop: 14,
@@ -2793,7 +2837,8 @@ function LogTab({
   onAddEx,
   setTypeList,
   onAddSetType,
-  clientBW
+  clientBW,
+  onUpdateExercise
 }) {
   const today = new Date().toLocaleDateString("en-ZA", {
     day: "2-digit",
@@ -2819,9 +2864,12 @@ function LogTab({
     bandLength: "",
     bandStrength: "",
     bandUsage: "resisted",
-    bandLoadKg: ""
+    bandLoadKg: "",
+    comment: ""
   });
   const [showBand, setShowBand] = useState(false);
+  const [editingInstr, setEditingInstr] = useState(false);
+  const [instrDraft, setInstrDraft] = useState("");
   const [saved, setSaved] = useState(false);
   const [showSupersetInfo, setShowSupersetInfo] = useState(false);
   const [tempoOverride, setTempoOverride] = useState({
@@ -2853,7 +2901,8 @@ function LogTab({
       bandLength: "",
       bandStrength: "",
       bandUsage: "resisted",
-      bandLoadKg: ""
+      bandLoadKg: "",
+      comment: ""
     });
     setShowBand(false);
     setTempoOverride({
@@ -2878,7 +2927,8 @@ function LogTab({
       bandLength: "",
       bandStrength: "",
       bandUsage: "resisted",
-      bandLoadKg: ""
+      bandLoadKg: "",
+      comment: ""
     }));
     setShowBand(false);
     setTempoOverride({
@@ -2886,6 +2936,7 @@ function LogTab({
       conSecs: ""
     });
     setEditingTempo(false);
+    setEditingInstr(false);
     setSaved(false);
   };
   const bandKgLive = showBand && form.bandLoadKg ? +form.bandLoadKg : 0;
@@ -2933,6 +2984,7 @@ function LogTab({
       bandStrength: showBand && form.bandStrength ? form.bandStrength : null,
       bandUsage: showBand ? form.bandUsage : null,
       bandLoadKg: bandKg || null,
+      comment: form.comment || null,
       date: today
     });
     setForm(f => ({
@@ -2947,7 +2999,8 @@ function LogTab({
       bandLength: "",
       bandStrength: "",
       bandUsage: "resisted",
-      bandLoadKg: ""
+      bandLoadKg: "",
+      comment: ""
     }));
     setShowBand(false);
     setSaved(true);
@@ -3695,6 +3748,134 @@ function LogTab({
     key: r,
     value: r
   }, r, " – ", RPE_DESC[r]))))), (() => {
+    const exInstr = program?.exercises.find(e => e.name === activeEx)?.instructions;
+    if (!exInstr && !editingInstr) return /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setInstrDraft("");
+        setEditingInstr(true);
+      },
+      style: {
+        width: "100%",
+        background: "none",
+        border: `1px dashed #5060FF44`,
+        borderRadius: 10,
+        padding: "8px 14px",
+        marginBottom: 12,
+        cursor: "pointer",
+        color: "#5060FF",
+        fontSize: 11,
+        fontWeight: 700,
+        textAlign: "left"
+      }
+    }, "📋 + Add exercise instructions");
+    if (editingInstr) return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#5060FF12",
+        border: `1px solid #5060FF44`,
+        borderRadius: 10,
+        padding: "12px 14px",
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#5060FF",
+        fontWeight: 700,
+        letterSpacing: 1.5,
+        textTransform: "uppercase",
+        marginBottom: 8
+      }
+    }, "📋 Exercise instructions"), /*#__PURE__*/React.createElement("textarea", {
+      rows: 3,
+      value: instrDraft,
+      onChange: e => setInstrDraft(e.target.value),
+      placeholder: "e.g. Keep chest tall, control the descent, drive through heels...",
+      style: {
+        ...ss,
+        resize: "vertical",
+        minHeight: 72,
+        lineHeight: 1.5,
+        marginBottom: 10
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditingInstr(false),
+      style: {
+        flex: 1,
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 8,
+        padding: "8px",
+        color: C.sub,
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 700
+      }
+    }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        if (onUpdateExercise) onUpdateExercise(activeEx, {
+          instructions: instrDraft.trim() || null
+        });
+        setEditingInstr(false);
+      },
+      style: {
+        flex: 2,
+        background: "#5060FF",
+        color: "#fff",
+        border: "none",
+        borderRadius: 8,
+        padding: "8px",
+        cursor: "pointer",
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: 18,
+        letterSpacing: 2
+      }
+    }, "SAVE")));
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: () => {
+        setInstrDraft(exInstr);
+        setEditingInstr(true);
+      },
+      style: {
+        background: "#5060FF18",
+        border: `1px solid #5060FF33`,
+        borderRadius: 10,
+        padding: "10px 14px",
+        marginBottom: 12,
+        cursor: "pointer"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#5060FF",
+        fontWeight: 700,
+        letterSpacing: 1.5,
+        textTransform: "uppercase"
+      }
+    }, "📋 Exercise instructions"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "#5060FF"
+      }
+    }, "✎ edit")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.sub,
+        lineHeight: 1.6
+      }
+    }, exInstr));
+  })(), (() => {
     const exDef = program?.exercises.find(e => e.name === activeEx);
     const hasTempo = exDef?.eccSecs || exDef?.conSecs;
     // Effective tempo: session override (if set) > program default
@@ -4046,7 +4227,24 @@ function LogTab({
         marginTop: 1
       }
     }, "Target: 40–70s")))));
-  })(), /*#__PURE__*/React.createElement("button", {
+  })(), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Set comment (optional)"
+  }), /*#__PURE__*/React.createElement("textarea", {
+    rows: 2,
+    placeholder: "e.g. Form broke down on rep 6, reduce load next set...",
+    value: form.comment,
+    onChange: e => upd("comment", e.target.value),
+    style: {
+      ...ss,
+      resize: "vertical",
+      minHeight: 60,
+      lineHeight: 1.5
+    }
+  })), /*#__PURE__*/React.createElement("button", {
     onClick: submit,
     style: {
       width: "100%",
@@ -4173,7 +4371,18 @@ function LogTab({
       fontSize: 12,
       color: C.warn
     }
-  }, " · 🔴 ", e.bandLength, " ", e.bandStrength, " ", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", "(", e.bandUsage, ")"), /*#__PURE__*/React.createElement("span", {
+  }, " · 🔴 ", e.bandLength, " ", e.bandStrength, " ", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", "(", e.bandUsage, ")"), e.comment && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted,
+      fontStyle: "italic",
+      marginTop: 4,
+      padding: "4px 8px",
+      background: C.card2,
+      borderRadius: 6,
+      border: `1px solid ${C.border}`
+    }
+  }, "💬 ", e.comment), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 12,
       color: C.muted
@@ -6778,6 +6987,7 @@ function App() {
     bandStrength,
     bandUsage,
     bandLoadKg,
+    comment,
     date
   }) => {
     if (!activeProgram) return;
@@ -6801,7 +7011,8 @@ function App() {
       bandLength,
       bandStrength,
       bandUsage,
-      bandLoadKg
+      bandLoadKg,
+      comment
     };
     updClient(activeClientId, c => ({
       ...c,
@@ -6933,7 +7144,17 @@ function App() {
     onAddEx: onAddEx,
     setTypeList: setTypeList,
     onAddSetType: onAddSetType,
-    clientBW: activeClient?.bw
+    clientBW: activeClient?.bw,
+    onUpdateExercise: (exName, fields) => {
+      if (!activeProgram) return;
+      editProgram({
+        ...activeProgram,
+        exercises: activeProgram.exercises.map(e => e.name === exName ? {
+          ...e,
+          ...fields
+        } : e)
+      });
+    }
   }), tab === "progress" && /*#__PURE__*/React.createElement(ProgressTab, {
     program: activeProgram
   }), tab === "report" && activeClient && /*#__PURE__*/React.createElement(ReportTab, {
