@@ -3760,21 +3760,21 @@ function LogTab({
       style: {
         marginBottom: 10,
         paddingBottom: 10,
-        borderBottom: `1px solid #5060FF33`
+        borderBottom: `1px solid #FF802033`
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 9,
-        color: "#5060FF88",
+        fontSize: 13,
+        color: "#FF8020",
         fontWeight: 700,
-        letterSpacing: 1.5,
+        letterSpacing: 1,
         textTransform: "uppercase",
-        marginBottom: 4
+        marginBottom: 6
       }
     }, "General instructions"), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
-        color: C.sub,
+        color: "#FF8020CC",
         lineHeight: 1.6
       }
     }, genInstr)) : null;
@@ -3829,8 +3829,11 @@ function LogTab({
       }
     }, "📋 Set instructions"), /*#__PURE__*/React.createElement("button", {
       onClick: () => {
-        const stamp = `\n\n── Set ${form.setNo} · ${today} ──\n`;
-        setInstrDraft(d => d + stamp);
+        // Count existing stamps for this set number to auto-number
+        const setPattern = `Set${form.setNo}.`;
+        const count = (instrDraft.match(new RegExp(setPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+        const stamp = `#${count + 1}   Set${form.setNo}.${today}:\n`;
+        setInstrDraft(d => stamp + (d ? '\n' + d : ''));
       },
       style: {
         background: "#5060FF22",
@@ -3842,7 +3845,7 @@ function LogTab({
         fontWeight: 700,
         cursor: "pointer"
       }
-    }, "+ Set ", form.setNo, " · ", today)), /*#__PURE__*/React.createElement(GenHeader, null), /*#__PURE__*/React.createElement("textarea", {
+    }, "+ #", (instrDraft.match(new RegExp(`Set${form.setNo}.`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length + 1, "   Set", form.setNo, ".", today)), /*#__PURE__*/React.createElement(GenHeader, null), /*#__PURE__*/React.createElement("textarea", {
       rows: 5,
       value: instrDraft,
       onChange: e => setInstrDraft(e.target.value),
@@ -3928,10 +3931,24 @@ function LogTab({
     }, "✎ edit")), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
-        color: C.sub,
-        lineHeight: 1.6
+        lineHeight: 1.8,
+        whiteSpace: "pre-wrap"
       }
-    }, exInstr));
+    }, exInstr.split('\n').map((line, li) => {
+      const isStamp = /^#\d+\s+Set\d+\./.test(line.trim());
+      return /*#__PURE__*/React.createElement("div", {
+        key: li,
+        style: {
+          fontWeight: isStamp ? 700 : 400,
+          fontStyle: isStamp ? "normal" : "italic",
+          color: isStamp ? "#5060FF" : "#EEF0FF",
+          fontSize: isStamp ? 11 : 11,
+          opacity: isStamp ? 1 : 0.7,
+          paddingLeft: isStamp ? 0 : 10,
+          borderLeft: isStamp ? "none" : `2px solid #5060FF33`
+        }
+      }, line || '\u00A0');
+    })));
   })(), (() => {
     const exDef = program?.exercises.find(e => e.name === activeEx);
     const hasTempo = exDef?.eccSecs || exDef?.conSecs;
@@ -7131,12 +7148,25 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
+      display: "flex",
+      alignItems: "baseline",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
       fontFamily: "'Bebas Neue',cursive",
       fontSize: 20,
       letterSpacing: 4,
       color: C.accent
     }
-  }, "FORGE TRAINING"), /*#__PURE__*/React.createElement("button", {
+  }, "FORGE TRAINING"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: C.muted,
+      fontWeight: 700,
+      letterSpacing: 1
+    }
+  }, "v57.0.0")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
