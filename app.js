@@ -713,10 +713,17 @@ function AddableSelect({
   onChange,
   options,
   onAddOption,
-  addLabel = "Add new..."
+  addLabel = "Add new...",
+  customItems = [],
+  onEditOption,
+  onDeleteOption
 }) {
+  const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
+  const [editItem, setEditItem] = useState(null);
+  const [editVal, setEditVal] = useState("");
+  const builtIn = options.filter(o => !customItems.includes(o));
   const confirm = () => {
     const v = draft.trim();
     if (!v) return;
@@ -725,72 +732,245 @@ function AddableSelect({
     setDraft("");
     setAdding(false);
   };
-  if (adding) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6
+  const saveEdit = old => {
+    const v = editVal.trim();
+    if (v && v !== old && onEditOption) {
+      onEditOption(old, v);
+      if (value === old) onChange(v);
+    }
+    setEditItem(null);
+    setEditVal("");
+  };
+  const selectItem = v => {
+    onChange(v);
+    setOpen(false);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setOpen(o => !o),
+    style: {
+      ...ss,
+      width: "100%",
+      textAlign: "left",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      cursor: "pointer",
+      background: C.card2,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: value ? C.text : C.muted
+    }
+  }, value || "Select…"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.muted,
+      fontSize: 12
+    }
+  }, open ? "▲" : "▼")), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute",
+      top: "calc(100% + 4px)",
+      left: 0,
+      right: 0,
+      zIndex: 200,
+      background: C.card,
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+      maxHeight: 260,
+      overflowY: "auto"
+    }
+  }, builtIn.filter(o => o).map(o => /*#__PURE__*/React.createElement("div", {
+    key: o,
+    onClick: () => selectItem(o),
+    style: {
+      padding: "10px 14px",
+      cursor: "pointer",
+      fontSize: 13,
+      background: value === o ? C.accent + "22" : "transparent",
+      color: value === o ? C.accent : C.text,
+      borderBottom: `1px solid ${C.border}`
+    }
+  }, o)), customItems.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "6px 14px 4px",
+      fontSize: 10,
+      color: C.muted,
+      fontWeight: 700,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      marginTop: 2
+    }
+  }, "Custom"), customItems.map(o => /*#__PURE__*/React.createElement("div", {
+    key: o,
+    style: {
+      borderBottom: `1px solid ${C.border}`
+    }
+  }, editItem === o ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      padding: "6px 10px",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    value: editVal,
+    onChange: e => setEditVal(e.target.value),
+    onKeyDown: e => {
+      if (e.key === "Enter") saveEdit(o);
+      if (e.key === "Escape") setEditItem(null);
+    },
+    style: {
+      ...ss,
+      flex: 1,
+      padding: "5px 8px",
+      fontSize: 12
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => saveEdit(o),
+    style: {
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 6,
+      padding: "5px 10px",
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: 700,
+      flexShrink: 0
+    }
+  }, "✓"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditItem(null),
+    style: {
+      background: "none",
+      color: C.sub,
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "5px 8px",
+      cursor: "pointer",
+      fontSize: 12,
+      flexShrink: 0
+    }
+  }, "✕")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: () => selectItem(o),
+    style: {
+      flex: 1,
+      padding: "10px 14px",
+      cursor: "pointer",
+      fontSize: 13,
+      background: value === o ? C.accent + "22" : "transparent",
+      color: value === o ? C.accent : C.text
+    }
+  }, o), onEditOption && /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      setEditItem(o);
+      setEditVal(o);
+    },
+    style: {
+      background: "none",
+      border: "none",
+      padding: "10px 8px",
+      cursor: "pointer",
+      color: C.muted,
+      fontSize: 14
+    }
+  }, "✎"), onDeleteOption && /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      if (window.confirm(`Delete "${o}"?`)) {
+        onDeleteOption(o);
+        if (value === o) onChange(builtIn[0] || "");
       }
-    }, /*#__PURE__*/React.createElement("input", {
-      autoFocus: true,
-      value: draft,
-      onChange: e => setDraft(e.target.value),
-      onKeyDown: e => {
-        if (e.key === "Enter") confirm();
-        if (e.key === "Escape") {
-          setAdding(false);
-          setDraft("");
-        }
-      },
-      placeholder: "Type & press Enter",
-      style: {
-        ...ss,
-        flex: 1
-      }
-    }), /*#__PURE__*/React.createElement("button", {
-      onClick: confirm,
-      style: {
-        background: C.accent,
-        color: "#001A12",
-        border: "none",
-        borderRadius: 8,
-        padding: "0 14px",
-        cursor: "pointer",
-        fontWeight: 700,
-        fontSize: 13,
-        flexShrink: 0
-      }
-    }, "Add"), /*#__PURE__*/React.createElement("button", {
-      onClick: () => {
+    },
+    style: {
+      background: "none",
+      border: "none",
+      padding: "10px 8px",
+      cursor: "pointer",
+      color: C.warn,
+      fontSize: 14
+    }
+  }, "🗑")))), adding ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      padding: "8px 10px",
+      alignItems: "center",
+      borderTop: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    value: draft,
+    onChange: e => setDraft(e.target.value),
+    onKeyDown: e => {
+      if (e.key === "Enter") confirm();
+      if (e.key === "Escape") {
         setAdding(false);
         setDraft("");
-      },
-      style: {
-        background: "none",
-        color: C.sub,
-        border: `1px solid ${C.border}`,
-        borderRadius: 8,
-        padding: "0 10px",
-        cursor: "pointer",
-        fontSize: 16,
-        flexShrink: 0
       }
-    }, "✕"));
-  }
-  return /*#__PURE__*/React.createElement("select", {
-    value: value,
-    onChange: e => {
-      if (e.target.value === "__add__") setAdding(true);else onChange(e.target.value);
     },
-    style: ss
-  }, options.map(o => /*#__PURE__*/React.createElement("option", {
-    key: o,
-    value: o
-  }, o)), /*#__PURE__*/React.createElement("option", {
-    disabled: true
-  }, "──────────"), /*#__PURE__*/React.createElement("option", {
-    value: "__add__"
-  }, "＋ ", addLabel));
+    placeholder: "Type & press Enter",
+    style: {
+      ...ss,
+      flex: 1,
+      padding: "5px 8px",
+      fontSize: 12
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: confirm,
+    style: {
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 6,
+      padding: "5px 10px",
+      cursor: "pointer",
+      fontWeight: 700,
+      fontSize: 12,
+      flexShrink: 0
+    }
+  }, "Add"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setAdding(false);
+      setDraft("");
+    },
+    style: {
+      background: "none",
+      color: C.sub,
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "5px 8px",
+      cursor: "pointer",
+      fontSize: 14,
+      flexShrink: 0
+    }
+  }, "✕")) : /*#__PURE__*/React.createElement("button", {
+    onClick: () => setAdding(true),
+    style: {
+      width: "100%",
+      background: "none",
+      border: "none",
+      borderTop: `1px solid ${C.border}`,
+      padding: "10px 14px",
+      cursor: "pointer",
+      color: C.accent,
+      fontSize: 13,
+      fontWeight: 700,
+      textAlign: "left"
+    }
+  }, "＋ ", addLabel)));
 }
 
 // ─── Sheet ────────────────────────────────────────────────────────────────────
@@ -867,7 +1047,16 @@ function ExerciseBuilder({
   latList,
   onAddEx,
   onAddEquip,
-  onAddLat
+  onAddLat,
+  customExercises = [],
+  onEditEx,
+  onDeleteEx,
+  customEquipment = [],
+  onEditEquip,
+  onDeleteEquip,
+  customLaterality = [],
+  onEditLat,
+  onDeleteLat
 }) {
   const [exForm, setExForm] = useState({
     name: "",
@@ -935,6 +1124,15 @@ function ExerciseBuilder({
     onAddEx: onAddEx,
     onAddEquip: onAddEquip,
     onAddLat: onAddLat,
+    customExercises: customExercises,
+    onEditEx: onEditEx,
+    onDeleteEx: onDeleteEx,
+    customEquipment: customEquipment,
+    onEditEquip: onEditEquip,
+    onDeleteEquip: onDeleteEquip,
+    customLaterality: customLaterality,
+    onEditLat: onEditLat,
+    onDeleteLat: onDeleteLat,
     onSave: upd => saveEdit(i, upd),
     onCancel: () => setEditIdx(null)
   })) :
@@ -1016,7 +1214,10 @@ function ExerciseBuilder({
     onChange: v => updEx("name", v),
     options: ["", ...exList].filter((v, i, a) => a.indexOf(v) === i),
     onAddOption: onAddEx,
-    addLabel: "Add new exercise"
+    addLabel: "Add new exercise",
+    customItems: customExercises,
+    onEditOption: onEditEx,
+    onDeleteOption: onDeleteEx
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -1034,7 +1235,10 @@ function ExerciseBuilder({
     onChange: v => updEx("eq", v),
     options: equipList,
     onAddOption: onAddEquip,
-    addLabel: "Add equipment"
+    addLabel: "Add equipment",
+    customItems: customEquipment,
+    onEditOption: onEditEquip,
+    onDeleteOption: onDeleteEquip
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
@@ -1046,7 +1250,10 @@ function ExerciseBuilder({
     onChange: v => updEx("lat", v),
     options: latList,
     onAddOption: onAddLat,
-    addLabel: "Add laterality"
+    addLabel: "Add laterality",
+    customItems: customLaterality,
+    onEditOption: onEditLat,
+    onDeleteOption: onDeleteLat
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -1132,7 +1339,16 @@ function ExRowEdit({
   onAddEquip,
   onAddLat,
   onSave,
-  onCancel
+  onCancel,
+  customExercises = [],
+  onEditEx,
+  onDeleteEx,
+  customEquipment = [],
+  onEditEquip,
+  onDeleteEquip,
+  customLaterality = [],
+  onEditLat,
+  onDeleteLat
 }) {
   const [form, setForm] = useState({
     name: ex.name,
@@ -1158,7 +1374,10 @@ function ExRowEdit({
     onChange: v => upd("name", v),
     options: ["", ...exList].filter((v, i, a) => a.indexOf(v) === i),
     onAddOption: onAddEx,
-    addLabel: "Add new exercise"
+    addLabel: "Add new exercise",
+    customItems: customExercises,
+    onEditOption: onEditEx,
+    onDeleteOption: onDeleteEx
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -1176,7 +1395,10 @@ function ExRowEdit({
     onChange: v => upd("eq", v),
     options: equipList,
     onAddOption: onAddEquip,
-    addLabel: "Add equipment"
+    addLabel: "Add equipment",
+    customItems: customEquipment,
+    onEditOption: onEditEquip,
+    onDeleteOption: onDeleteEquip
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
@@ -1188,7 +1410,10 @@ function ExRowEdit({
     onChange: v => upd("lat", v),
     options: latList,
     onAddOption: onAddLat,
-    addLabel: "Add laterality"
+    addLabel: "Add laterality",
+    customItems: customLaterality,
+    onEditOption: onEditLat,
+    onDeleteOption: onDeleteLat
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -2441,7 +2666,16 @@ function AddProgramModal({
     latList: latList,
     onAddEx: onAddEx,
     onAddEquip: onAddEquip,
-    onAddLat: onAddLat
+    onAddLat: onAddLat,
+    customExercises: customExercises || [],
+    onEditEx: onEditEx,
+    onDeleteEx: onDeleteEx,
+    customEquipment: customEquipment || [],
+    onEditEquip: onEditEquip,
+    onDeleteEquip: onDeleteEquip,
+    customLaterality: customLaterality || [],
+    onEditLat: onEditLat,
+    onDeleteLat: onDeleteLat
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -2493,7 +2727,17 @@ function EditProgramModal({
   onAddEquip,
   onAddLat,
   onAddCategory,
-  onAddProgType
+  onAddProgType,
+  onDelete,
+  customExercises,
+  onEditEx,
+  onDeleteEx,
+  customEquipment,
+  onEditEquip,
+  onDeleteEquip,
+  customLaterality,
+  onEditLat,
+  onDeleteLat
 }) {
   const [form, setForm] = useState({
     name: program.name,
@@ -2563,12 +2807,44 @@ function EditProgramModal({
     latList: latList,
     onAddEx: onAddEx,
     onAddEquip: onAddEquip,
-    onAddLat: onAddLat
+    onAddLat: onAddLat,
+    customExercises: customExercises || [],
+    onEditEx: onEditEx,
+    onDeleteEx: onDeleteEx,
+    customEquipment: customEquipment || [],
+    onEditEquip: onEditEquip,
+    onDeleteEquip: onDeleteEquip,
+    customLaterality: customLaterality || [],
+    onEditLat: onEditLat,
+    onDeleteLat: onDeleteLat
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10,
-      marginTop: 18
+      marginTop: 18,
+      flexDirection: "column"
+    }
+  }, onDelete && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      if (window.confirm(`Delete program "${form.name}"? This cannot be undone.`)) {
+        onDelete(program.id);
+      }
+    },
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px solid ${C.warn}55`,
+      borderRadius: 10,
+      padding: "11px",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "🗑 Delete this program"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
@@ -2597,7 +2873,7 @@ function EditProgramModal({
       letterSpacing: 2,
       cursor: "pointer"
     }
-  }, "SAVE CHANGES")));
+  }, "SAVE CHANGES"))));
 }
 
 // ─── Programs Tab ─────────────────────────────────────────────────────────────
@@ -2609,6 +2885,7 @@ function ProgramsTab({
   onSetActive,
   onAddProgram,
   onEditProgram,
+  onDeleteProgram,
   exList,
   equipList,
   latList,
@@ -2618,7 +2895,16 @@ function ProgramsTab({
   onAddEquip,
   onAddLat,
   onAddCategory,
-  onAddProgType
+  onAddProgType,
+  customExercises = [],
+  onEditEx,
+  onDeleteEx,
+  customEquipment = [],
+  onEditEquip,
+  onDeleteEquip,
+  customLaterality = [],
+  onEditLat,
+  onDeleteLat
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editProg, setEditProg] = useState(null);
@@ -2817,7 +3103,20 @@ function ProgramsTab({
       onEditProgram(p);
       setEditProg(null);
     },
+    onDelete: pid => {
+      onDeleteProgram(pid);
+      setEditProg(null);
+    },
     onClose: () => setEditProg(null),
+    customExercises: customExercises,
+    onEditEx: onEditEx,
+    onDeleteEx: onDeleteEx,
+    customEquipment: customEquipment,
+    onEditEquip: onEditEquip,
+    onDeleteEquip: onDeleteEquip,
+    customLaterality: customLaterality,
+    onEditLat: onEditLat,
+    onDeleteLat: onDeleteLat,
     exList: exList,
     equipList: equipList,
     latList: latList,
@@ -6920,6 +7219,23 @@ function App() {
   const onAddCategory = name => setCustomCategories(l => [...l, name]);
   const onAddProgType = name => setCustomProgTypes(l => [...l, name]);
   const onAddSetType = name => setCustomSetTypes(l => [...l, name]);
+
+  // Edit/delete custom list items
+  const onEditEx = (o, n) => setCustomExercises(l => l.map(x => x === o ? n : x));
+  const onDeleteEx = v => setCustomExercises(l => l.filter(x => x !== v));
+  const onEditEquip = (o, n) => setCustomEquipment(l => l.map(x => x === o ? n : x));
+  const onDeleteEquip = v => setCustomEquipment(l => l.filter(x => x !== v));
+  const onEditLat = (o, n) => setCustomLaterality(l => l.map(x => x === o ? n : x));
+  const onDeleteLat = v => setCustomLaterality(l => l.filter(x => x !== v));
+
+  // Delete program
+  const deleteProgram = pid => {
+    updClient(activeClientId, c => ({
+      ...c,
+      programs: c.programs.filter(p => p.id !== pid),
+      activeProgramId: c.activeProgramId === pid ? c.programs.find(p => p.id !== pid)?.id || null : c.activeProgramId
+    }));
+  };
   useEffect(() => {
     try {
       localStorage.setItem('forge_clients', JSON.stringify(clients));
@@ -7166,7 +7482,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v57.0.0")), /*#__PURE__*/React.createElement("button", {
+  }, "v57.0.2")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
