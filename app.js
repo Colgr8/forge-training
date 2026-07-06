@@ -714,7 +714,6 @@ function AddableSelect({
   options,
   onAddOption,
   addLabel = "Add new...",
-  customItems = [],
   onEditOption,
   onDeleteOption
 }) {
@@ -723,7 +722,6 @@ function AddableSelect({
   const [draft, setDraft] = useState("");
   const [editItem, setEditItem] = useState(null);
   const [editVal, setEditVal] = useState("");
-  const builtIn = options.filter(o => !customItems.includes(o));
   const confirm = () => {
     const v = draft.trim();
     if (!v) return;
@@ -782,31 +780,10 @@ function AddableSelect({
       border: `1px solid ${C.border}`,
       borderRadius: 10,
       boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-      maxHeight: 260,
+      maxHeight: 280,
       overflowY: "auto"
     }
-  }, builtIn.filter(o => o).map(o => /*#__PURE__*/React.createElement("div", {
-    key: o,
-    onClick: () => selectItem(o),
-    style: {
-      padding: "10px 14px",
-      cursor: "pointer",
-      fontSize: 13,
-      background: value === o ? C.accent + "22" : "transparent",
-      color: value === o ? C.accent : C.text,
-      borderBottom: `1px solid ${C.border}`
-    }
-  }, o)), customItems.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "6px 14px 4px",
-      fontSize: 10,
-      color: C.muted,
-      fontWeight: 700,
-      letterSpacing: 1.5,
-      textTransform: "uppercase",
-      marginTop: 2
-    }
-  }, "Custom"), customItems.map(o => /*#__PURE__*/React.createElement("div", {
+  }, options.filter(o => o).map(o => /*#__PURE__*/React.createElement("div", {
     key: o,
     style: {
       borderBottom: `1px solid ${C.border}`
@@ -891,7 +868,7 @@ function AddableSelect({
       e.stopPropagation();
       if (window.confirm(`Delete "${o}"?`)) {
         onDeleteOption(o);
-        if (value === o) onChange(builtIn[0] || "");
+        if (value === o) onChange(options.find(x => x !== o) || "");
       }
     },
     style: {
@@ -1215,7 +1192,6 @@ function ExerciseBuilder({
     options: ["", ...exList].filter((v, i, a) => a.indexOf(v) === i),
     onAddOption: onAddEx,
     addLabel: "Add new exercise",
-    customItems: customExercises,
     onEditOption: onEditEx,
     onDeleteOption: onDeleteEx
   })), /*#__PURE__*/React.createElement("div", {
@@ -1236,7 +1212,6 @@ function ExerciseBuilder({
     options: equipList,
     onAddOption: onAddEquip,
     addLabel: "Add equipment",
-    customItems: customEquipment,
     onEditOption: onEditEquip,
     onDeleteOption: onDeleteEquip
   })), /*#__PURE__*/React.createElement("div", {
@@ -1251,7 +1226,6 @@ function ExerciseBuilder({
     options: latList,
     onAddOption: onAddLat,
     addLabel: "Add laterality",
-    customItems: customLaterality,
     onEditOption: onEditLat,
     onDeleteOption: onDeleteLat
   }))), /*#__PURE__*/React.createElement("div", {
@@ -1375,7 +1349,6 @@ function ExRowEdit({
     options: ["", ...exList].filter((v, i, a) => a.indexOf(v) === i),
     onAddOption: onAddEx,
     addLabel: "Add new exercise",
-    customItems: customExercises,
     onEditOption: onEditEx,
     onDeleteOption: onDeleteEx
   })), /*#__PURE__*/React.createElement("div", {
@@ -1396,7 +1369,6 @@ function ExRowEdit({
     options: equipList,
     onAddOption: onAddEquip,
     addLabel: "Add equipment",
-    customItems: customEquipment,
     onEditOption: onEditEquip,
     onDeleteOption: onDeleteEquip
   })), /*#__PURE__*/React.createElement("div", {
@@ -1411,7 +1383,6 @@ function ExRowEdit({
     options: latList,
     onAddOption: onAddLat,
     addLabel: "Add laterality",
-    customItems: customLaterality,
     onEditOption: onEditLat,
     onDeleteOption: onDeleteLat
   }))), /*#__PURE__*/React.createElement("div", {
@@ -2556,7 +2527,16 @@ function AddProgramModal({
   onAddEquip,
   onAddLat,
   onAddCategory,
-  onAddProgType
+  onAddProgType,
+  customExercises,
+  onEditEx,
+  onDeleteEx,
+  customEquipment,
+  onEditEquip,
+  onDeleteEquip,
+  customLaterality,
+  onEditLat,
+  onDeleteLat
 }) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -3096,7 +3076,16 @@ function ProgramsTab({
     onAddEquip: onAddEquip,
     onAddLat: onAddLat,
     onAddCategory: onAddCategory,
-    onAddProgType: onAddProgType
+    onAddProgType: onAddProgType,
+    customExercises: customExercises,
+    onEditEx: onEditEx,
+    onDeleteEx: onDeleteEx,
+    customEquipment: customEquipment,
+    onEditEquip: onEditEquip,
+    onDeleteEquip: onDeleteEquip,
+    customLaterality: customLaterality,
+    onEditLat: onEditLat,
+    onDeleteLat: onDeleteLat
   }), editProg && /*#__PURE__*/React.createElement(EditProgramModal, {
     program: editProg,
     onSave: p => {
@@ -7201,15 +7190,15 @@ function App() {
   const [showAddClient, setShowAddClient] = useState(false);
   const [showDataSync, setShowDataSync] = useState(false);
   const [editClientTarget, setEditClientTarget] = useState(null);
-  const [customExercises, setCustomExercises] = useState(() => lsGet('forge_customEx', []));
-  const [customEquipment, setCustomEquipment] = useState(() => lsGet('forge_customEquip', []));
-  const [customLaterality, setCustomLaterality] = useState(() => lsGet('forge_customLat', []));
+  const [customExercises, setCustomExercises] = useState(() => lsGet('forge_customEx', EX_LIST));
+  const [customEquipment, setCustomEquipment] = useState(() => lsGet('forge_customEquip', EQUIP_LIST));
+  const [customLaterality, setCustomLaterality] = useState(() => lsGet('forge_customLat', LAT_LIST));
   const [customCategories, setCustomCategories] = useState(() => lsGet('forge_customCats', []));
   const [customProgTypes, setCustomProgTypes] = useState(() => lsGet('forge_customPT', []));
   const [customSetTypes, setCustomSetTypes] = useState(() => lsGet('forge_customST', []));
-  const exList = useMemo(() => [...EX_LIST, ...customExercises], [customExercises]);
-  const equipList = useMemo(() => [...EQUIP_LIST, ...customEquipment], [customEquipment]);
-  const latList = useMemo(() => [...LAT_LIST, ...customLaterality], [customLaterality]);
+  const exList = customExercises;
+  const equipList = customEquipment;
+  const latList = customLaterality;
   const categoryList = useMemo(() => [...CATEGORIES, ...customCategories], [customCategories]);
   const progTypeList = useMemo(() => [...PROG_TYPES, ...customProgTypes], [customProgTypes]);
   const setTypeList = useMemo(() => [...SET_TYPES, ...customSetTypes], [customSetTypes]);
@@ -7482,7 +7471,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v57.0.2")), /*#__PURE__*/React.createElement("button", {
+  }, "v57.0.4")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
@@ -7530,6 +7519,7 @@ function App() {
     onSetActive: setActiveProgram,
     onAddProgram: addProgram,
     onEditProgram: editProgram,
+    onDeleteProgram: deleteProgram,
     exList: exList,
     equipList: equipList,
     latList: latList,
@@ -7539,7 +7529,16 @@ function App() {
     onAddEquip: onAddEquip,
     onAddLat: onAddLat,
     onAddCategory: onAddCategory,
-    onAddProgType: onAddProgType
+    onAddProgType: onAddProgType,
+    customExercises: customExercises,
+    onEditEx: onEditEx,
+    onDeleteEx: onDeleteEx,
+    customEquipment: customEquipment,
+    onEditEquip: onEditEquip,
+    onDeleteEquip: onDeleteEquip,
+    customLaterality: customLaterality,
+    onEditLat: onEditLat,
+    onDeleteLat: onDeleteLat
   }), tab === "log" && /*#__PURE__*/React.createElement(LogTab, {
     program: activeProgram,
     onAddEntry: addEntry,

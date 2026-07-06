@@ -1,4 +1,4 @@
-const CACHE = 'forge-v57.0.3';
+const CACHE = 'forge-v57.0.5';
 const FILES = [
   '/',
   '/index.html',
