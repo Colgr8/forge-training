@@ -298,6 +298,28 @@ const RPE_DESC = {
   10: "Maximal"
 };
 const EX_LIST = ["Chest Press", "Shoulder Press", "Fly", "Lateral raise", "Row", "Chinups", "Reverse fly", "Bicep curls", "Tricep dips", "Squat", "Deadlift", "Forward lunge", "Reverse lunge"];
+
+// One-time migration: merge any previously-stored (additions-only) list with
+// the new full default list, so existing users don't lose defaults that used
+// to be hardcoded separately. Runs once per key, then behaves like a normal
+// localStorage-backed list from then on.
+function migrateList(key, defaults) {
+  try {
+    const migKey = key + '_v2mig';
+    if (localStorage.getItem(migKey)) {
+      const v = localStorage.getItem(key);
+      return v ? JSON.parse(v) : defaults;
+    }
+    const v = localStorage.getItem(key);
+    const stored = v ? JSON.parse(v) : [];
+    const merged = Array.from(new Set([...defaults, ...stored]));
+    localStorage.setItem(key, JSON.stringify(merged));
+    localStorage.setItem(migKey, '1');
+    return merged;
+  } catch {
+    return defaults;
+  }
+}
 const SEED_EX = [{
   name: "Squat",
   eq: "Barbell",
@@ -7190,9 +7212,9 @@ function App() {
   const [showAddClient, setShowAddClient] = useState(false);
   const [showDataSync, setShowDataSync] = useState(false);
   const [editClientTarget, setEditClientTarget] = useState(null);
-  const [customExercises, setCustomExercises] = useState(() => lsGet('forge_customEx', EX_LIST));
-  const [customEquipment, setCustomEquipment] = useState(() => lsGet('forge_customEquip', EQUIP_LIST));
-  const [customLaterality, setCustomLaterality] = useState(() => lsGet('forge_customLat', LAT_LIST));
+  const [customExercises, setCustomExercises] = useState(() => migrateList('forge_customEx', EX_LIST));
+  const [customEquipment, setCustomEquipment] = useState(() => migrateList('forge_customEquip', EQUIP_LIST));
+  const [customLaterality, setCustomLaterality] = useState(() => migrateList('forge_customLat', LAT_LIST));
   const [customCategories, setCustomCategories] = useState(() => lsGet('forge_customCats', []));
   const [customProgTypes, setCustomProgTypes] = useState(() => lsGet('forge_customPT', []));
   const [customSetTypes, setCustomSetTypes] = useState(() => lsGet('forge_customST', []));
@@ -7471,7 +7493,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v57.0.4")), /*#__PURE__*/React.createElement("button", {
+  }, "v57.0.5")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
