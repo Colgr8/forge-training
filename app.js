@@ -196,6 +196,7 @@ const avCol = idx => AV_COLS[idx % AV_COLS.length];
 const isIsoType = t => ["Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Yielding Iso-Holds", "Yielding Iso-GPP"].includes(t);
 const isOvrcIso = t => t === "Ovrc Iso-Ballistic" || t === "Ovrc Iso-Max";
 const isYieldIso = t => t === "Yielding Iso-Holds" || t === "Yielding Iso-GPP";
+const isClusterSet = t => t === "Cluster Set";
 
 // Band strength → kg load ranges (increments of 1kg)
 const BAND_RANGES = {
@@ -205,6 +206,11 @@ const BAND_RANGES = {
   "Heavy": [11, 20],
   "Extra Heavy": [21, 35]
 };
+// Rest period dropdown options: 20s to 900s in 5s increments
+const REST_OPTIONS = Array.from({
+  length: (900 - 20) / 5 + 1
+}, (_, i) => 20 + i * 5);
+const fmtRest = s => s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} min` : `${s}s`;
 const bandRangeOptions = strength => {
   const r = BAND_RANGES[strength];
   if (!r) return [];
@@ -285,7 +291,7 @@ function SessionXTick({
 }
 const CATEGORIES = ["Strength", "Power", "Stability", "Mobility"];
 const PROG_TYPES = ["General Strength", "Hypertrophy", "Endurance Strength", "Max Strength", "Power", "Muscular Endurance", "Hybrid"];
-const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Negative", "Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Yielding Iso-Holds", "Yielding Iso-GPP"];
+const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Negative", "Cluster Set", "Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Yielding Iso-Holds", "Yielding Iso-GPP"];
 const EQUIP_LIST = ["Barbell", "Dumbbell", "Cable machine", "Bodyweight", "Kettlebell", "Long band", "Short band", "Medicine ball", "Trap(Hex) bar"];
 const LAT_LIST = ["Bilateral", "Unilateral - Left", "Unilateral - Right", "Alternating", "Contralateral"];
 const RPE_DESC = {
@@ -1063,6 +1069,8 @@ function ExerciseBuilder({
     lat: "Bilateral",
     eccSecs: "",
     conSecs: "",
+    restSecs: "",
+    restBetweenNext: "",
     instructions: "",
     generalInstructions: ""
   });
@@ -1084,6 +1092,8 @@ function ExerciseBuilder({
       lat: "Bilateral",
       eccSecs: "",
       conSecs: "",
+      restSecs: "",
+      restBetweenNext: "",
       instructions: "",
       generalInstructions: ""
     });
@@ -1164,7 +1174,17 @@ function ExerciseBuilder({
       color: C.accent,
       fontWeight: 700
     }
-  }, " · ⏱ ", ex.eccSecs || "?", "/", ex.conSecs || "?", "s"))), /*#__PURE__*/React.createElement("button", {
+  }, " · ⏱ ", ex.eccSecs || "?", "/", ex.conSecs || "?", "s"), ex.restSecs && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.gold,
+      fontWeight: 700
+    }
+  }, " · 💤 ", fmtRest(+ex.restSecs)), ex.restBetweenNext && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.blue,
+      fontWeight: 700
+    }
+  }, " · →", fmtRest(+ex.restBetweenNext)))), /*#__PURE__*/React.createElement("button", {
     onClick: () => setEditIdx(i),
     style: {
       background: "none",
@@ -1293,6 +1313,49 @@ function ExerciseBuilder({
     }
   }, "Prescribed tempo — sets the TUT target for hypertrophy. Optional."), /*#__PURE__*/React.createElement("div", {
     style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Rest between sets"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: exForm.restSecs,
+    onChange: e => updEx("restSecs", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select…"), REST_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, fmtRest(v))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Rest to next exercise"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: exForm.restBetweenNext,
+    onChange: e => updEx("restBetweenNext", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select…"), REST_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, fmtRest(v)))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 8,
+      lineHeight: 1.4
+    }
+  }, "Rest between sets of this exercise, and transition rest before moving to the next exercise. Both optional."), /*#__PURE__*/React.createElement("div", {
+    style: {
       marginBottom: 10
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
@@ -1352,6 +1415,8 @@ function ExRowEdit({
     lat: ex.lat,
     eccSecs: ex.eccSecs || "",
     conSecs: ex.conSecs || "",
+    restSecs: ex.restSecs || "",
+    restBetweenNext: ex.restBetweenNext || "",
     instructions: ex.instructions || "",
     generalInstructions: ex.generalInstructions || ""
   });
@@ -1448,6 +1513,48 @@ function ExRowEdit({
       marginBottom: 10
     }
   }, "Prescribed tempo for hypertrophy TUT"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Rest between sets"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.restSecs,
+    onChange: e => upd("restSecs", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select…"), REST_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, fmtRest(v))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Rest to next exercise"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.restBetweenNext,
+    onChange: e => upd("restBetweenNext", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select…"), REST_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, fmtRest(v)))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 10
+    }
+  }, "Rest between sets, and transition rest before the next exercise. Both optional."), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 12
     }
@@ -2174,7 +2281,17 @@ function SessionDetailSheet({
       fontSize: 11,
       color: C.warn
     }
-  }, "🔴 ", e.bandLength, " ", e.bandStrength, " (", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", e.bandUsage, ")", e.rawLoad != null && e.bandLoadKg ? ` — ${e.rawLoad}kg plate ${e.bandUsage === "assisted" ? "−" : "+"} ${e.bandLoadKg}kg band = ${e.load}kg effective` : ""), e.comment && /*#__PURE__*/React.createElement("div", {
+  }, "🔴 ", e.bandLength, " ", e.bandStrength, " (", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", e.bandUsage, ")", e.rawLoad != null && e.bandLoadKg ? ` — ${e.rawLoad}kg plate ${e.bandUsage === "assisted" ? "−" : "+"} ${e.bandLoadKg}kg band = ${e.load}kg effective` : ""), e.clusterReps && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.gold
+    }
+  }, "⏱ ", e.clusterCount, "×", e.clusterReps, " clusters", e.clusterRest ? ` (${e.clusterRest}s rest)` : ""), e.restApplied && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.blue
+    }
+  }, "💤 ", e.restApplied >= 60 ? `${Math.floor(e.restApplied / 60)}:${String(e.restApplied % 60).padStart(2, "0")} min` : `${e.restApplied}s`, " rest"), e.comment && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: C.muted,
@@ -2608,7 +2725,7 @@ function AddProgramModal({
     addLabel: "Add category"
   })), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 22
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
     t: "Program type"
@@ -3178,7 +3295,10 @@ function LogTab({
     bandStrength: "",
     bandUsage: "resisted",
     bandLoadKg: "",
-    comment: ""
+    comment: "",
+    clusterReps: "",
+    clusterCount: "",
+    clusterRest: ""
   });
   const [showBand, setShowBand] = useState(false);
   const [editingInstr, setEditingInstr] = useState(false);
@@ -3190,10 +3310,54 @@ function LogTab({
     conSecs: ""
   }); // session-only override
   const [editingTempo, setEditingTempo] = useState(false);
+  const [restTimerOn, setRestTimerOn] = useState(false);
+  const [restOverride, setRestOverride] = useState("");
+  const [editingRest, setEditingRest] = useState(false);
+  const [restNextOverride, setRestNextOverride] = useState("");
+  const [editingRestNext, setEditingRestNext] = useState(false);
+  const [restRemaining, setRestRemaining] = useState(0);
+  const [restRunning, setRestRunning] = useState(false);
+  const [restTotal, setRestTotal] = useState(0);
   const upd = (k, v) => setForm(f => ({
     ...f,
     [k]: v
   }));
+
+  // Rest timer countdown
+  useEffect(() => {
+    if (!restRunning || restRemaining <= 0) return;
+    const t = setTimeout(() => setRestRemaining(r => r - 1), 1000);
+    return () => clearTimeout(t);
+  }, [restRunning, restRemaining]);
+
+  // Alert when rest hits zero
+  useEffect(() => {
+    if (restRunning && restRemaining === 0) {
+      setRestRunning(false);
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [0, 0.15, 0.3].forEach(t => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.connect(g);
+          g.connect(ctx.destination);
+          o.frequency.value = 880;
+          g.gain.value = 0.15;
+          o.start(ctx.currentTime + t);
+          o.stop(ctx.currentTime + t + 0.12);
+        });
+      } catch {}
+      try {
+        navigator.vibrate && navigator.vibrate([200, 100, 200]);
+      } catch {}
+    }
+  }, [restRemaining, restRunning]);
+  const startRestTimer = secs => {
+    if (!secs || secs <= 0) return;
+    setRestTotal(secs);
+    setRestRemaining(secs);
+    setRestRunning(true);
+  };
 
   // When program changes, reset to first exercise
   useEffect(() => {
@@ -3215,7 +3379,10 @@ function LogTab({
       bandStrength: "",
       bandUsage: "resisted",
       bandLoadKg: "",
-      comment: ""
+      comment: "",
+      clusterReps: "",
+      clusterCount: "",
+      clusterRest: ""
     });
     setShowBand(false);
     setTempoOverride({
@@ -3241,7 +3408,10 @@ function LogTab({
       bandStrength: "",
       bandUsage: "resisted",
       bandLoadKg: "",
-      comment: ""
+      comment: "",
+      clusterReps: "",
+      clusterCount: "",
+      clusterRest: ""
     }));
     setShowBand(false);
     setTempoOverride({
@@ -3251,6 +3421,10 @@ function LogTab({
     setEditingTempo(false);
     setEditingInstr(false);
     setSaved(false);
+    setRestOverride("");
+    setEditingRest(false);
+    setRestNextOverride("");
+    setEditingRestNext(false);
   };
   const bandKgLive = showBand && form.bandLoadKg ? +form.bandLoadKg : 0;
   const bandSignedLive = bandKgLive ? form.bandUsage === "assisted" ? -bandKgLive : bandKgLive : 0;
@@ -3278,6 +3452,8 @@ function LogTab({
     const exDefSub = program?.exercises.find(e => e.name === activeEx);
     const eccUsed = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDefSub?.eccSecs || null;
     const conUsed = tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDefSub?.conSecs || null;
+    // Rest applied to this set: session override > exercise default (recorded regardless of timer toggle)
+    const restApplied = restOverride !== "" ? +restOverride : exDefSub?.restSecs || null;
     onAddEntry({
       ex: activeEx,
       ...form,
@@ -3298,6 +3474,10 @@ function LogTab({
       bandUsage: showBand ? form.bandUsage : null,
       bandLoadKg: bandKg || null,
       comment: form.comment || null,
+      clusterReps: isClusterSet(form.type) && form.clusterReps ? +form.clusterReps : null,
+      clusterCount: isClusterSet(form.type) && form.clusterCount ? +form.clusterCount : null,
+      clusterRest: isClusterSet(form.type) && form.clusterRest ? +form.clusterRest : null,
+      restApplied: restApplied || null,
       date: today
     });
     setForm(f => ({
@@ -3313,11 +3493,17 @@ function LogTab({
       bandStrength: "",
       bandUsage: "resisted",
       bandLoadKg: "",
-      comment: ""
+      comment: "",
+      clusterReps: "",
+      clusterCount: "",
+      clusterRest: ""
     }));
     setShowBand(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+    // Auto-start countdown only when the Rest Timer toggle is on — the value is
+    // still recorded above regardless, so history always reflects the rest used.
+    if (restTimerOn && restApplied) startRestTimer(restApplied);
   };
   if (!program) return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3404,7 +3590,316 @@ function LogTab({
       gap: 4,
       cursor: "pointer"
     }
-  }, "⚡ Complex sets"))), showSupersetInfo && /*#__PURE__*/React.createElement(Sheet, {
+  }, "⚡ Complex sets"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      background: C.card,
+      borderRadius: 12,
+      padding: "10px 14px",
+      marginBottom: 12,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13
+    }
+  }, "⏱"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      fontWeight: 600
+    }
+  }, "Rest Timer"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: C.muted
+    }
+  }, "(auto-start after LOG SET)")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setRestTimerOn(o => !o),
+    style: {
+      width: 44,
+      height: 24,
+      borderRadius: 12,
+      border: "none",
+      cursor: "pointer",
+      background: restTimerOn ? C.accent : C.border,
+      position: "relative",
+      padding: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 18,
+      height: 18,
+      borderRadius: "50%",
+      background: "#fff",
+      position: "absolute",
+      top: 3,
+      left: restTimerOn ? 23 : 3,
+      transition: "left 0.15s"
+    }
+  }))), (restRunning || restRemaining > 0) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: restRemaining === 0 ? C.accent + "22" : C.card2,
+      borderRadius: 14,
+      padding: "16px",
+      marginBottom: 12,
+      border: `1px solid ${restRemaining === 0 ? C.accent : C.border}`,
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      fontWeight: 700,
+      marginBottom: 6
+    }
+  }, restRemaining === 0 ? "Rest complete!" : "Resting…"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 48,
+      letterSpacing: 2,
+      color: restRemaining === 0 ? C.accent : C.text,
+      lineHeight: 1
+    }
+  }, Math.floor(restRemaining / 60), ":", String(restRemaining % 60).padStart(2, "0")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center",
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setRestRemaining(r => Math.max(0, r - 10)),
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "6px 12px",
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "−10s"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setRestRunning(r => !r),
+    style: {
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 8,
+      padding: "6px 16px",
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, restRunning ? "Pause" : restRemaining > 0 ? "Resume" : "Dismiss"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setRestRemaining(r => r + 10),
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "6px 12px",
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "+10s"), restRemaining === 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setRestRemaining(0);
+      setRestRunning(false);
+    },
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      padding: "6px 12px",
+      color: C.muted,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "✕"))), (() => {
+    const exDefR = program?.exercises.find(e => e.name === activeEx);
+    const baseRest = exDefR?.restSecs;
+    if (!baseRest && restOverride === "" && !editingRest) return null;
+    return editingRest ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+        marginBottom: 12,
+        background: C.card2,
+        borderRadius: 10,
+        padding: "10px 12px",
+        border: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: C.sub,
+        flexShrink: 0
+      }
+    }, "Rest:"), /*#__PURE__*/React.createElement("select", {
+      autoFocus: true,
+      value: restOverride !== "" ? restOverride : baseRest || "",
+      onChange: e => setRestOverride(e.target.value),
+      style: {
+        ...ss,
+        flex: 1,
+        padding: "6px 8px"
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "Select…"), REST_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, fmtRest(v)))), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditingRest(false),
+      style: {
+        background: C.accent,
+        color: "#001A12",
+        border: "none",
+        borderRadius: 6,
+        padding: "6px 12px",
+        cursor: "pointer",
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, "✓")) : /*#__PURE__*/React.createElement("div", {
+      onClick: () => setEditingRest(true),
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 12,
+        background: C.card2,
+        borderRadius: 10,
+        padding: "8px 12px",
+        border: `1px dashed ${C.border}`,
+        cursor: "pointer"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: C.sub
+      }
+    }, "Rest: ", /*#__PURE__*/React.createElement("strong", {
+      style: {
+        color: C.text
+      }
+    }, fmtRest(+(restOverride !== "" ? restOverride : baseRest))), restOverride !== "" ? " (session override)" : " (default)"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: C.accent
+      }
+    }, "✎ adjust"));
+  })(), (() => {
+    const exDefN = program?.exercises.find(e => e.name === activeEx);
+    const baseNext = exDefN?.restBetweenNext;
+    if (!baseNext && restNextOverride === "" && !editingRestNext) return null;
+    const activeVal = restNextOverride !== "" ? restNextOverride : baseNext;
+    return editingRestNext ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+        marginBottom: 12,
+        background: C.card2,
+        borderRadius: 10,
+        padding: "10px 12px",
+        border: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: C.sub,
+        flexShrink: 0
+      }
+    }, "→ Next ex:"), /*#__PURE__*/React.createElement("select", {
+      autoFocus: true,
+      value: activeVal || "",
+      onChange: e => setRestNextOverride(e.target.value),
+      style: {
+        ...ss,
+        flex: 1,
+        padding: "6px 8px"
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "Select…"), REST_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, fmtRest(v)))), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditingRestNext(false),
+      style: {
+        background: C.accent,
+        color: "#001A12",
+        border: "none",
+        borderRadius: 6,
+        padding: "6px 12px",
+        cursor: "pointer",
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, "✓")) : /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 12,
+        background: C.card2,
+        borderRadius: 10,
+        padding: "8px 12px",
+        border: `1px dashed ${C.blue}44`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: () => setEditingRestNext(true),
+      style: {
+        cursor: "pointer",
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: C.sub
+      }
+    }, "→ Next exercise: ", /*#__PURE__*/React.createElement("strong", {
+      style: {
+        color: C.text
+      }
+    }, fmtRest(+activeVal)), restNextOverride !== "" ? " (session)" : " (default)")), /*#__PURE__*/React.createElement("button", {
+      onClick: () => startRestTimer(+activeVal),
+      style: {
+        background: C.blue + "22",
+        border: `1px solid ${C.blue}55`,
+        borderRadius: 6,
+        padding: "5px 10px",
+        color: C.blue,
+        cursor: "pointer",
+        fontSize: 11,
+        fontWeight: 700,
+        marginRight: 8
+      }
+    }, "▶ Start"), /*#__PURE__*/React.createElement("span", {
+      onClick: () => setEditingRestNext(true),
+      style: {
+        fontSize: 11,
+        color: C.blue,
+        cursor: "pointer"
+      }
+    }, "✎"));
+  })(), showSupersetInfo && /*#__PURE__*/React.createElement(Sheet, {
     title: "⚡ COMPLEX SETS GUIDE",
     onClose: () => setShowSupersetInfo(false)
   }, /*#__PURE__*/React.createElement("div", {
@@ -3644,14 +4139,21 @@ function LogTab({
       flex: 1
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
-    t: isIsoType(form.type) ? "Contractions" : "Reps"
+    t: isIsoType(form.type) ? "Contractions" : isClusterSet(form.type) ? "Total Reps (auto)" : "Reps"
   }), /*#__PURE__*/React.createElement("input", {
     type: "number",
     min: "1",
     placeholder: isOvrcIso(form.type) ? "3" : isYieldIso(form.type) ? "1" : "8",
     value: form.reps,
     onChange: e => upd("reps", e.target.value),
-    style: ss
+    readOnly: isClusterSet(form.type),
+    style: {
+      ...ss,
+      ...(isClusterSet(form.type) ? {
+        background: C.card2,
+        color: C.sub
+      } : {})
+    }
   })), isOvrcIso(form.type) ? /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
@@ -3704,7 +4206,88 @@ function LogTab({
     value: form.load,
     onChange: e => upd("load", e.target.value),
     style: ss
-  }))), isIsoType(form.type) && /*#__PURE__*/React.createElement("div", {
+  }))), isClusterSet(form.type) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#FFB02015",
+      borderRadius: 10,
+      padding: "12px 14px",
+      border: `1px solid #FFB02033`,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.gold,
+      fontWeight: 700,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      marginBottom: 10
+    }
+  }, "⏱ Cluster Set breakdown"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Reps per cluster"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "1",
+    placeholder: "2",
+    value: form.clusterReps,
+    onChange: e => {
+      const cr = e.target.value;
+      upd("clusterReps", cr);
+      const cc = form.clusterCount;
+      if (cr && cc) upd("reps", String(+cr * +cc));
+    },
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Number of clusters"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "1",
+    placeholder: "3",
+    value: form.clusterCount,
+    onChange: e => {
+      const cc = e.target.value;
+      upd("clusterCount", cc);
+      const cr = form.clusterReps;
+      if (cr && cc) upd("reps", String(+cr * +cc));
+    },
+    style: ss
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Intra-cluster rest (s)"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.clusterRest,
+    onChange: e => upd("clusterRest", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select…"), [5, 10, 15, 20, 25, 30].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "s (", v === 5 ? "rest-pause" : "cluster", ")")))), form.clusterReps && form.clusterCount && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.gold,
+      marginTop: 8,
+      fontWeight: 600
+    }
+  }, form.clusterCount, " clusters × ", form.clusterReps, " reps", form.clusterRest ? ` (${form.clusterRest}s rest between)` : "", " = ", /*#__PURE__*/React.createElement("strong", null, +form.clusterReps * +form.clusterCount, " total reps"))), isIsoType(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card2,
       borderRadius: 10,
@@ -4755,7 +5338,17 @@ function LogTab({
       fontSize: 12,
       color: C.warn
     }
-  }, " · 🔴 ", e.bandLength, " ", e.bandStrength, " ", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", "(", e.bandUsage, ")"), e.comment && /*#__PURE__*/React.createElement("div", {
+  }, " · 🔴 ", e.bandLength, " ", e.bandStrength, " ", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", "(", e.bandUsage, ")"), e.clusterReps && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.gold
+    }
+  }, " · ⏱ ", e.clusterCount, "×", e.clusterReps, " clusters"), e.restApplied && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.blue
+    }
+  }, " · 💤 ", e.restApplied >= 60 ? `${Math.floor(e.restApplied / 60)}:${String(e.restApplied % 60).padStart(2, "0")}` : `${e.restApplied}s`, " rest"), e.comment && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: C.muted,
@@ -7389,6 +7982,10 @@ function App() {
     bandUsage,
     bandLoadKg,
     comment,
+    clusterReps,
+    clusterCount,
+    clusterRest,
+    restApplied,
     date
   }) => {
     if (!activeProgram) return;
@@ -7413,7 +8010,11 @@ function App() {
       bandStrength,
       bandUsage,
       bandLoadKg,
-      comment
+      comment,
+      clusterReps,
+      clusterCount,
+      clusterRest,
+      restApplied
     };
     updClient(activeClientId, c => ({
       ...c,
@@ -7493,7 +8094,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v57.0.5")), /*#__PURE__*/React.createElement("button", {
+  }, "v57.1.2")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
