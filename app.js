@@ -210,6 +210,59 @@ const BAND_RANGES = {
 const REST_OPTIONS = Array.from({
   length: (900 - 20) / 5 + 1
 }, (_, i) => 20 + i * 5);
+
+// Increment magnitude options for incremental rest: fine steps early, coarser further out
+const INCREMENT_OPTIONS = [...Array.from({
+  length: 13
+}, (_, i) => i * 5),
+// 0,5,10...60 (5s steps)
+...Array.from({
+  length: 23
+}, (_, i) => 70 + i * 10),
+// 70,80...300 (10s steps)
+...Array.from({
+  length: 20
+}, (_, i) => 330 + i * 30),
+// 330,360...900 (30s steps)
+...Array.from({
+  length: 45
+}, (_, i) => 960 + i * 60) // 960,1020...3600 (60s steps, up to 1hr)
+];
+
+// Compute rest before the next set, given base rest + incremental progression.
+// completedSetNo = the set number just logged (rest applies before the following set).
+// Rest calc with optional pyramid (trend switch partway through the set sequence).
+// Phase 1 runs from set 1 to the turn point; phase 2 takes over after that,
+// continuing from wherever phase 1 left off (so the curve is continuous, not reset).
+// Rest calc with unlimited trend switches ("wave" pattern). `turns` is an array
+// of {afterSet, dir, amt} — each says "from this set number onward, switch to
+// this new trend/increment". Sorted internally so add order doesn't matter.
+function calcIncrementalRest(baseSecs, dir0, amt0, completedSetNo, turns) {
+  if (!baseSecs) return null;
+  const clamp = v => Math.min(900, Math.max(10, v));
+  const n = Math.max(1, completedSetNo || 1);
+  const phases = [{
+    start: 1,
+    dir: dir0,
+    amt: amt0
+  }, ...(turns || []).filter(t => t && t.afterSet).map(t => ({
+    start: +t.afterSet,
+    dir: t.dir,
+    amt: +t.amt || 0
+  }))].sort((a, b) => a.start - b.start);
+  let rest = baseSecs;
+  for (let s = 2; s <= n; s++) {
+    let active = phases[0];
+    for (const p of phases) {
+      if (p.start <= s - 1) active = p;
+    }
+    rest = clamp(rest + (active.amt || 0) * (active.dir === "-" ? -1 : 1));
+  }
+  return clamp(rest);
+}
+const TURN_OPTIONS = Array.from({
+  length: 19
+}, (_, i) => i + 2);
 const fmtRest = s => s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} min` : `${s}s`;
 const bandRangeOptions = strength => {
   const r = BAND_RANGES[strength];
@@ -1070,6 +1123,9 @@ function ExerciseBuilder({
     eccSecs: "",
     conSecs: "",
     restSecs: "",
+    restIncrementDir: "+",
+    restIncrementAmt: "0",
+    restTurns: [],
     restBetweenNext: "",
     instructions: "",
     generalInstructions: ""
@@ -1093,6 +1149,9 @@ function ExerciseBuilder({
       eccSecs: "",
       conSecs: "",
       restSecs: "",
+      restIncrementDir: "+",
+      restIncrementAmt: "0",
+      restTurns: [],
       restBetweenNext: "",
       instructions: "",
       generalInstructions: ""
@@ -1179,7 +1238,7 @@ function ExerciseBuilder({
       color: C.gold,
       fontWeight: 700
     }
-  }, " · 💤 ", fmtRest(+ex.restSecs)), ex.restBetweenNext && /*#__PURE__*/React.createElement("span", {
+  }, " ", "· 💤 ", fmtRest(+ex.restSecs), +(ex.restIncrementAmt || 0) > 0 ? (ex.restTurns || []).length > 0 ? ` (🌊 wave, ${ex.restTurns.length} turn${ex.restTurns.length !== 1 ? "s" : ""})` : ` (${ex.restIncrementDir}${fmtRest(+ex.restIncrementAmt)}/set)` : ""), ex.restBetweenNext && /*#__PURE__*/React.createElement("span", {
     style: {
       color: C.blue,
       fontWeight: 700
@@ -1347,14 +1406,175 @@ function ExerciseBuilder({
   }, "Select…"), REST_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
     key: v,
     value: v
-  }, fmtRest(v)))))), /*#__PURE__*/React.createElement("div", {
+  }, fmtRest(v)))))), exForm.restSecs && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 70
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Trend"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: exForm.restIncrementDir,
+    onChange: e => updEx("restIncrementDir", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "+"
+  }, "+"), /*#__PURE__*/React.createElement("option", {
+    value: "-"
+  }, "−"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Increment per set"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: exForm.restIncrementAmt,
+    onChange: e => updEx("restIncrementAmt", e.target.value),
+    style: ss
+  }, INCREMENT_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v === 0 ? "None (flat rest)" : fmtRest(v)))))), +exForm.restIncrementAmt > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, exForm.restTurns.map((t, ti) => /*#__PURE__*/React.createElement("div", {
+    key: ti,
+    style: {
+      background: C.card,
+      borderRadius: 8,
+      padding: "10px",
+      marginBottom: 8,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: C.gold,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase"
+    }
+  }, "🌊 Turn ", ti + 1), /*#__PURE__*/React.createElement("button", {
+    onClick: () => updEx("restTurns", exForm.restTurns.filter((_, i) => i !== ti)),
+    style: {
+      background: "none",
+      border: "none",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 12
+    }
+  }, "🗑 Remove")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Switch trend after set #"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.afterSet,
+    onChange: e => {
+      const nt = [...exForm.restTurns];
+      nt[ti] = {
+        ...nt[ti],
+        afterSet: +e.target.value
+      };
+      updEx("restTurns", nt);
+    },
+    style: ss
+  }, TURN_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, "Set ", v)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 70
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "New trend"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.dir,
+    onChange: e => {
+      const nt = [...exForm.restTurns];
+      nt[ti] = {
+        ...nt[ti],
+        dir: e.target.value
+      };
+      updEx("restTurns", nt);
+    },
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "+"
+  }, "+"), /*#__PURE__*/React.createElement("option", {
+    value: "-"
+  }, "−"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "New increment"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.amt,
+    onChange: e => {
+      const nt = [...exForm.restTurns];
+      nt[ti] = {
+        ...nt[ti],
+        amt: +e.target.value
+      };
+      updEx("restTurns", nt);
+    },
+    style: ss
+  }, INCREMENT_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v === 0 ? "None (flat)" : fmtRest(v)))))))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const lastSet = exForm.restTurns.length ? exForm.restTurns[exForm.restTurns.length - 1].afterSet : 3;
+      updEx("restTurns", [...exForm.restTurns, {
+        afterSet: Math.min(20, lastSet + 2),
+        dir: "+",
+        amt: 0
+      }]);
+    },
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px dashed ${C.gold}55`,
+      borderRadius: 8,
+      padding: "8px",
+      cursor: "pointer",
+      color: C.gold,
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 8
+    }
+  }, "🌊 + Add trend change")), +exForm.restIncrementAmt > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.gold,
+      marginBottom: 8,
+      fontWeight: 600,
+      lineHeight: 1.6
+    }
+  }, "Preview: ", [1, 2, 3, 4, 5, 6, 7, 8].map(n => `Set${n}→${n + 1} ${fmtRest(calcIncrementalRest(+exForm.restSecs, exForm.restIncrementDir, +exForm.restIncrementAmt, n, exForm.restTurns))}`).join(" · "))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: C.muted,
       marginBottom: 8,
       lineHeight: 1.4
     }
-  }, "Rest between sets of this exercise, and transition rest before moving to the next exercise. Both optional."), /*#__PURE__*/React.createElement("div", {
+  }, "Rest between sets of this exercise (with optional per-set increment/decrement), and transition rest before moving to the next exercise. All optional."), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10
     }
@@ -1416,6 +1636,14 @@ function ExRowEdit({
     eccSecs: ex.eccSecs || "",
     conSecs: ex.conSecs || "",
     restSecs: ex.restSecs || "",
+    restIncrementDir: ex.restIncrementDir || "+",
+    restIncrementAmt: ex.restIncrementAmt || "0",
+    // Migrate old single-pyramid fields into the new turns array if present
+    restTurns: ex.restTurns || (ex.restPyramidOn ? [{
+      afterSet: +ex.restPyramidTurn || 3,
+      dir: ex.restIncrementDir2 || "+",
+      amt: +ex.restIncrementAmt2 || 0
+    }] : []),
     restBetweenNext: ex.restBetweenNext || "",
     instructions: ex.instructions || "",
     generalInstructions: ex.generalInstructions || ""
@@ -1548,13 +1776,174 @@ function ExRowEdit({
   }, "Select…"), REST_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
     key: v,
     value: v
-  }, fmtRest(v)))))), /*#__PURE__*/React.createElement("div", {
+  }, fmtRest(v)))))), form.restSecs && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 70
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Trend"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.restIncrementDir,
+    onChange: e => upd("restIncrementDir", e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "+"
+  }, "+"), /*#__PURE__*/React.createElement("option", {
+    value: "-"
+  }, "−"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Increment per set"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: form.restIncrementAmt,
+    onChange: e => upd("restIncrementAmt", e.target.value),
+    style: ss
+  }, INCREMENT_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v === 0 ? "None (flat rest)" : fmtRest(v)))))), +form.restIncrementAmt > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, form.restTurns.map((t, ti) => /*#__PURE__*/React.createElement("div", {
+    key: ti,
+    style: {
+      background: C.card,
+      borderRadius: 8,
+      padding: "10px",
+      marginBottom: 8,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: C.gold,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase"
+    }
+  }, "🌊 Turn ", ti + 1), /*#__PURE__*/React.createElement("button", {
+    onClick: () => upd("restTurns", form.restTurns.filter((_, i) => i !== ti)),
+    style: {
+      background: "none",
+      border: "none",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 12
+    }
+  }, "🗑 Remove")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Switch trend after set #"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.afterSet,
+    onChange: e => {
+      const nt = [...form.restTurns];
+      nt[ti] = {
+        ...nt[ti],
+        afterSet: +e.target.value
+      };
+      upd("restTurns", nt);
+    },
+    style: ss
+  }, TURN_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, "Set ", v)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 70
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "New trend"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.dir,
+    onChange: e => {
+      const nt = [...form.restTurns];
+      nt[ti] = {
+        ...nt[ti],
+        dir: e.target.value
+      };
+      upd("restTurns", nt);
+    },
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "+"
+  }, "+"), /*#__PURE__*/React.createElement("option", {
+    value: "-"
+  }, "−"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "New increment"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.amt,
+    onChange: e => {
+      const nt = [...form.restTurns];
+      nt[ti] = {
+        ...nt[ti],
+        amt: +e.target.value
+      };
+      upd("restTurns", nt);
+    },
+    style: ss
+  }, INCREMENT_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v === 0 ? "None (flat)" : fmtRest(v)))))))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const lastSet = form.restTurns.length ? form.restTurns[form.restTurns.length - 1].afterSet : 3;
+      upd("restTurns", [...form.restTurns, {
+        afterSet: Math.min(20, lastSet + 2),
+        dir: "+",
+        amt: 0
+      }]);
+    },
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px dashed ${C.gold}55`,
+      borderRadius: 8,
+      padding: "8px",
+      cursor: "pointer",
+      color: C.gold,
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 8
+    }
+  }, "🌊 + Add trend change")), +form.restIncrementAmt > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.gold,
+      marginBottom: 8,
+      fontWeight: 600,
+      lineHeight: 1.6
+    }
+  }, "Preview: ", [1, 2, 3, 4, 5, 6, 7, 8].map(n => `Set${n}→${n + 1} ${fmtRest(calcIncrementalRest(+form.restSecs, form.restIncrementDir, +form.restIncrementAmt, n, form.restTurns))}`).join(" · "))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: C.muted,
       marginBottom: 10
     }
-  }, "Rest between sets, and transition rest before the next exercise. Both optional."), /*#__PURE__*/React.createElement("div", {
+  }, "Rest between sets (with optional per-set increment/decrement), and transition rest before the next exercise. All optional."), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 12
     }
@@ -3453,7 +3842,7 @@ function LogTab({
     const eccUsed = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDefSub?.eccSecs || null;
     const conUsed = tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDefSub?.conSecs || null;
     // Rest applied to this set: session override > exercise default (recorded regardless of timer toggle)
-    const restApplied = restOverride !== "" ? +restOverride : exDefSub?.restSecs || null;
+    const restApplied = restOverride !== "" ? +restOverride : calcIncrementalRest(exDefSub?.restSecs, exDefSub?.restIncrementDir, exDefSub?.restIncrementAmt, +form.setNo, exDefSub?.restTurns);
     onAddEntry({
       ex: activeEx,
       ...form,
@@ -3732,6 +4121,8 @@ function LogTab({
   }, "✕"))), (() => {
     const exDefR = program?.exercises.find(e => e.name === activeEx);
     const baseRest = exDefR?.restSecs;
+    const calcRest = calcIncrementalRest(baseRest, exDefR?.restIncrementDir, exDefR?.restIncrementAmt, +form.setNo, exDefR?.restTurns);
+    const hasIncrement = +(exDefR?.restIncrementAmt || 0) > 0;
     if (!baseRest && restOverride === "" && !editingRest) return null;
     return editingRest ? /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3752,7 +4143,7 @@ function LogTab({
       }
     }, "Rest:"), /*#__PURE__*/React.createElement("select", {
       autoFocus: true,
-      value: restOverride !== "" ? restOverride : baseRest || "",
+      value: restOverride !== "" ? restOverride : calcRest || "",
       onChange: e => setRestOverride(e.target.value),
       style: {
         ...ss,
@@ -3794,11 +4185,11 @@ function LogTab({
         fontSize: 11,
         color: C.sub
       }
-    }, "Rest: ", /*#__PURE__*/React.createElement("strong", {
+    }, "Rest after Set ", form.setNo, ": ", /*#__PURE__*/React.createElement("strong", {
       style: {
         color: C.text
       }
-    }, fmtRest(+(restOverride !== "" ? restOverride : baseRest))), restOverride !== "" ? " (session override)" : " (default)"), /*#__PURE__*/React.createElement("span", {
+    }, fmtRest(+(restOverride !== "" ? restOverride : calcRest))), restOverride !== "" ? " (session override)" : hasIncrement ? (exDefR.restTurns || []).length > 0 ? ` (🌊 wave, ${exDefR.restTurns.length} turn${exDefR.restTurns.length !== 1 ? "s" : ""})` : ` (${exDefR.restIncrementDir}${fmtRest(+exDefR.restIncrementAmt)}/set)` : " (default)"), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         color: C.accent
@@ -8094,7 +8485,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v57.1.2")), /*#__PURE__*/React.createElement("button", {
+  }, "v57.1.6")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
