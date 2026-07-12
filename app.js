@@ -87,6 +87,20 @@ const acwrZone = v => {
 
 // Hypertrophy Index: volume in optimal rep range relative to max strength
 // Peaks at 6–12 reps, moderate-high intensity (65–85% 1RM)
+// Training Density = total volume moved per unit of total session time (work + rest),
+// expressed in kg/min. This is the metric that actually uses recorded rest periods —
+// shorter rest at equal volume = higher density = a genuinely different training stimulus.
+// Estimate seconds of actual work for one set (TUT for dynamic sets, hold×reps for iso)
+const estSetWorkSecs = (e, exDef) => {
+  if (e.holdDuration) return e.holdDuration * (e.reps || 1);
+  const ecc = e.eccSecs || exDef?.eccSecs || 2;
+  const con = e.conSecs || exDef?.conSecs || 1;
+  return (e.reps || 1) * (ecc + con);
+};
+const calcDensity = (totalVol, totalTimeSecs) => {
+  if (!totalTimeSecs || totalTimeSecs <= 0) return null;
+  return +(totalVol / (totalTimeSecs / 60)).toFixed(1);
+};
 const calcHypIndex = (totalVol, oneRM, avgReps, avgTUT) => {
   const repFactor = avgReps >= 6 && avgReps <= 12 ? 1.0 : avgReps > 12 && avgReps <= 20 ? 0.8 : avgReps > 3 && avgReps < 6 ? 0.5 : 0.2;
   // TUT factor: optimal hypertrophy TUT = 40–70 s per set
@@ -5822,6 +5836,8 @@ function ProgressTab({
       const exDef = sessions.length ? program?.exercises?.find(e => e.name === sel) : null;
       const loggedTempo = ee.filter(e => e.eccSecs || e.conSecs);
       const avgTUT = loggedTempo.length ? ee.reduce((sum, e) => sum + e.reps * ((e.eccSecs || exDef?.eccSecs || 2) + (e.conSecs || exDef?.conSecs || 1)), 0) / ee.length : exDef?.eccSecs || exDef?.conSecs ? top.reps * ((exDef.eccSecs || 2) + (exDef.conSecs || 1)) : null;
+      const totalRestSecs = ee.reduce((sum, e) => sum + (e.restApplied || 0), 0);
+      const totalWorkSecs = ee.reduce((sum, e) => sum + estSetWorkSecs(e, exDef), 0);
       return {
         session: s.id,
         date: s.date,
@@ -5832,7 +5848,8 @@ function ProgressTab({
         "Hyp Index": calcHypIndex(totalVol, oneRM, avgReps, avgTUT),
         "Max Str Index": calcMSI(maxLoad, oneRM),
         "Str End Index": calcSEI(totalVol, oneRM, avgReps),
-        "Power Index": calcPowerIndex(power, oneRM)
+        "Power Index": calcPowerIndex(power, oneRM),
+        "Density": calcDensity(totalVol, totalWorkSecs + totalRestSecs)
       };
     }).filter(Boolean).map((d, i, arr) => ({
       ...d,
@@ -5903,6 +5920,11 @@ function ProgressTab({
     label: "Power Index",
     unit: "",
     color: "#AA44FF"
+  }, {
+    key: "Density",
+    label: "Density",
+    unit: " kg/min",
+    color: "#00C896"
   }];
   if (!program) return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -7117,6 +7139,9 @@ function ReportTab({
         row[`msi_${ex.name}`] = calcMSI(maxLoad, oneRM);
         row[`sei_${ex.name}`] = calcSEI(totalVol, oneRM, avgReps);
         row[`pi_${ex.name}`] = calcPowerIndex(top.power || calcPower(maxLoad, vel), oneRM);
+        const totalRestSecs = ee.reduce((sum, e) => sum + (e.restApplied || 0), 0);
+        const totalWorkSecs = ee.reduce((sum, e) => sum + estSetWorkSecs(e, prescEx), 0);
+        row[`density_${ex.name}`] = calcDensity(totalVol, totalWorkSecs + totalRestSecs);
         if (client.bw) row[`rel_${ex.name}`] = +(oneRM / client.bw).toFixed(2);
       });
       return row;
@@ -8018,7 +8043,69 @@ function ReportTab({
       strokeWidth: 0
     },
     connectNulls: true
-  }))))), /*#__PURE__*/React.createElement("div", {
+  }))))), /*#__PURE__*/React.createElement(ChartCard, {
+    title: "Training density (volume ÷ total time, kg/min)"
+  }, /*#__PURE__*/React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 200
+  }, /*#__PURE__*/React.createElement(LineChart, {
+    data: sessionData,
+    margin: {
+      top: 4,
+      right: 14,
+      bottom: 4,
+      left: 0
+    }
+  }, /*#__PURE__*/React.createElement(CartesianGrid, {
+    stroke: C.border,
+    strokeDasharray: "3 3"
+  }), /*#__PURE__*/React.createElement(XAxis, {
+    dataKey: "session",
+    axisLine: false,
+    tickLine: false,
+    height: 34,
+    tick: props => /*#__PURE__*/React.createElement(SessionXTick, {
+      ...props,
+      dateMap: dateMap
+    })
+  }), /*#__PURE__*/React.createElement(YAxis, {
+    tick: {
+      fill: C.muted,
+      fontSize: 11
+    },
+    axisLine: false,
+    tickLine: false,
+    width: 34
+  }), /*#__PURE__*/React.createElement(Tooltip, {
+    contentStyle: {
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 8,
+      color: C.text,
+      fontSize: 12
+    },
+    formatter: (v, name) => [`${v} kg/min`, name]
+  }), exercises.map((ex, i) => /*#__PURE__*/React.createElement(Line, {
+    key: ex.name,
+    type: "monotone",
+    dataKey: `density_${ex.name}`,
+    name: ex.name,
+    stroke: exColors[i],
+    strokeWidth: 2.5,
+    dot: {
+      fill: exColors[i],
+      r: 3,
+      strokeWidth: 0
+    },
+    connectNulls: true
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "0 14px 12px",
+      fontSize: 11,
+      color: C.muted,
+      lineHeight: 1.5
+    }
+  }, "Volume moved per minute of total session time (work + rest). Shorter rest at equal volume raises density — a genuinely different training stimulus even when load and reps stay the same.")), /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card,
       borderRadius: 14,
@@ -8485,7 +8572,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v57.1.6")), /*#__PURE__*/React.createElement("button", {
+  }, "v58.0.0")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
