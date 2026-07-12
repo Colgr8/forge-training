@@ -2694,7 +2694,12 @@ function SessionDetailSheet({
       fontSize: 11,
       color: C.blue
     }
-  }, "💤 ", e.restApplied >= 60 ? `${Math.floor(e.restApplied / 60)}:${String(e.restApplied % 60).padStart(2, "0")} min` : `${e.restApplied}s`, " rest"), e.comment && /*#__PURE__*/React.createElement("div", {
+  }, "💤 ", e.restApplied >= 60 ? `${Math.floor(e.restApplied / 60)}:${String(e.restApplied % 60).padStart(2, "0")} min` : `${e.restApplied}s`, " rest"), (e.equipUsed || e.latUsed) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub
+    }
+  }, "🔧 ", e.equipUsed || "", e.equipUsed && e.latUsed ? ", " : "", e.latUsed || "", " (session)"), e.comment && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: C.muted,
@@ -3671,7 +3676,9 @@ function LogTab({
   setTypeList,
   onAddSetType,
   clientBW,
-  onUpdateExercise
+  onUpdateExercise,
+  equipList,
+  latList
 }) {
   const today = new Date().toLocaleDateString("en-ZA", {
     day: "2-digit",
@@ -3717,6 +3724,9 @@ function LogTab({
   const [restOverride, setRestOverride] = useState("");
   const [editingRest, setEditingRest] = useState(false);
   const [restNextOverride, setRestNextOverride] = useState("");
+  const [equipOverride, setEquipOverride] = useState("");
+  const [latOverride, setLatOverride] = useState("");
+  const [editingEquipLat, setEditingEquipLat] = useState(false);
   const [editingRestNext, setEditingRestNext] = useState(false);
   const [restRemaining, setRestRemaining] = useState(0);
   const [restRunning, setRestRunning] = useState(false);
@@ -3828,6 +3838,9 @@ function LogTab({
     setEditingRest(false);
     setRestNextOverride("");
     setEditingRestNext(false);
+    setEquipOverride("");
+    setLatOverride("");
+    setEditingEquipLat(false);
   };
   const bandKgLive = showBand && form.bandLoadKg ? +form.bandLoadKg : 0;
   const bandSignedLive = bandKgLive ? form.bandUsage === "assisted" ? -bandKgLive : bandKgLive : 0;
@@ -3881,6 +3894,8 @@ function LogTab({
       clusterCount: isClusterSet(form.type) && form.clusterCount ? +form.clusterCount : null,
       clusterRest: isClusterSet(form.type) && form.clusterRest ? +form.clusterRest : null,
       restApplied: restApplied || null,
+      equipUsed: equipOverride || null,
+      latUsed: latOverride || null,
       date: today
     });
     setForm(f => ({
@@ -4495,7 +4510,87 @@ function LogTab({
   }, today, " · ", program.name)), /*#__PURE__*/React.createElement(Tag, {
     text: program.name,
     color: C.blue
-  })), isIsoType(form.type) && (() => {
+  })), (() => {
+    const exDefEL = program?.exercises.find(e => e.name === activeEx);
+    if (!exDefEL) return null;
+    const eq = equipOverride || exDefEL.eq;
+    const lat = latOverride || exDefEL.lat;
+    if (!eq && !lat) return null;
+    return editingEquipLat ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+        marginBottom: 12,
+        background: C.card2,
+        borderRadius: 10,
+        padding: "10px 12px",
+        border: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("select", {
+      value: eq,
+      onChange: e => setEquipOverride(e.target.value),
+      style: {
+        ...ss,
+        flex: 1,
+        padding: "6px 8px"
+      }
+    }, (equipList || []).map(o => /*#__PURE__*/React.createElement("option", {
+      key: o,
+      value: o
+    }, o))), /*#__PURE__*/React.createElement("select", {
+      value: lat,
+      onChange: e => setLatOverride(e.target.value),
+      style: {
+        ...ss,
+        flex: 1,
+        padding: "6px 8px"
+      }
+    }, (latList || []).map(o => /*#__PURE__*/React.createElement("option", {
+      key: o,
+      value: o
+    }, o))), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditingEquipLat(false),
+      style: {
+        background: C.accent,
+        color: "#001A12",
+        border: "none",
+        borderRadius: 6,
+        padding: "6px 12px",
+        cursor: "pointer",
+        fontSize: 11,
+        fontWeight: 700,
+        flexShrink: 0
+      }
+    }, "✓")) : /*#__PURE__*/React.createElement("div", {
+      onClick: () => setEditingEquipLat(true),
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 12,
+        background: C.card2,
+        borderRadius: 10,
+        padding: "8px 12px",
+        border: `1px dashed ${C.border}`,
+        cursor: "pointer"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: C.sub
+      }
+    }, "🔧 ", /*#__PURE__*/React.createElement("strong", {
+      style: {
+        color: C.text
+      }
+    }, eq), ", ", lat, equipOverride || latOverride ? " (session)" : ""), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: C.accent
+      }
+    }, "✎ adjust"));
+  })(), isIsoType(form.type) && (() => {
     const m = ISO_META[form.type];
     return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -5753,7 +5848,12 @@ function LogTab({
       fontSize: 12,
       color: C.blue
     }
-  }, " · 💤 ", e.restApplied >= 60 ? `${Math.floor(e.restApplied / 60)}:${String(e.restApplied % 60).padStart(2, "0")}` : `${e.restApplied}s`, " rest"), e.comment && /*#__PURE__*/React.createElement("div", {
+  }, " · 💤 ", e.restApplied >= 60 ? `${Math.floor(e.restApplied / 60)}:${String(e.restApplied % 60).padStart(2, "0")}` : `${e.restApplied}s`, " rest"), (e.equipUsed || e.latUsed) && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.sub
+    }
+  }, " · 🔧 ", e.equipUsed || "", e.equipUsed && e.latUsed ? ", " : "", e.latUsed || ""), e.comment && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: C.muted,
@@ -8464,6 +8564,8 @@ function App() {
     clusterCount,
     clusterRest,
     restApplied,
+    equipUsed,
+    latUsed,
     date
   }) => {
     if (!activeProgram) return;
@@ -8492,7 +8594,9 @@ function App() {
       clusterReps,
       clusterCount,
       clusterRest,
-      restApplied
+      restApplied,
+      equipUsed,
+      latUsed
     };
     updClient(activeClientId, c => ({
       ...c,
@@ -8572,7 +8676,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v58.0.0")), /*#__PURE__*/React.createElement("button", {
+  }, "v58.0.1")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
@@ -8648,6 +8752,8 @@ function App() {
     setTypeList: setTypeList,
     onAddSetType: onAddSetType,
     clientBW: activeClient?.bw,
+    equipList: equipList,
+    latList: latList,
     onUpdateExercise: (exName, fields) => {
       if (!activeProgram) return;
       editProgram({
