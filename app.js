@@ -3803,6 +3803,7 @@ function LogTab({
   setTypeList,
   onAddSetType,
   clientBW,
+  clientName,
   onUpdateExercise,
   equipList,
   latList,
@@ -3812,7 +3813,9 @@ function LogTab({
   onAdjustRest,
   onDismissRest,
   focusReq,
-  doneColor
+  doneColor,
+  onDeleteEntry,
+  onUpdateEntry
 }) {
   const today = new Date().toLocaleDateString("en-ZA", {
     day: "2-digit",
@@ -3861,6 +3864,11 @@ function LogTab({
   const [equipOverride, setEquipOverride] = useState("");
   const [latOverride, setLatOverride] = useState("");
   const [editingEquipLat, setEditingEquipLat] = useState(false);
+  // Editing an already-logged set: {sessionId, entryIdx} while active, else null.
+  const [editingEntryRef, setEditingEntryRef] = useState(null);
+  // Custom in-app delete confirmation — some mobile/PWA contexts silently
+  // block native window.confirm(), which made the delete button look broken.
+  const [confirmDelete, setConfirmDelete] = useState(null); // {sessionId, entryIdx, label}
   const [editingRestNext, setEditingRestNext] = useState(false);
   // Rest countdown itself now lives at App level (keyed per client) so multiple
   // clients' timers can run independently. These are just local read aliases.
@@ -3942,6 +3950,45 @@ function LogTab({
     setEquipOverride("");
     setLatOverride("");
     setEditingEquipLat(false);
+    setEditingEntryRef(null);
+  };
+
+  // Load an already-logged set's data into the form for editing in place.
+  const startEditEntry = (sessionId, entryIdx, entry) => {
+    if (entry.ex !== activeEx) setActiveEx(entry.ex);
+    setForm(f => ({
+      ...f,
+      reps: String(entry.reps ?? ""),
+      setNo: String(entry.set ?? "1"),
+      type: entry.type || "Normal",
+      load: entry.rawLoad != null ? String(entry.rawLoad) : entry.load != null ? String(entry.load) : "",
+      rir: entry.rir ?? 2,
+      rpe: entry.rpe ?? 7,
+      velocity: entry.velocity != null ? String(entry.velocity) : "",
+      repTime: entry.repTime != null ? String(entry.repTime) : "",
+      holdDuration: entry.holdDuration != null ? String(entry.holdDuration) : "",
+      mvic: entry.mvic != null ? String(entry.mvic) : "",
+      force: entry.force != null ? String(entry.force) : "",
+      bandLength: entry.bandLength || "",
+      bandStrength: entry.bandStrength || "",
+      bandUsage: entry.bandUsage || "resisted",
+      bandLoadKg: entry.bandLoadKg != null ? String(entry.bandLoadKg) : "",
+      comment: entry.comment || "",
+      clusterReps: entry.clusterReps != null ? String(entry.clusterReps) : "",
+      clusterCount: entry.clusterCount != null ? String(entry.clusterCount) : "",
+      clusterRest: entry.clusterRest != null ? String(entry.clusterRest) : ""
+    }));
+    setShowBand(!!entry.bandStrength);
+    const sessionDate = sessions.find(s => s.id === sessionId)?.date || today;
+    setEditingEntryRef({
+      sessionId,
+      entryIdx,
+      sessionDate
+    });
+  };
+  const cancelEditEntry = () => {
+    setEditingEntryRef(null);
+    switchEx(activeEx); // clears form back to a fresh blank state
   };
   const bandKgLive = showBand && form.bandLoadKg ? +form.bandLoadKg : 0;
   const bandSignedLive = bandKgLive ? form.bandUsage === "assisted" ? -bandKgLive : bandKgLive : 0;
@@ -3962,7 +4009,12 @@ function LogTab({
   const recentSessions = sessions.filter(s => s.entries.some(e => e.ex === activeEx)).slice(-5).reverse().map(s => ({
     sid: s.id,
     date: s.date,
-    sets: s.entries.filter(e => e.ex === activeEx)
+    sets: s.entries.map((e, idx) => ({
+      e,
+      idx
+    })).filter(({
+      e
+    }) => e.ex === activeEx)
   }));
   const submit = () => {
     if (!form.reps || !program) return;
@@ -3981,7 +4033,7 @@ function LogTab({
     const conUsed = tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDefSub?.conSecs || null;
     // Rest applied to this set: session override > exercise default (recorded regardless of timer toggle)
     const restApplied = restOverride !== "" ? +restOverride : calcIncrementalRest(exDefSub?.restSecs, exDefSub?.restIncrementDir, exDefSub?.restIncrementAmt, +form.setNo, exDefSub?.restTurns);
-    onAddEntry({
+    const entryFields = {
       ex: activeEx,
       ...form,
       reps: +form.reps,
@@ -4008,7 +4060,18 @@ function LogTab({
       equipUsed: equipOverride || null,
       latUsed: latOverride || null,
       date: today
-    });
+    };
+    if (editingEntryRef) {
+      // Editing an existing set: overwrite in place, no new timer, no re-add.
+      const {
+        sessionId,
+        entryIdx
+      } = editingEntryRef;
+      onUpdateEntry(sessionId, entryIdx, entryFields);
+      setEditingEntryRef(null);
+    } else {
+      onAddEntry(entryFields);
+    }
     setForm(f => ({
       ...f,
       reps: "",
@@ -4030,9 +4093,9 @@ function LogTab({
     setShowBand(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-    // Auto-start countdown only when the Rest Timer toggle is on — the value is
-    // still recorded above regardless, so history always reflects the rest used.
-    if (restTimerOn && restApplied) startRestTimer(restApplied);
+    // Auto-start countdown only when the Rest Timer toggle is on, and only for
+    // freshly-logged sets — editing a past mistake shouldn't kick off a new rest.
+    if (!editingEntryRef && restTimerOn && restApplied) startRestTimer(restApplied);
   };
   if (!program) return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4055,7 +4118,58 @@ function LogTab({
     style: {
       padding: "16px 14px"
     }
+  }, confirmDelete && /*#__PURE__*/React.createElement(Sheet, {
+    title: "🗑 DELETE SET?",
+    onClose: () => setConfirmDelete(null)
   }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: C.text,
+      lineHeight: 1.6,
+      marginBottom: 20,
+      textAlign: "center"
+    }
+  }, "Delete ", /*#__PURE__*/React.createElement("strong", null, confirmDelete.label), "?", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.muted
+    }
+  }, "This cannot be undone.")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmDelete(null),
+    style: {
+      flex: 1,
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      padding: "13px",
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 14,
+      fontWeight: 700
+    }
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      onDeleteEntry(confirmDelete.sessionId, confirmDelete.entryIdx);
+      setConfirmDelete(null);
+    },
+    style: {
+      flex: 1,
+      background: C.warn,
+      color: "#fff",
+      border: "none",
+      borderRadius: 10,
+      padding: "13px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 18,
+      letterSpacing: 2,
+      cursor: "pointer"
+    }
+  }, "DELETE"))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
@@ -5819,12 +5933,39 @@ function LogTab({
       minHeight: 60,
       lineHeight: 1.5
     }
-  })), /*#__PURE__*/React.createElement("button", {
+  })), editingEntryRef && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      background: C.blue + "18",
+      border: `1px solid ${C.blue}44`,
+      borderRadius: 10,
+      padding: "8px 12px",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: C.blue,
+      fontWeight: 700
+    }
+  }, "✎ Editing Set ", form.setNo, " of ", editingEntryRef.sessionDate === today ? "current" : editingEntryRef.sessionDate, clientName ? ` of ${clientName}` : ""), /*#__PURE__*/React.createElement("button", {
+    onClick: cancelEditEntry,
+    style: {
+      background: "none",
+      border: "none",
+      color: C.sub,
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "Cancel")), /*#__PURE__*/React.createElement("button", {
     onClick: submit,
     style: {
       width: "100%",
-      background: saved ? C.accent + "CC" : C.accent,
-      color: "#001A12",
+      background: saved ? C.accent + "CC" : editingEntryRef ? C.blue : C.accent,
+      color: editingEntryRef && !saved ? "#fff" : "#001A12",
       border: "none",
       borderRadius: 10,
       padding: "14px",
@@ -5833,10 +5974,17 @@ function LogTab({
       fontSize: 20,
       letterSpacing: 2
     }
-  }, saved ? `✓  ${activeEx.toUpperCase()} LOGGED!` : "LOG SET")), sessions.at(-1)?.date === today && sessions.at(-1).entries.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SecLabel, {
+  }, saved ? editingEntryRef ? `✓  SET UPDATED!` : `✓  ${activeEx.toUpperCase()} LOGGED!` : editingEntryRef ? "UPDATE SET" : "LOG SET")), sessions.at(-1)?.date === today && sessions.at(-1).entries.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SecLabel, {
     text: "Today's session"
   }), progExNames.map(name => {
-    const todayEntries = sessions.at(-1).entries.filter(e => e.ex === name);
+    const todaySessionId = sessions.at(-1).id;
+    const allEntries = sessions.at(-1).entries;
+    const todayEntries = allEntries.map((e, idx) => ({
+      e,
+      idx
+    })).filter(({
+      e
+    }) => e.ex === name);
     if (!todayEntries.length) return null;
     return /*#__PURE__*/React.createElement("div", {
       key: name,
@@ -5857,19 +6005,70 @@ function LogTab({
     }, name), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
-        flexWrap: "wrap",
+        flexDirection: "column",
         gap: 6
       }
-    }, todayEntries.map((e, i) => /*#__PURE__*/React.createElement("span", {
-      key: i,
+    }, todayEntries.map(({
+      e,
+      idx
+    }) => /*#__PURE__*/React.createElement("div", {
+      key: idx,
       style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
         background: C.card2,
-        borderRadius: 6,
-        padding: "4px 10px",
-        fontSize: 12,
+        borderRadius: 8,
+        padding: "6px 6px 6px 12px",
         border: `1px solid ${C.border}`
       }
-    }, "Set ", e.set, ": ", e.reps, "×", e.load, "kg"))));
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12
+      }
+    }, "Set ", e.set, ": ", e.reps, "×", e.load, "kg"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => startEditEntry(todaySessionId, idx, e),
+      style: {
+        background: C.blue + "18",
+        border: `1px solid ${C.blue}44`,
+        borderRadius: 6,
+        width: 30,
+        height: 30,
+        cursor: "pointer",
+        color: C.blue,
+        fontSize: 14,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      },
+      title: "Edit this set"
+    }, "✎"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setConfirmDelete({
+        sessionId: todaySessionId,
+        entryIdx: idx,
+        label: `Set ${e.set} (${e.reps}×${e.load}kg)`
+      }),
+      style: {
+        background: C.warn + "18",
+        border: `1px solid ${C.warn}44`,
+        borderRadius: 6,
+        width: 30,
+        height: 30,
+        cursor: "pointer",
+        color: C.warn,
+        fontSize: 14,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      },
+      title: "Delete this set"
+    }, "🗑"))))));
   })), recentSessions.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SecLabel, {
     text: `History — ${activeEx}`
   }), recentSessions.map((s, si) => /*#__PURE__*/React.createElement("div", {
@@ -5907,8 +6106,11 @@ function LogTab({
       fontSize: 11,
       color: C.muted
     }
-  }, s.sets.length, " set", s.sets.length !== 1 ? "s" : "")), s.sets.map((e, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
+  }, s.sets.length, " set", s.sets.length !== 1 ? "s" : "")), s.sets.map(({
+    e,
+    idx
+  }) => /*#__PURE__*/React.createElement("div", {
+    key: idx,
     style: {
       display: "flex",
       justifyContent: "space-between",
@@ -5916,7 +6118,11 @@ function LogTab({
       padding: "7px 0",
       borderTop: `1px solid ${C.border}`
     }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
       color: C.muted,
@@ -5985,9 +6191,12 @@ function LogTab({
   }, " · RPE ", e.rpe, !isOvrcIso(e.type) ? ` · RIR ${e.rir}` : "")), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "right",
-      flexShrink: 0
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      gap: 8
     }
-  }, !isOvrcIso(e.type) ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", null, !isOvrcIso(e.type) ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: "'Bebas Neue',cursive",
       fontSize: 22,
@@ -6010,7 +6219,49 @@ function LogTab({
       color: C.warn,
       fontWeight: 700
     }
-  }, "Max effort"))))))));
+  }, "Max effort")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 2
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => startEditEntry(s.sid, idx, e),
+    style: {
+      background: C.blue + "18",
+      border: `1px solid ${C.blue}44`,
+      borderRadius: 6,
+      width: 30,
+      height: 30,
+      cursor: "pointer",
+      color: C.blue,
+      fontSize: 14,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    title: "Edit this set"
+  }, "✎"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmDelete({
+      sessionId: s.sid,
+      entryIdx: idx,
+      label: `Set ${e.set} from ${s.date} (${e.reps}×${e.load}kg)`
+    }),
+    style: {
+      background: C.warn + "18",
+      border: `1px solid ${C.warn}44`,
+      borderRadius: 6,
+      width: 30,
+      height: 30,
+      cursor: "pointer",
+      color: C.warn,
+      fontSize: 14,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    title: "Delete this set"
+  }, "🗑")))))))));
 }
 
 // ─── Progress Tab ─────────────────────────────────────────────────────────────
@@ -8912,6 +9163,46 @@ function App() {
       })
     }));
   };
+
+  // Delete a single logged set (identified by session id + its index within that
+  // session's entries array), scoped to the currently active program.
+  const deleteEntry = (sessionId, entryIdx) => {
+    if (!activeProgram) return;
+    updClient(activeClientId, c => ({
+      ...c,
+      programs: c.programs.map(p => {
+        if (p.id !== c.activeProgramId) return p;
+        return {
+          ...p,
+          sessions: p.sessions.map(s => s.id !== sessionId ? s : {
+            ...s,
+            entries: s.entries.filter((_, i) => i !== entryIdx)
+          })
+        };
+      })
+    }));
+  };
+
+  // Overwrite a single logged set in place (used when editing a mistaken entry).
+  const updateEntry = (sessionId, entryIdx, updatedFields) => {
+    if (!activeProgram) return;
+    updClient(activeClientId, c => ({
+      ...c,
+      programs: c.programs.map(p => {
+        if (p.id !== c.activeProgramId) return p;
+        return {
+          ...p,
+          sessions: p.sessions.map(s => s.id !== sessionId ? s : {
+            ...s,
+            entries: s.entries.map((e, i) => i === entryIdx ? {
+              ...e,
+              ...updatedFields
+            } : e)
+          })
+        };
+      })
+    }));
+  };
   const screenW = useWindowWidth();
   const isTablet = screenW >= 640;
   return /*#__PURE__*/React.createElement("div", {
@@ -8965,7 +9256,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v59.0.9")), /*#__PURE__*/React.createElement("button", {
+  }, "v59.1.2")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
@@ -9111,6 +9402,7 @@ function App() {
     setTypeList: setTypeList,
     onAddSetType: onAddSetType,
     clientBW: activeClient?.bw,
+    clientName: activeClient?.name,
     equipList: equipList,
     latList: latList,
     restState: restTimers[activeClientId] || {
@@ -9123,6 +9415,8 @@ function App() {
     onPauseResumeRest: () => pauseResumeRestFor(activeClientId),
     onAdjustRest: delta => adjustRestFor(activeClientId, delta),
     onDismissRest: () => dismissRestFor(activeClientId),
+    onDeleteEntry: deleteEntry,
+    onUpdateEntry: updateEntry,
     focusReq: focusReq,
     doneColor: doneColorForClient(activeClientId),
     onUpdateExercise: (exName, fields) => {
