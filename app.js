@@ -8711,11 +8711,6 @@ function App() {
       localStorage.setItem('forge_customST', JSON.stringify(customSetTypes));
     } catch {}
   }, [customSetTypes]);
-  useEffect(() => {
-    try {
-      sessionStorage.setItem('forge_sessionGroup', JSON.stringify(sessionGroup));
-    } catch {}
-  }, [sessionGroup]);
   const clientIdx = clients.findIndex(c => c.id === activeClientId);
   const activeClient = clients[clientIdx];
   const activeProgram = activeClient?.programs.find(p => p.id === activeClient.activeProgramId) || null;
@@ -8732,6 +8727,11 @@ function App() {
   // Explicit "session group" — trainer pre-selects who they're training together
   // (duo/trio/group) before a session, rather than relying purely on recency.
   const [sessionGroup, setSessionGroup] = useState(() => sessGet('forge_sessionGroup', [])); // array of client ids
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('forge_sessionGroup', JSON.stringify(sessionGroup));
+    } catch {}
+  }, [sessionGroup]);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const prevClientRef = React.useRef(activeClientId);
   useEffect(() => {
@@ -8965,7 +8965,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v59.0.8")), /*#__PURE__*/React.createElement("button", {
+  }, "v59.0.9")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
