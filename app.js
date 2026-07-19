@@ -6,6 +6,14 @@ function lsGet(key, fallback) {
     return fallback;
   }
 }
+function sessGet(key, fallback) {
+  try {
+    const v = sessionStorage.getItem(key);
+    return v ? JSON.parse(v) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 const {
   useState,
   useMemo,
@@ -2778,6 +2786,125 @@ function SessionDetailSheet({
 
 // ─── Client Switcher ──────────────────────────────────────────────────────────
 
+function SessionGroupModal({
+  clients,
+  selected,
+  onSave,
+  onClose
+}) {
+  const [picked, setPicked] = useState(selected);
+  const active = clients.filter(c => !c.archived);
+  const toggle = id => setPicked(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  const groupWord = picked.length === 0 ? "" : picked.length === 1 ? "Solo" : picked.length === 2 ? "Duo" : picked.length === 3 ? "Trio" : `Group of ${picked.length}`;
+  return /*#__PURE__*/React.createElement(Sheet, {
+    title: "👥 SESSION GROUP",
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      lineHeight: 1.6,
+      marginBottom: 16
+    }
+  }, "Select who you're training together this session. They'll always show as quick-switch pills below the header — no need to visit each one first for them to appear."), picked.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.accent + "15",
+      border: `1px solid ${C.accent}44`,
+      borderRadius: 10,
+      padding: "8px 12px",
+      marginBottom: 14,
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 18,
+      letterSpacing: 1,
+      color: C.accent
+    }
+  }, groupWord)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxHeight: 340,
+      overflowY: "auto",
+      marginBottom: 16
+    }
+  }, active.map(c => {
+    const idx = clients.findIndex(x => x.id === c.id);
+    const isPicked = picked.includes(c.id);
+    return /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      onClick: () => toggle(c.id),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 12px",
+        background: isPicked ? C.card2 : "transparent",
+        borderRadius: 10,
+        marginBottom: 6,
+        border: `1px solid ${isPicked ? C.accent + "55" : C.border}`,
+        cursor: "pointer"
+      }
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: c.name,
+      idx: idx,
+      size: 32
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: 600,
+        color: C.text
+      }
+    }, c.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        border: `1.5px solid ${isPicked ? C.accent : C.border}`,
+        background: isPicked ? C.accent : "transparent",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 13,
+        color: "#001A12",
+        fontWeight: 700
+      }
+    }, isPicked ? "✓" : ""));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, selected.length > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => onSave([]),
+    style: {
+      flex: 1,
+      background: "none",
+      border: `1px solid ${C.warn}55`,
+      borderRadius: 10,
+      padding: "12px",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "End Group"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onSave(picked),
+    style: {
+      flex: 2,
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 10,
+      padding: "13px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      letterSpacing: 2,
+      cursor: "pointer"
+    }
+  }, picked.length > 0 ? `SAVE (${picked.length})` : "SAVE")));
+}
 function ClientSwitcher({
   clients,
   activeId,
@@ -3678,7 +3805,14 @@ function LogTab({
   clientBW,
   onUpdateExercise,
   equipList,
-  latList
+  latList,
+  restState,
+  onStartRest,
+  onPauseResumeRest,
+  onAdjustRest,
+  onDismissRest,
+  focusReq,
+  doneColor
 }) {
   const today = new Date().toLocaleDateString("en-ZA", {
     day: "2-digit",
@@ -3728,49 +3862,16 @@ function LogTab({
   const [latOverride, setLatOverride] = useState("");
   const [editingEquipLat, setEditingEquipLat] = useState(false);
   const [editingRestNext, setEditingRestNext] = useState(false);
-  const [restRemaining, setRestRemaining] = useState(0);
-  const [restRunning, setRestRunning] = useState(false);
-  const [restTotal, setRestTotal] = useState(0);
+  // Rest countdown itself now lives at App level (keyed per client) so multiple
+  // clients' timers can run independently. These are just local read aliases.
+  const restRemaining = restState.remaining;
+  const restRunning = restState.running;
+  const restTotal = restState.total;
+  const startRestTimer = secs => onStartRest(secs, activeEx);
   const upd = (k, v) => setForm(f => ({
     ...f,
     [k]: v
   }));
-
-  // Rest timer countdown
-  useEffect(() => {
-    if (!restRunning || restRemaining <= 0) return;
-    const t = setTimeout(() => setRestRemaining(r => r - 1), 1000);
-    return () => clearTimeout(t);
-  }, [restRunning, restRemaining]);
-
-  // Alert when rest hits zero
-  useEffect(() => {
-    if (restRunning && restRemaining === 0) {
-      setRestRunning(false);
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        [0, 0.15, 0.3].forEach(t => {
-          const o = ctx.createOscillator();
-          const g = ctx.createGain();
-          o.connect(g);
-          g.connect(ctx.destination);
-          o.frequency.value = 880;
-          g.gain.value = 0.15;
-          o.start(ctx.currentTime + t);
-          o.stop(ctx.currentTime + t + 0.12);
-        });
-      } catch {}
-      try {
-        navigator.vibrate && navigator.vibrate([200, 100, 200]);
-      } catch {}
-    }
-  }, [restRemaining, restRunning]);
-  const startRestTimer = secs => {
-    if (!secs || secs <= 0) return;
-    setRestTotal(secs);
-    setRestRemaining(secs);
-    setRestRunning(true);
-  };
 
   // When program changes, reset to first exercise
   useEffect(() => {
@@ -3844,6 +3945,16 @@ function LogTab({
   };
   const bandKgLive = showBand && form.bandLoadKg ? +form.bandLoadKg : 0;
   const bandSignedLive = bandKgLive ? form.bandUsage === "assisted" ? -bandKgLive : bandKgLive : 0;
+
+  // When arriving here via a pill tap (quick-switch), jump straight to whichever
+  // exercise that client's rest timer belongs to, rather than leaving them on
+  // whatever exercise happened to be selected last.
+  useEffect(() => {
+    if (focusReq?.exName && program?.exercises?.some(e => e.name === focusReq.exName)) {
+      switchEx(focusReq.exName);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusReq?.token]);
   const effLoadLive = Math.max(0, (form.load ? +form.load : 0) + bandSignedLive);
   const vol = form.reps && effLoadLive ? +form.reps * effLoadLive : 0;
   const sessions = program?.sessions || [];
@@ -4063,13 +4174,13 @@ function LogTab({
       left: restTimerOn ? 23 : 3,
       transition: "left 0.15s"
     }
-  }))), (restRunning || restRemaining > 0) && /*#__PURE__*/React.createElement("div", {
+  }))), (restRunning || restRemaining > 0 || restTotal > 0) && /*#__PURE__*/React.createElement("div", {
     style: {
-      background: restRemaining === 0 ? C.accent + "22" : C.card2,
+      background: restRemaining === 0 ? (doneColor || C.accent) + "22" : C.card2,
       borderRadius: 14,
       padding: "16px",
       marginBottom: 12,
-      border: `1px solid ${restRemaining === 0 ? C.accent : C.border}`,
+      border: `1px solid ${restRemaining === 0 ? doneColor || C.accent : C.border}`,
       textAlign: "center"
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -4086,7 +4197,7 @@ function LogTab({
       fontFamily: "'Bebas Neue',cursive",
       fontSize: 48,
       letterSpacing: 2,
-      color: restRemaining === 0 ? C.accent : C.text,
+      color: restRemaining === 0 ? doneColor || C.accent : C.text,
       lineHeight: 1
     }
   }, Math.floor(restRemaining / 60), ":", String(restRemaining % 60).padStart(2, "0")), /*#__PURE__*/React.createElement("div", {
@@ -4097,7 +4208,7 @@ function LogTab({
       marginTop: 12
     }
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setRestRemaining(r => Math.max(0, r - 10)),
+    onClick: () => onAdjustRest(-10),
     style: {
       background: "none",
       border: `1px solid ${C.border}`,
@@ -4109,7 +4220,7 @@ function LogTab({
       fontWeight: 700
     }
   }, "−10s"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setRestRunning(r => !r),
+    onClick: () => restRemaining === 0 ? onDismissRest() : onPauseResumeRest(),
     style: {
       background: C.accent,
       color: "#001A12",
@@ -4120,8 +4231,8 @@ function LogTab({
       fontSize: 12,
       fontWeight: 700
     }
-  }, restRunning ? "Pause" : restRemaining > 0 ? "Resume" : "Dismiss"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setRestRemaining(r => r + 10),
+  }, restRemaining === 0 ? "Dismiss" : restRunning ? "Pause" : "Resume"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onAdjustRest(10),
     style: {
       background: "none",
       border: `1px solid ${C.border}`,
@@ -4133,10 +4244,7 @@ function LogTab({
       fontWeight: 700
     }
   }, "+10s"), restRemaining === 0 && /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setRestRemaining(0);
-      setRestRunning(false);
-    },
+    onClick: () => onDismissRest(),
     style: {
       background: "none",
       border: `1px solid ${C.border}`,
@@ -8389,6 +8497,151 @@ function App() {
   const [customCategories, setCustomCategories] = useState(() => lsGet('forge_customCats', []));
   const [customProgTypes, setCustomProgTypes] = useState(() => lsGet('forge_customPT', []));
   const [customSetTypes, setCustomSetTypes] = useState(() => lsGet('forge_customST', []));
+
+  // ── Multi-client rest timer — keyed by clientId so each client's countdown
+  // runs independently, even while viewing a different client's screen. ──────
+  const [restTimers, setRestTimers] = useState({}); // { [clientId]: {remaining, running, total, label} }
+
+  // Genuinely distinct chime "melodies" per client slot — not just a pitch shift,
+  // but different note counts, intervals, waveforms and rhythms, so each one is
+  // recognizable as a different chime character rather than the same beep pitched up/down.
+  const CHIME_PATTERNS = [{
+    notes: [523, 659],
+    gaps: [0, 0.13],
+    dur: 0.16,
+    wave: "sine"
+  },
+  // rising 2-note
+  {
+    notes: [784, 784],
+    gaps: [0, 0.11],
+    dur: 0.09,
+    wave: "triangle"
+  },
+  // sharp double-pulse
+  {
+    notes: [988, 784, 659],
+    gaps: [0, 0.12, 0.24],
+    dur: 0.14,
+    wave: "sine"
+  },
+  // descending 3-note
+  {
+    notes: [659, 659, 659],
+    gaps: [0, 0.09, 0.18],
+    dur: 0.07,
+    wave: "square"
+  },
+  // triple-pulse same note
+  {
+    notes: [523, 659, 784],
+    gaps: [0, 0.09, 0.18],
+    dur: 0.12,
+    wave: "triangle"
+  },
+  // fast ascending arpeggio
+  {
+    notes: [1175, 659, 1175],
+    gaps: [0, 0.14, 0.28],
+    dur: 0.13,
+    wave: "sine"
+  } // high-low-high
+  ];
+  const chimeForClient = cid => CHIME_PATTERNS[Math.max(0, clients.findIndex(c => c.id === cid)) % CHIME_PATTERNS.length];
+
+  // Done-state colour matches each client's own Avatar initials colour (avCol),
+  // so the alert colour is instantly recognizable as "theirs" everywhere.
+  const doneColorForClient = cid => avCol(Math.max(0, clients.findIndex(c => c.id === cid)));
+  const playRestAlert = (pattern = CHIME_PATTERNS[0]) => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      pattern.notes.forEach((freq, i) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.type = pattern.wave;
+        o.frequency.value = freq;
+        g.gain.value = 0.15;
+        const startAt = ctx.currentTime + pattern.gaps[i];
+        o.start(startAt);
+        o.stop(startAt + pattern.dur);
+      });
+    } catch {}
+    try {
+      navigator.vibrate && navigator.vibrate([200, 100, 200]);
+    } catch {}
+  };
+
+  // Single global 1s tick — decrements every running timer across all clients
+  useEffect(() => {
+    const anyRunning = Object.values(restTimers).some(t => t.running && t.remaining > 0);
+    if (!anyRunning) return;
+    const t = setTimeout(() => {
+      setRestTimers(prev => {
+        const next = {
+          ...prev
+        };
+        const completedClientIds = [];
+        Object.keys(next).forEach(cid => {
+          const timer = next[cid];
+          if (timer.running && timer.remaining > 0) {
+            const newRemaining = timer.remaining - 1;
+            next[cid] = {
+              ...timer,
+              remaining: newRemaining,
+              running: newRemaining > 0
+            };
+            if (newRemaining === 0) completedClientIds.push(cid);
+          }
+        });
+        completedClientIds.forEach(cid => playRestAlert(chimeForClient(cid)));
+        return next;
+      });
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [restTimers]);
+  const startRestFor = (clientId, secs, label) => {
+    if (!secs || secs <= 0) return;
+    setRestTimers(prev => ({
+      ...prev,
+      [clientId]: {
+        remaining: secs,
+        running: true,
+        total: secs,
+        label: label || ""
+      }
+    }));
+  };
+  const pauseResumeRestFor = clientId => setRestTimers(prev => {
+    const t = prev[clientId];
+    if (!t) return prev;
+    return {
+      ...prev,
+      [clientId]: {
+        ...t,
+        running: !t.running
+      }
+    };
+  });
+  const adjustRestFor = (clientId, delta) => setRestTimers(prev => {
+    const t = prev[clientId];
+    if (!t) return prev;
+    return {
+      ...prev,
+      [clientId]: {
+        ...t,
+        remaining: Math.max(0, t.remaining + delta)
+      }
+    };
+  });
+  const dismissRestFor = clientId => setRestTimers(prev => {
+    const next = {
+      ...prev
+    };
+    delete next[clientId];
+    return next;
+  });
   const exList = customExercises;
   const equipList = customEquipment;
   const latList = customLaterality;
@@ -8458,6 +8711,11 @@ function App() {
       localStorage.setItem('forge_customST', JSON.stringify(customSetTypes));
     } catch {}
   }, [customSetTypes]);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('forge_sessionGroup', JSON.stringify(sessionGroup));
+    } catch {}
+  }, [sessionGroup]);
   const clientIdx = clients.findIndex(c => c.id === activeClientId);
   const activeClient = clients[clientIdx];
   const activeProgram = activeClient?.programs.find(p => p.id === activeClient.activeProgramId) || null;
@@ -8465,6 +8723,37 @@ function App() {
   const switchClient = id => {
     setActiveClientId(id);
     setTab("programs");
+  };
+
+  // Track recently-active clients so the trainer can quickly bounce back and
+  // forth between two (or more) clients they're running in the same session,
+  // regardless of whether a rest timer happens to be running for them.
+  const [recentClients, setRecentClients] = useState([]);
+  // Explicit "session group" — trainer pre-selects who they're training together
+  // (duo/trio/group) before a session, rather than relying purely on recency.
+  const [sessionGroup, setSessionGroup] = useState(() => sessGet('forge_sessionGroup', [])); // array of client ids
+  const [showGroupPicker, setShowGroupPicker] = useState(false);
+  const prevClientRef = React.useRef(activeClientId);
+  useEffect(() => {
+    if (prevClientRef.current !== activeClientId) {
+      const prev = prevClientRef.current;
+      setRecentClients(rc => [prev, ...rc.filter(x => x !== prev && x !== activeClientId)].slice(0, 4));
+      prevClientRef.current = activeClientId;
+    }
+  }, [activeClientId]);
+  // Quick-switch used by the in-session pill bar — keeps current tab (usually Log)
+  // instead of resetting to Programs like the main client switcher does.
+  // Jumping to a client via a pill should land directly on their Log tab,
+  // focused on whichever exercise their timer belongs to (if any).
+  const [focusReq, setFocusReq] = useState(null); // {exName, token}
+  const quickSwitchClient = id => {
+    setActiveClientId(id);
+    setTab("log");
+    const t = restTimers[id];
+    if (t?.label) setFocusReq({
+      exName: t.label,
+      token: Date.now()
+    });
   };
   const addClient = ({
     name,
@@ -8676,7 +8965,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v58.0.1")), /*#__PURE__*/React.createElement("button", {
+  }, "v59.0.8")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
@@ -8687,7 +8976,25 @@ function App() {
       padding: "2px 4px"
     },
     title: "Data & Sync"
-  }, "⚙️")), /*#__PURE__*/React.createElement("button", {
+  }, "⚙️")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowGroupPicker(true),
+    style: {
+      background: sessionGroup.length > 0 ? C.accent + "18" : C.card2,
+      border: `1px solid ${sessionGroup.length > 0 ? C.accent + "55" : C.border}`,
+      borderRadius: 22,
+      padding: "7px 12px",
+      cursor: "pointer",
+      color: sessionGroup.length > 0 ? C.accent : C.muted,
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "👥 ", sessionGroup.length > 0 ? `Group (${sessionGroup.length})` : "Set Group"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowSwitcher(true),
     style: {
       background: C.card2,
@@ -8711,7 +9018,59 @@ function App() {
       color: C.muted,
       fontSize: 11
     }
-  }, "▾"))), /*#__PURE__*/React.createElement("div", {
+  }, "▾")))), (() => {
+    const pillIds = sessionGroup.length > 0 ? sessionGroup : recentClients;
+    const visible = pillIds.filter(cid => cid !== activeClientId && clients.some(c => c.id === cid));
+    if (visible.length === 0) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        overflowX: "auto",
+        padding: "8px 14px",
+        background: C.card2,
+        borderBottom: `1px solid ${C.border}`
+      }
+    }, visible.map(cid => {
+      const c = clients.find(cl => cl.id === cid);
+      const t = restTimers[cid];
+      const hasTimer = !!t;
+      const isDone = hasTimer && t.remaining === 0;
+      const doneColor = doneColorForClient(cid);
+      return /*#__PURE__*/React.createElement("button", {
+        key: cid,
+        onClick: () => quickSwitchClient(cid),
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          flexShrink: 0,
+          background: isDone ? doneColor : C.card,
+          border: `1px solid ${isDone ? doneColor : C.border}`,
+          borderRadius: 20,
+          padding: "6px 12px",
+          cursor: "pointer"
+        }
+      }, /*#__PURE__*/React.createElement(Avatar, {
+        name: c.name,
+        idx: clients.findIndex(x => x.id === cid),
+        size: 18
+      }), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: isDone ? "#0B0B16" : C.text,
+          fontWeight: 700
+        }
+      }, c.name.split(" ")[0]), hasTimer && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontFamily: "'Bebas Neue',cursive",
+          letterSpacing: 1,
+          color: isDone ? "#0B0B16" : C.gold
+        }
+      }, isDone ? "Done!" : `${Math.floor(t.remaining / 60)}:${String(t.remaining % 60).padStart(2, "0")}`));
+    }));
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       overflowY: "auto",
@@ -8754,6 +9113,18 @@ function App() {
     clientBW: activeClient?.bw,
     equipList: equipList,
     latList: latList,
+    restState: restTimers[activeClientId] || {
+      remaining: 0,
+      running: false,
+      total: 0,
+      label: ""
+    },
+    onStartRest: (secs, label) => startRestFor(activeClientId, secs, label),
+    onPauseResumeRest: () => pauseResumeRestFor(activeClientId),
+    onAdjustRest: delta => adjustRestFor(activeClientId, delta),
+    onDismissRest: () => dismissRestFor(activeClientId),
+    focusReq: focusReq,
+    doneColor: doneColorForClient(activeClientId),
     onUpdateExercise: (exName, fields) => {
       if (!activeProgram) return;
       editProgram({
@@ -8856,6 +9227,14 @@ function App() {
     },
     onImport: importData,
     onClose: () => setShowDataSync(false)
+  }), showGroupPicker && /*#__PURE__*/React.createElement(SessionGroupModal, {
+    clients: clients,
+    selected: sessionGroup,
+    onSave: ids => {
+      setSessionGroup(ids);
+      setShowGroupPicker(false);
+    },
+    onClose: () => setShowGroupPicker(false)
   }));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
