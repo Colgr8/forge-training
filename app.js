@@ -825,6 +825,8 @@ function AddableSelect({
   const [draft, setDraft] = useState("");
   const [editItem, setEditItem] = useState(null);
   const [editVal, setEditVal] = useState("");
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState(null); // item name pending delete confirmation
+
   const confirm = () => {
     const v = draft.trim();
     if (!v) return;
@@ -937,6 +939,53 @@ function AddableSelect({
       fontSize: 12,
       flexShrink: 0
     }
+  }, "✕")) : confirmDeleteItem === o ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      padding: "6px 10px",
+      alignItems: "center",
+      background: C.warn + "12"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      fontSize: 12,
+      color: C.warn
+    }
+  }, "Delete \"", o, "\"?"), /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      onDeleteOption(o);
+      if (value === o) onChange(options.find(x => x !== o) || "");
+      setConfirmDeleteItem(null);
+    },
+    style: {
+      background: C.warn,
+      color: "#fff",
+      border: "none",
+      borderRadius: 6,
+      padding: "5px 10px",
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: 700,
+      flexShrink: 0
+    }
+  }, "Delete"), /*#__PURE__*/React.createElement("button", {
+    onClick: e => {
+      e.stopPropagation();
+      setConfirmDeleteItem(null);
+    },
+    style: {
+      background: "none",
+      color: C.sub,
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "5px 8px",
+      cursor: "pointer",
+      fontSize: 12,
+      flexShrink: 0
+    }
   }, "✕")) : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -969,10 +1018,7 @@ function AddableSelect({
   }, "✎"), onDeleteOption && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
-      if (window.confirm(`Delete "${o}"?`)) {
-        onDeleteOption(o);
-        if (value === o) onChange(options.find(x => x !== o) || "");
-      }
+      setConfirmDeleteItem(o);
     },
     style: {
       background: "none",
@@ -2786,6 +2832,202 @@ function SessionDetailSheet({
 
 // ─── Client Switcher ──────────────────────────────────────────────────────────
 
+function GroupEditorModal({
+  clients,
+  group,
+  colors,
+  onSave,
+  onDelete,
+  onClose
+}) {
+  const [name, setName] = useState(group?.name || "");
+  const [color, setColor] = useState(group?.color || colors[0]);
+  const [picked, setPicked] = useState(group?.clientIds || []);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const active = clients.filter(c => !c.archived);
+  const toggle = id => setPicked(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  if (confirmingDelete) {
+    return /*#__PURE__*/React.createElement(Sheet, {
+      title: "🗑 DELETE GROUP?",
+      onClose: () => setConfirmingDelete(false)
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 14,
+        color: C.text,
+        lineHeight: 1.6,
+        marginBottom: 20,
+        textAlign: "center"
+      }
+    }, "Delete ", /*#__PURE__*/React.createElement("strong", null, "\"", group.name, "\""), "?", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: C.muted
+      }
+    }, "This only removes the saved group — it does not affect any client data. This cannot be undone.")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setConfirmingDelete(false),
+      style: {
+        flex: 1,
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 10,
+        padding: "13px",
+        color: C.sub,
+        cursor: "pointer",
+        fontSize: 14,
+        fontWeight: 700
+      }
+    }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => onDelete(group.id),
+      style: {
+        flex: 1,
+        background: C.warn,
+        color: "#fff",
+        border: "none",
+        borderRadius: 10,
+        padding: "13px",
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: 18,
+        letterSpacing: 2,
+        cursor: "pointer"
+      }
+    }, "DELETE")));
+  }
+  return /*#__PURE__*/React.createElement(Sheet, {
+    title: group ? "✎ EDIT GROUP" : "＋ NEW GROUP",
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Group name"
+  }), /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    value: name,
+    onChange: e => setName(e.target.value),
+    placeholder: "e.g. Tuesday Morning Trio",
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Colour"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginTop: 4
+    }
+  }, colors.map(c => /*#__PURE__*/React.createElement("button", {
+    key: c,
+    onClick: () => setColor(c),
+    style: {
+      width: 32,
+      height: 32,
+      borderRadius: "50%",
+      background: c,
+      cursor: "pointer",
+      border: color === c ? "3px solid #fff" : "3px solid transparent",
+      boxShadow: color === c ? `0 0 0 2px ${c}` : "none"
+    }
+  })))), /*#__PURE__*/React.createElement(Lbl, {
+    t: "Members"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxHeight: 280,
+      overflowY: "auto",
+      marginTop: 4,
+      marginBottom: 16
+    }
+  }, active.map(c => {
+    const idx = clients.findIndex(x => x.id === c.id);
+    const isPicked = picked.includes(c.id);
+    return /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      onClick: () => toggle(c.id),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 12px",
+        background: isPicked ? C.card2 : "transparent",
+        borderRadius: 10,
+        marginBottom: 6,
+        border: `1px solid ${isPicked ? color + "77" : C.border}`,
+        cursor: "pointer"
+      }
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: c.name,
+      idx: idx,
+      size: 30
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: 600,
+        color: C.text
+      }
+    }, c.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        border: `1.5px solid ${isPicked ? color : C.border}`,
+        background: isPicked ? color : "transparent",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 13,
+        color: "#001A12",
+        fontWeight: 700
+      }
+    }, isPicked ? "✓" : ""));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, group && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmingDelete(true),
+    style: {
+      flex: 1,
+      background: "none",
+      border: `1px solid ${C.warn}55`,
+      borderRadius: 10,
+      padding: "12px",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "🗑 Delete"), /*#__PURE__*/React.createElement("button", {
+    disabled: !name.trim() || picked.length === 0,
+    onClick: () => onSave({
+      name: name.trim(),
+      color,
+      clientIds: picked
+    }),
+    style: {
+      flex: 2,
+      background: !name.trim() || picked.length === 0 ? C.border : C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 10,
+      padding: "13px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      letterSpacing: 2,
+      cursor: !name.trim() || picked.length === 0 ? "default" : "pointer"
+    }
+  }, "SAVE GROUP")));
+}
 function SessionGroupModal({
   clients,
   selected,
@@ -3401,6 +3643,7 @@ function EditProgramModal({
   const [exercises, setExercises] = useState(program.exercises.map(e => ({
     ...e
   })));
+  const [confirmDeleteProgram, setConfirmDeleteProgram] = useState(false);
   const upd = (k, v) => setForm(f => ({
     ...f,
     [k]: v
@@ -3414,6 +3657,57 @@ function EditProgramModal({
     });
     onClose();
   };
+  if (confirmDeleteProgram) {
+    return /*#__PURE__*/React.createElement(Sheet, {
+      title: "🗑 DELETE PROGRAM?",
+      onClose: () => setConfirmDeleteProgram(false)
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 14,
+        color: C.text,
+        lineHeight: 1.6,
+        marginBottom: 20,
+        textAlign: "center"
+      }
+    }, "Delete ", /*#__PURE__*/React.createElement("strong", null, "\"", form.name, "\""), "?", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: C.muted
+      }
+    }, "All exercises and session history for this program will be lost. This cannot be undone.")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setConfirmDeleteProgram(false),
+      style: {
+        flex: 1,
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 10,
+        padding: "13px",
+        color: C.sub,
+        cursor: "pointer",
+        fontSize: 14,
+        fontWeight: 700
+      }
+    }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => onDelete(program.id),
+      style: {
+        flex: 1,
+        background: C.warn,
+        color: "#fff",
+        border: "none",
+        borderRadius: 10,
+        padding: "13px",
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: 18,
+        letterSpacing: 2,
+        cursor: "pointer"
+      }
+    }, "DELETE")));
+  }
   return /*#__PURE__*/React.createElement(Sheet, {
     title: "EDIT PROGRAM",
     onClose: onClose
@@ -3479,11 +3773,7 @@ function EditProgramModal({
       flexDirection: "column"
     }
   }, onDelete && /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      if (window.confirm(`Delete program "${form.name}"? This cannot be undone.`)) {
-        onDelete(program.id);
-      }
-    },
+    onClick: () => setConfirmDeleteProgram(true),
     style: {
       width: "100%",
       background: "none",
@@ -3535,6 +3825,7 @@ function EditProgramModal({
 function ProgramsTab({
   client,
   clientIdx,
+  allClients = [],
   activeProgramId,
   onSetActive,
   onAddProgram,
@@ -3558,7 +3849,13 @@ function ProgramsTab({
   onDeleteEquip,
   customLaterality = [],
   onEditLat,
-  onDeleteLat
+  onDeleteLat,
+  savedGroups = [],
+  onStartGroup,
+  onNewGroup,
+  onEditGroup,
+  activeSavedGroupId,
+  onStopGroup
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editProg, setEditProg] = useState(null);
@@ -3607,7 +3904,147 @@ function ProgramsTab({
   }), /*#__PURE__*/React.createElement(Tag, {
     text: `${client.programs.length} program${client.programs.length !== 1 ? "s" : ""}`,
     color: C.sub
-  })))), /*#__PURE__*/React.createElement(SecLabel, {
+  })))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Groups"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: onNewGroup,
+    style: {
+      background: "none",
+      border: `1px dashed ${C.border}`,
+      borderRadius: 8,
+      padding: "5px 10px",
+      cursor: "pointer",
+      color: C.accent,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, "＋ New Group")), savedGroups.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 12,
+      padding: "14px",
+      textAlign: "center",
+      border: `1px dashed ${C.border}`,
+      marginBottom: 18
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted
+    }
+  }, "No saved groups yet. Create one for regular duos/trios you train.")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 18
+    }
+  }, savedGroups.map(g => /*#__PURE__*/React.createElement("div", {
+    key: g.id,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      background: C.card,
+      borderRadius: 12,
+      padding: "10px 12px",
+      marginBottom: 8,
+      border: `1px solid ${g.color}44`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 12,
+      height: 12,
+      borderRadius: "50%",
+      background: g.color,
+      flexShrink: 0
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontWeight: 700,
+      fontSize: 13,
+      color: C.text,
+      marginBottom: 4
+    }
+  }, g.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center"
+    }
+  }, g.clientIds.slice(0, 5).map((cid, i) => {
+    const gc = allClients.find(c => c.id === cid);
+    if (!gc) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: cid,
+      style: {
+        marginLeft: i === 0 ? 0 : -8,
+        border: `2px solid ${C.card}`,
+        borderRadius: "50%"
+      }
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: gc.name,
+      idx: allClients.findIndex(c => c.id === cid),
+      size: 22
+    }));
+  }), g.clientIds.length > 5 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginLeft: -8,
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: C.card2,
+      border: `2px solid ${C.card}`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 9,
+      color: C.muted,
+      fontWeight: 700
+    }
+  }, "+", g.clientIds.length - 5))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onEditGroup(g),
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "6px 10px",
+      cursor: "pointer",
+      color: C.sub,
+      fontSize: 12
+    }
+  }, "✎"), activeSavedGroupId === g.id ? /*#__PURE__*/React.createElement("button", {
+    onClick: onStopGroup,
+    style: {
+      background: C.warn + "22",
+      border: `1px solid ${C.warn}55`,
+      borderRadius: 6,
+      padding: "6px 12px",
+      cursor: "pointer",
+      color: C.warn,
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "⏹ Stop") : /*#__PURE__*/React.createElement("button", {
+    onClick: () => onStartGroup(g),
+    style: {
+      background: g.color + "22",
+      border: `1px solid ${g.color}55`,
+      borderRadius: 6,
+      padding: "6px 12px",
+      cursor: "pointer",
+      color: g.color,
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "▶ Start")))), /*#__PURE__*/React.createElement(SecLabel, {
     text: "Programs"
   }), client.programs.length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -8983,7 +9420,54 @@ function App() {
       sessionStorage.setItem('forge_sessionGroup', JSON.stringify(sessionGroup));
     } catch {}
   }, [sessionGroup]);
+  // Which SAVED group (if any) is the source of the current sessionGroup — lets
+  // the Programs page show "⏹ Stop" on the specific group card that's running.
+  const [activeSavedGroupId, setActiveSavedGroupId] = useState(() => sessGet('forge_activeSavedGroupId', null));
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('forge_activeSavedGroupId', JSON.stringify(activeSavedGroupId));
+    } catch {}
+  }, [activeSavedGroupId]);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
+
+  // ── Saved Groups — persistent, named, coloured client groupings (distinct
+  // from the ad-hoc sessionGroup above, which resets when the app closes) ──
+  const [savedGroups, setSavedGroups] = useState(() => lsGet('forge_savedGroups', [])); // {id, name, color, clientIds}
+  useEffect(() => {
+    try {
+      localStorage.setItem('forge_savedGroups', JSON.stringify(savedGroups));
+    } catch {}
+  }, [savedGroups]);
+  const [editingGroup, setEditingGroup] = useState(undefined); // undefined=closed, null=new, {..}=edit
+  const GROUP_COLORS = [C.accent, C.blue, "#AA44FF", C.gold, "#FF5060", "#FF8020", "#44AAFF", "#00C896"];
+  const addSavedGroup = (name, color, clientIds) => {
+    setSavedGroups(gs => [...gs, {
+      id: `grp${Date.now()}`,
+      name,
+      color,
+      clientIds
+    }]);
+  };
+  const updateSavedGroup = (id, fields) => setSavedGroups(gs => gs.map(g => g.id === id ? {
+    ...g,
+    ...fields
+  } : g));
+  const deleteSavedGroup = id => setSavedGroups(gs => gs.filter(g => g.id !== id));
+  const startSavedGroup = group => {
+    setSessionGroup(group.clientIds);
+    setActiveSavedGroupId(group.id);
+    // Always land on the Log tab — whether or not the active client is already
+    // a member of this group, tapping Start should take you straight to logging.
+    if (group.clientIds.length > 0 && !group.clientIds.includes(activeClientId)) {
+      quickSwitchClient(group.clientIds[0]); // switches client AND tab to "log"
+    } else {
+      setTab("log"); // already on a member of the group — just jump tabs
+    }
+  };
+  const stopSavedGroup = () => {
+    setSessionGroup([]);
+    setActiveSavedGroupId(null);
+  };
   const prevClientRef = React.useRef(activeClientId);
   useEffect(() => {
     if (prevClientRef.current !== activeClientId) {
@@ -9256,7 +9740,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v59.1.2")), /*#__PURE__*/React.createElement("button", {
+  }, "v60.0.4")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
@@ -9370,6 +9854,7 @@ function App() {
   }, tab === "programs" && activeClient && /*#__PURE__*/React.createElement(ProgramsTab, {
     client: activeClient,
     clientIdx: clientIdx,
+    allClients: clients,
     activeProgramId: activeClient.activeProgramId,
     onSetActive: setActiveProgram,
     onAddProgram: addProgram,
@@ -9393,7 +9878,13 @@ function App() {
     onDeleteEquip: onDeleteEquip,
     customLaterality: customLaterality,
     onEditLat: onEditLat,
-    onDeleteLat: onDeleteLat
+    onDeleteLat: onDeleteLat,
+    savedGroups: savedGroups,
+    onStartGroup: startSavedGroup,
+    onNewGroup: () => setEditingGroup(null),
+    onEditGroup: g => setEditingGroup(g),
+    activeSavedGroupId: activeSavedGroupId,
+    onStopGroup: stopSavedGroup
   }), tab === "log" && /*#__PURE__*/React.createElement(LogTab, {
     program: activeProgram,
     onAddEntry: addEntry,
@@ -9526,9 +10017,23 @@ function App() {
     selected: sessionGroup,
     onSave: ids => {
       setSessionGroup(ids);
+      setActiveSavedGroupId(null);
       setShowGroupPicker(false);
     },
     onClose: () => setShowGroupPicker(false)
+  }), editingGroup !== undefined && /*#__PURE__*/React.createElement(GroupEditorModal, {
+    clients: clients,
+    group: editingGroup,
+    colors: GROUP_COLORS,
+    onSave: fields => {
+      if (editingGroup) updateSavedGroup(editingGroup.id, fields);else addSavedGroup(fields.name, fields.color, fields.clientIds);
+      setEditingGroup(undefined);
+    },
+    onDelete: id => {
+      deleteSavedGroup(id);
+      setEditingGroup(undefined);
+    },
+    onClose: () => setEditingGroup(undefined)
   }));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
