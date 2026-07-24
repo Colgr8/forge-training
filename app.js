@@ -3977,9 +3977,11 @@ function ProgramsTab({
   }, g.name), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      alignItems: "center"
+      alignItems: "center",
+      flexWrap: "wrap",
+      rowGap: 4
     }
-  }, g.clientIds.slice(0, 5).map((cid, i) => {
+  }, g.clientIds.map((cid, i) => {
     const gc = allClients.find(c => c.id === cid);
     if (!gc) return null;
     return /*#__PURE__*/React.createElement("div", {
@@ -3994,22 +3996,7 @@ function ProgramsTab({
       idx: allClients.findIndex(c => c.id === cid),
       size: 22
     }));
-  }), g.clientIds.length > 5 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginLeft: -8,
-      width: 22,
-      height: 22,
-      borderRadius: "50%",
-      background: C.card2,
-      border: `2px solid ${C.card}`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 9,
-      color: C.muted,
-      fontWeight: 700
-    }
-  }, "+", g.clientIds.length - 5))), /*#__PURE__*/React.createElement("button", {
+  }))), /*#__PURE__*/React.createElement("button", {
     onClick: () => onEditGroup(g),
     style: {
       background: "none",
@@ -9740,7 +9727,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v60.0.4")), /*#__PURE__*/React.createElement("button", {
+  }, "v60.0.5")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
