@@ -6493,199 +6493,207 @@ function LogTab({
       },
       title: "Delete this set"
     }, "🗑"))))));
-  })), recentSessions.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SecLabel, {
-    text: `History — ${activeEx}`
-  }), recentSessions.map((s, si) => /*#__PURE__*/React.createElement("div", {
-    key: si,
-    style: {
-      background: C.card,
-      borderRadius: 12,
-      padding: "12px 14px",
-      marginBottom: 10,
-      border: `1px solid ${C.border}`
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement(Tag, {
-    text: s.sid,
-    color: C.blue
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: C.sub
-    }
-  }, s.date)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.muted
-    }
-  }, s.sets.length, " set", s.sets.length !== 1 ? "s" : "")), s.sets.map(({
-    e,
-    idx
-  }) => /*#__PURE__*/React.createElement("div", {
-    key: idx,
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "7px 0",
-      borderTop: `1px solid ${C.border}`
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: C.muted,
-      marginRight: 8
-    }
-  }, "Set ", e.set), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 13
-    }
-  }, e.reps, " reps"), e.holdDuration && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "#5060FF"
-    }
-  }, " · ⏱ ", e.holdDuration, "s"), e.mvic && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "#5060FF"
-    }
-  }, " · ", e.mvic, "% MVIC"), e.force && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: C.gold
-    }
-  }, " · ", e.force, "N"), e.bandStrength && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: C.warn
-    }
-  }, " · 🔴 ", e.bandLength, " ", e.bandStrength, " ", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", "(", e.bandUsage, ")"), e.clusterReps && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: C.gold
-    }
-  }, " · ⏱ ", e.clusterCount, "×", e.clusterReps, " clusters"), e.restApplied && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
+  })), recentSessions.length > 0 && (() => {
+    const exDefaultEL = program?.exercises.find(ex => ex.name === activeEx);
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SecLabel, {
+      text: `History — ${activeEx}`
+    }), recentSessions.map((s, si) => /*#__PURE__*/React.createElement("div", {
+      key: si,
+      style: {
+        background: C.card,
+        borderRadius: 12,
+        padding: "12px 14px",
+        marginBottom: 10,
+        border: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement(Tag, {
+      text: s.sid,
       color: C.blue
-    }
-  }, " · 💤 ", e.restApplied >= 60 ? `${Math.floor(e.restApplied / 60)}:${String(e.restApplied % 60).padStart(2, "0")}` : `${e.restApplied}s`, " rest"), (e.equipUsed || e.latUsed) && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: C.sub
-    }
-  }, " · 🔧 ", e.equipUsed || "", e.equipUsed && e.latUsed ? ", " : "", e.latUsed || ""), e.comment && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.muted,
-      fontStyle: "italic",
-      marginTop: 4,
-      padding: "4px 8px",
-      background: C.card2,
-      borderRadius: 6,
-      border: `1px solid ${C.border}`
-    }
-  }, "💬 ", e.comment), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: C.muted
-    }
-  }, " · ", e.type), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: C.sub
-    }
-  }, " · RPE ", e.rpe, !isOvrcIso(e.type) ? ` · RIR ${e.rir}` : "")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "right",
-      flexShrink: 0,
-      display: "flex",
-      alignItems: "center",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", null, !isOvrcIso(e.type) ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Bebas Neue',cursive",
-      fontSize: 22,
-      color: C.accent,
-      lineHeight: 1
-    }
-  }, e.load, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      opacity: 0.6
-    }
-  }, " kg")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: C.sub
-    }
-  }, "~", est1RM(e.load, e.reps), " 1RM")) : /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.warn,
-      fontWeight: 700
-    }
-  }, "Max effort")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 2
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => startEditEntry(s.sid, idx, e),
-    style: {
-      background: C.blue + "18",
-      border: `1px solid ${C.blue}44`,
-      borderRadius: 6,
-      width: 30,
-      height: 30,
-      cursor: "pointer",
-      color: C.blue,
-      fontSize: 14,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    },
-    title: "Edit this set"
-  }, "✎"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setConfirmDelete({
-      sessionId: s.sid,
-      entryIdx: idx,
-      label: `Set ${e.set} from ${s.date} (${e.reps}×${e.load}kg)`
-    }),
-    style: {
-      background: C.warn + "18",
-      border: `1px solid ${C.warn}44`,
-      borderRadius: 6,
-      width: 30,
-      height: 30,
-      cursor: "pointer",
-      color: C.warn,
-      fontSize: 14,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    },
-    title: "Delete this set"
-  }, "🗑")))))))));
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: C.sub
+      }
+    }, s.date)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.muted
+      }
+    }, s.sets.length, " set", s.sets.length !== 1 ? "s" : "")), s.sets.map(({
+      e,
+      idx
+    }) => {
+      const eqShown = e.equipUsed || exDefaultEL?.eq;
+      const latShown = e.latUsed || exDefaultEL?.lat;
+      const isOverride = !!(e.equipUsed || e.latUsed);
+      return /*#__PURE__*/React.createElement("div", {
+        key: idx,
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "7px 0",
+          borderTop: `1px solid ${C.border}`
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          flex: 1
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: C.muted,
+          marginRight: 8
+        }
+      }, "Set ", e.set), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 13
+        }
+      }, e.reps, " reps"), e.holdDuration && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: "#5060FF"
+        }
+      }, " · ⏱ ", e.holdDuration, "s"), e.mvic && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: "#5060FF"
+        }
+      }, " · ", e.mvic, "% MVIC"), e.force && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: C.gold
+        }
+      }, " · ", e.force, "N"), e.bandStrength && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: C.warn
+        }
+      }, " · 🔴 ", e.bandLength, " ", e.bandStrength, " ", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", "(", e.bandUsage, ")"), e.clusterReps && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: C.gold
+        }
+      }, " · ⏱ ", e.clusterCount, "×", e.clusterReps, " clusters"), e.restApplied && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: C.blue
+        }
+      }, " · 💤 ", e.restApplied >= 60 ? `${Math.floor(e.restApplied / 60)}:${String(e.restApplied % 60).padStart(2, "0")}` : `${e.restApplied}s`, " rest"), (eqShown || latShown) && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: C.sub
+        }
+      }, " · 🔧 ", eqShown || "", eqShown && latShown ? ", " : "", latShown || "", isOverride ? " (session)" : ""), e.comment && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: C.muted,
+          fontStyle: "italic",
+          marginTop: 4,
+          padding: "4px 8px",
+          background: C.card2,
+          borderRadius: 6,
+          border: `1px solid ${C.border}`
+        }
+      }, "💬 ", e.comment), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: C.muted
+        }
+      }, " · ", e.type), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: C.sub
+        }
+      }, " · RPE ", e.rpe, !isOvrcIso(e.type) ? ` · RIR ${e.rir}` : "")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          textAlign: "right",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 8
+        }
+      }, /*#__PURE__*/React.createElement("div", null, !isOvrcIso(e.type) ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontFamily: "'Bebas Neue',cursive",
+          fontSize: 22,
+          color: C.accent,
+          lineHeight: 1
+        }
+      }, e.load, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          opacity: 0.6
+        }
+      }, " kg")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: C.sub
+        }
+      }, "~", est1RM(e.load, e.reps), " 1RM")) : /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: C.warn,
+          fontWeight: 700
+        }
+      }, "Max effort")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          gap: 2
+        }
+      }, /*#__PURE__*/React.createElement("button", {
+        onClick: () => startEditEntry(s.sid, idx, e),
+        style: {
+          background: C.blue + "18",
+          border: `1px solid ${C.blue}44`,
+          borderRadius: 6,
+          width: 30,
+          height: 30,
+          cursor: "pointer",
+          color: C.blue,
+          fontSize: 14,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        },
+        title: "Edit this set"
+      }, "✎"), /*#__PURE__*/React.createElement("button", {
+        onClick: () => setConfirmDelete({
+          sessionId: s.sid,
+          entryIdx: idx,
+          label: `Set ${e.set} from ${s.date} (${e.reps}×${e.load}kg)`
+        }),
+        style: {
+          background: C.warn + "18",
+          border: `1px solid ${C.warn}44`,
+          borderRadius: 6,
+          width: 30,
+          height: 30,
+          cursor: "pointer",
+          color: C.warn,
+          fontSize: 14,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        },
+        title: "Delete this set"
+      }, "🗑"))));
+    }))));
+  })());
 }
 
 // ─── Progress Tab ─────────────────────────────────────────────────────────────
@@ -9727,7 +9735,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v60.0.5")), /*#__PURE__*/React.createElement("button", {
+  }, "v60.0.6")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
