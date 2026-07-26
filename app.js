@@ -3155,7 +3155,9 @@ function ClientSwitcher({
   onAddClient,
   onArchive,
   onReinstate,
-  onEditClient
+  onEditClient,
+  savedGroups = [],
+  onEditGroup
 }) {
   const [showArchived, setShowArchived] = useState(false);
   const active = clients.filter(c => !c.archived);
@@ -3207,7 +3209,30 @@ function ClientSwitcher({
       color: C.sub,
       marginTop: 2
     }
-  }, c.programs.length, " program", c.programs.length !== 1 ? "s" : "", c.bw ? ` · ${c.bw} kg` : "")), c.id === activeId && /*#__PURE__*/React.createElement("span", {
+  }, c.programs.length, " program", c.programs.length !== 1 ? "s" : "", c.bw ? ` · ${c.bw} kg` : ""), savedGroups.filter(g => g.clientIds.includes(c.id)).length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 5,
+      flexWrap: "wrap",
+      marginTop: 5
+    }
+  }, savedGroups.filter(g => g.clientIds.includes(c.id)).map(g => /*#__PURE__*/React.createElement("button", {
+    key: g.id,
+    onClick: e => {
+      e.stopPropagation();
+      onEditGroup(g);
+    },
+    style: {
+      background: g.color + "22",
+      border: `1px solid ${g.color}55`,
+      borderRadius: 10,
+      padding: "2px 8px",
+      cursor: "pointer",
+      color: g.color,
+      fontSize: 10,
+      fontWeight: 700
+    }
+  }, g.name)))), c.id === activeId && /*#__PURE__*/React.createElement("span", {
     style: {
       color: C.accent,
       fontSize: 20,
@@ -3855,9 +3880,13 @@ function ProgramsTab({
   onNewGroup,
   onEditGroup,
   activeSavedGroupId,
-  onStopGroup
+  onStopGroup,
+  sessionGroup = [],
+  onOpenSessionPicker,
+  onRemoveFromSession
 }) {
   const [showAdd, setShowAdd] = useState(false);
+  const [groupView, setGroupView] = useState("permanent"); // "permanent" | "temporary"
   const [editProg, setEditProg] = useState(null);
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3904,16 +3933,47 @@ function ProgramsTab({
   }), /*#__PURE__*/React.createElement(Tag, {
     text: `${client.programs.length} program${client.programs.length !== 1 ? "s" : ""}`,
     color: C.sub
-  })))), /*#__PURE__*/React.createElement("div", {
+  })))), /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Groups"
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setGroupView("permanent"),
+    style: {
+      flex: 1,
+      background: groupView === "permanent" ? C.accent + "18" : C.card,
+      border: `1px solid ${groupView === "permanent" ? C.accent + "55" : C.border}`,
+      borderRadius: 10,
+      padding: "8px",
+      cursor: "pointer",
+      color: groupView === "permanent" ? C.accent : C.sub,
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "Group (Permanent)"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setGroupView("temporary"),
+    style: {
+      flex: 1,
+      background: groupView === "temporary" ? C.gold + "18" : C.card,
+      border: `1px solid ${groupView === "temporary" ? C.gold + "55" : C.border}`,
+      borderRadius: 10,
+      padding: "8px",
+      cursor: "pointer",
+      color: groupView === "temporary" ? C.gold : C.sub,
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "Group (Temporary)")), groupView === "permanent" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "flex-end",
       marginBottom: 8
     }
-  }, /*#__PURE__*/React.createElement(SecLabel, {
-    text: "Groups (Permanent)"
-  }), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("button", {
     onClick: onNewGroup,
     style: {
       background: "none",
@@ -4031,7 +4091,89 @@ function ProgramsTab({
       fontSize: 12,
       fontWeight: 700
     }
-  }, "▶ Start")))), /*#__PURE__*/React.createElement(SecLabel, {
+  }, "▶ Start"))))) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 18
+    }
+  }, sessionGroup.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 12,
+      padding: "14px",
+      textAlign: "center",
+      border: `1px dashed ${C.border}`,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted
+    }
+  }, "No temporary Group set for today. This resets when the app fully closes.")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 12,
+      padding: "12px 14px",
+      marginBottom: 12,
+      border: `1px solid ${C.gold}44`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.gold,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 8
+    }
+  }, "Today's Group (", sessionGroup.length, ")"), sessionGroup.map(cid => {
+    const gc = allClients.find(c => c.id === cid);
+    if (!gc) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: cid,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "6px 0"
+      }
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: gc.name,
+      idx: allClients.findIndex(c => c.id === cid),
+      size: 24
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 13,
+        color: C.text,
+        fontWeight: 600
+      }
+    }, gc.name), /*#__PURE__*/React.createElement("button", {
+      onClick: () => onRemoveFromSession(cid),
+      style: {
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "4px 8px",
+        cursor: "pointer",
+        color: C.warn,
+        fontSize: 12
+      }
+    }, "✕"));
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: onOpenSessionPicker,
+    style: {
+      width: "100%",
+      background: C.gold + "18",
+      border: `1px solid ${C.gold}55`,
+      borderRadius: 10,
+      padding: "10px",
+      cursor: "pointer",
+      color: C.gold,
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, sessionGroup.length > 0 ? "✎ Edit Today's Group" : "＋ Set Today's Group")), /*#__PURE__*/React.createElement(SecLabel, {
     text: "Programs"
   }), client.programs.length === 0 && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -9735,7 +9877,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v60.0.9")), /*#__PURE__*/React.createElement("button", {
+  }, "v60.1.0")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
@@ -9903,7 +10045,10 @@ function App() {
     onNewGroup: () => setEditingGroup(null),
     onEditGroup: g => setEditingGroup(g),
     activeSavedGroupId: activeSavedGroupId,
-    onStopGroup: stopSavedGroup
+    onStopGroup: stopSavedGroup,
+    sessionGroup: sessionGroup,
+    onOpenSessionPicker: () => setShowGroupPicker(true),
+    onRemoveFromSession: cid => setSessionGroup(sg => sg.filter(id => id !== cid))
   }), tab === "log" && /*#__PURE__*/React.createElement(LogTab, {
     program: activeProgram,
     onAddEntry: addEntry,
@@ -10007,6 +10152,11 @@ function App() {
     onReinstate: reinstateClient,
     onEditClient: c => {
       setEditClientTarget(c);
+      setShowSwitcher(false);
+    },
+    savedGroups: savedGroups,
+    onEditGroup: g => {
+      setEditingGroup(g);
       setShowSwitcher(false);
     }
   }), showAddClient && /*#__PURE__*/React.createElement(AddClientModal, {
