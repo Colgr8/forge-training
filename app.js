@@ -2898,7 +2898,7 @@ function GroupEditorModal({
     }, "DELETE")));
   }
   return /*#__PURE__*/React.createElement(Sheet, {
-    title: group ? "✎ EDIT GROUP" : "＋ NEW GROUP",
+    title: group ? "✎ EDIT GROUP (PERMANENT)" : "＋ NEW GROUP (PERMANENT)",
     onClose: onClose
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3039,7 +3039,7 @@ function SessionGroupModal({
   const toggle = id => setPicked(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   const groupWord = picked.length === 0 ? "" : picked.length === 1 ? "Solo" : picked.length === 2 ? "Duo" : picked.length === 3 ? "Trio" : `Group of ${picked.length}`;
   return /*#__PURE__*/React.createElement(Sheet, {
-    title: "👥 SESSION GROUP",
+    title: "👥 GROUP (TEMPORARY)",
     onClose: onClose
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3912,7 +3912,7 @@ function ProgramsTab({
       marginBottom: 8
     }
   }, /*#__PURE__*/React.createElement(SecLabel, {
-    text: "Groups"
+    text: "Groups (Permanent)"
   }), /*#__PURE__*/React.createElement("button", {
     onClick: onNewGroup,
     style: {
@@ -3939,7 +3939,7 @@ function ProgramsTab({
       fontSize: 11,
       color: C.muted
     }
-  }, "No saved groups yet. Create one for regular duos/trios you train.")) : /*#__PURE__*/React.createElement("div", {
+  }, "No groups yet. Create one for regular duos/trios you train.")) : /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 18
     }
@@ -9735,7 +9735,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v60.0.6")), /*#__PURE__*/React.createElement("button", {
+  }, "v60.0.8")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
