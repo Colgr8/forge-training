@@ -9735,7 +9735,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v60.0.8")), /*#__PURE__*/React.createElement("button", {
+  }, "v60.0.9")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
@@ -9807,19 +9807,28 @@ function App() {
       const hasTimer = !!t;
       const isDone = hasTimer && t.remaining === 0;
       const doneColor = doneColorForClient(cid);
-      return /*#__PURE__*/React.createElement("button", {
+      return /*#__PURE__*/React.createElement("div", {
         key: cid,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+          flexShrink: 0,
+          background: isDone ? doneColor : C.card,
+          border: `1px solid ${isDone ? doneColor : C.border}`,
+          borderRadius: 20,
+          padding: "6px 6px 6px 12px"
+        }
+      }, /*#__PURE__*/React.createElement("button", {
         onClick: () => quickSwitchClient(cid),
         style: {
           display: "flex",
           alignItems: "center",
           gap: 6,
-          flexShrink: 0,
-          background: isDone ? doneColor : C.card,
-          border: `1px solid ${isDone ? doneColor : C.border}`,
-          borderRadius: 20,
-          padding: "6px 12px",
-          cursor: "pointer"
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: 0
         }
       }, /*#__PURE__*/React.createElement(Avatar, {
         name: c.name,
@@ -9838,7 +9847,22 @@ function App() {
           letterSpacing: 1,
           color: isDone ? "#0B0B16" : C.gold
         }
-      }, isDone ? "Done!" : `${Math.floor(t.remaining / 60)}:${String(t.remaining % 60).padStart(2, "0")}`));
+      }, isDone ? "Done!" : `${Math.floor(t.remaining / 60)}:${String(t.remaining % 60).padStart(2, "0")}`)), sessionGroup.length > 0 && /*#__PURE__*/React.createElement("button", {
+        onClick: e => {
+          e.stopPropagation();
+          setSessionGroup(sg => sg.filter(id => id !== cid));
+        },
+        title: "Remove from today's Group",
+        style: {
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: "4px 6px",
+          color: isDone ? "#0B0B16" : C.muted,
+          fontSize: 13,
+          lineHeight: 1
+        }
+      }, "✕"));
     }));
   })(), /*#__PURE__*/React.createElement("div", {
     style: {
