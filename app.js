@@ -3469,6 +3469,10 @@ function AddProgramModal({
   onAddLat,
   onAddCategory,
   onAddProgType,
+  onEditCategory,
+  onDeleteCategory,
+  onEditProgType,
+  onDeleteProgType,
   customExercises,
   onEditEx,
   onDeleteEx,
@@ -3524,7 +3528,9 @@ function AddProgramModal({
     onChange: v => upd("category", v),
     options: categoryList,
     onAddOption: onAddCategory,
-    addLabel: "Add category"
+    addLabel: "Add category",
+    onEditOption: onEditCategory,
+    onDeleteOption: onDeleteCategory
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 12
@@ -3536,7 +3542,9 @@ function AddProgramModal({
     onChange: v => upd("type", v),
     options: progTypeList,
     onAddOption: onAddProgType,
-    addLabel: "Add program type"
+    addLabel: "Add program type",
+    onEditOption: onEditProgType,
+    onDeleteOption: onDeleteProgType
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -3650,6 +3658,10 @@ function EditProgramModal({
   onAddCategory,
   onAddProgType,
   onDelete,
+  onEditCategory,
+  onDeleteCategory,
+  onEditProgType,
+  onDeleteProgType,
   customExercises,
   onEditEx,
   onDeleteEx,
@@ -3757,7 +3769,9 @@ function EditProgramModal({
     onChange: v => upd("category", v),
     options: categoryList,
     onAddOption: onAddCategory,
-    addLabel: "Add category"
+    addLabel: "Add category",
+    onEditOption: onEditCategory,
+    onDeleteOption: onDeleteCategory
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 18
@@ -3769,7 +3783,9 @@ function EditProgramModal({
     onChange: v => upd("type", v),
     options: progTypeList,
     onAddOption: onAddProgType,
-    addLabel: "Add program type"
+    addLabel: "Add program type",
+    onEditOption: onEditProgType,
+    onDeleteOption: onDeleteProgType
   })), /*#__PURE__*/React.createElement(SecLabel, {
     text: "Exercises"
   }), /*#__PURE__*/React.createElement(ExerciseBuilder, {
@@ -3866,6 +3882,10 @@ function ProgramsTab({
   onAddLat,
   onAddCategory,
   onAddProgType,
+  onEditCategory,
+  onDeleteCategory,
+  onEditProgType,
+  onDeleteProgType,
   customExercises = [],
   onEditEx,
   onDeleteEx,
@@ -4317,6 +4337,10 @@ function ProgramsTab({
     onAddLat: onAddLat,
     onAddCategory: onAddCategory,
     onAddProgType: onAddProgType,
+    onEditCategory: onEditCategory,
+    onDeleteCategory: onDeleteCategory,
+    onEditProgType: onEditProgType,
+    onDeleteProgType: onDeleteProgType,
     customExercises: customExercises,
     onEditEx: onEditEx,
     onDeleteEx: onDeleteEx,
@@ -4355,7 +4379,11 @@ function ProgramsTab({
     onAddEquip: onAddEquip,
     onAddLat: onAddLat,
     onAddCategory: onAddCategory,
-    onAddProgType: onAddProgType
+    onAddProgType: onAddProgType,
+    onEditCategory: onEditCategory,
+    onDeleteCategory: onDeleteCategory,
+    onEditProgType: onEditProgType,
+    onDeleteProgType: onDeleteProgType
   }));
 }
 
@@ -9319,8 +9347,8 @@ function App() {
   const [customExercises, setCustomExercises] = useState(() => migrateList('forge_customEx', EX_LIST));
   const [customEquipment, setCustomEquipment] = useState(() => migrateList('forge_customEquip', EQUIP_LIST));
   const [customLaterality, setCustomLaterality] = useState(() => migrateList('forge_customLat', LAT_LIST));
-  const [customCategories, setCustomCategories] = useState(() => lsGet('forge_customCats', []));
-  const [customProgTypes, setCustomProgTypes] = useState(() => lsGet('forge_customPT', []));
+  const [customCategories, setCustomCategories] = useState(() => migrateList('forge_customCats', CATEGORIES));
+  const [customProgTypes, setCustomProgTypes] = useState(() => migrateList('forge_customPT', PROG_TYPES));
   const [customSetTypes, setCustomSetTypes] = useState(() => lsGet('forge_customST', []));
 
   // ── Multi-client rest timer — keyed by clientId so each client's countdown
@@ -9470,14 +9498,18 @@ function App() {
   const exList = customExercises;
   const equipList = customEquipment;
   const latList = customLaterality;
-  const categoryList = useMemo(() => [...CATEGORIES, ...customCategories], [customCategories]);
-  const progTypeList = useMemo(() => [...PROG_TYPES, ...customProgTypes], [customProgTypes]);
+  const categoryList = customCategories;
+  const progTypeList = customProgTypes;
   const setTypeList = useMemo(() => [...SET_TYPES, ...customSetTypes], [customSetTypes]);
   const onAddEx = name => setCustomExercises(l => [...l, name]);
   const onAddEquip = name => setCustomEquipment(l => [...l, name]);
   const onAddLat = name => setCustomLaterality(l => [...l, name]);
   const onAddCategory = name => setCustomCategories(l => [...l, name]);
   const onAddProgType = name => setCustomProgTypes(l => [...l, name]);
+  const onEditCategory = (o, n) => setCustomCategories(l => l.map(x => x === o ? n : x));
+  const onDeleteCategory = v => setCustomCategories(l => l.filter(x => x !== v));
+  const onEditProgType = (o, n) => setCustomProgTypes(l => l.map(x => x === o ? n : x));
+  const onDeleteProgType = v => setCustomProgTypes(l => l.filter(x => x !== v));
   const onAddSetType = name => setCustomSetTypes(l => [...l, name]);
 
   // Edit/delete custom list items
@@ -9877,7 +9909,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v60.1.0")), /*#__PURE__*/React.createElement("button", {
+  }, "v60.1.1")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
@@ -10031,6 +10063,10 @@ function App() {
     onAddLat: onAddLat,
     onAddCategory: onAddCategory,
     onAddProgType: onAddProgType,
+    onEditCategory: onEditCategory,
+    onDeleteCategory: onDeleteCategory,
+    onEditProgType: onEditProgType,
+    onDeleteProgType: onDeleteProgType,
     customExercises: customExercises,
     onEditEx: onEditEx,
     onDeleteEx: onDeleteEx,
