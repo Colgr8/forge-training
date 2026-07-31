@@ -47,6 +47,186 @@ const est1RM = (load, reps) => +(load * (1 + reps / 30)).toFixed(1);
 const estVelocity = (load, oneRM) => +Math.max(0.15, 0.15 + 1.0 * (1 - load / Math.max(oneRM, load))).toFixed(2);
 const calcPower = (load, vel) => Math.round(load * 9.81 * vel); // Watts (mean per rep)
 
+// ── Recommended next load ────────────────────────────────────────────────────
+// Base increment comes from last session's average RPE (autoregulation), then
+// scaled by weekly training frequency for that exercise (higher frequency =
+// smaller jumps, since fatigue compounds across the week), with a small bonus
+// if the load has plateaued for 3+ sessions without RPE climbing.
+// ── Zone target load ─────────────────────────────────────────────────────────
+// A completely separate system from calcRecommendedLoad above. That one
+// autoregulates SESSION-TO-SESSION within whatever zone the client is already
+// training. This one estimates a STARTING target the moment a program's Type
+// changes (e.g. General Strength → Max Strength) — using standard %1RM
+// guidelines against the client's best known Est 1RM for that exercise,
+// since there's no history yet in the new zone to autoregulate from.
+const ZONE_PCT_1RM = {
+  "Hypertrophy": 70,
+  "Endurance Strength": 60,
+  "Max Strength": 87,
+  "Power": 75,
+  "Muscular Endurance": 55,
+  "Hybrid": 70
+};
+// Standard target RIR per zone — how much "reps in reserve" to leave at the
+// target load. Lower RIR (closer to failure) for Hypertrophy; more reserve
+// for Power/Endurance where fatigue management or bar speed matters more.
+const ZONE_RIR_TARGET = {
+  "Hypertrophy": 2,
+  "Endurance Strength": 3,
+  "Max Strength": 2,
+  "Power": 3,
+  "Muscular Endurance": 3,
+  "Hybrid": 2
+};
+// Best-ever Est 1RM for an exercise across whatever sessions are passed in.
+function getBest1RM(sessions, exName) {
+  let best1RM = 0;
+  sessions.forEach(s => {
+    s.entries.forEach(e => {
+      if (e.ex === exName && e.load > 0 && e.reps > 0 && !isOvrcIso(e.type)) {
+        const rm = est1RM(e.load, e.reps);
+        if (rm > best1RM) best1RM = rm;
+      }
+    });
+  });
+  return best1RM;
+}
+function calcZoneTarget(sessions, exName, progType) {
+  // General Strength is the baseline-discovery phase — the load is found
+  // through direct trial/feel, not derived from an existing 1RM. A formula-based
+  // target here would be circular (you'd need a real 1RM to compute a target,
+  // but that's exactly what General Strength hasn't established yet). Once real
+  // sessions exist, the separate within-block progression box takes over instead.
+  if (progType === "General Strength") return null;
+  const pct = ZONE_PCT_1RM[progType];
+  if (!pct) return null;
+  const best1RM = getBest1RM(sessions, exName);
+  if (best1RM <= 0) return null;
+  const target = Math.round(best1RM * pct / 100);
+
+  // Inverse Epley: given the target load and best 1RM, estimate the max reps
+  // achievable at that load with 0 RIR (i.e. "this load is roughly an N-rep max").
+  const maxReps = Math.max(1, Math.round(30 * (best1RM / target - 1)));
+  const targetRIR = ZONE_RIR_TARGET[progType] ?? 2;
+  const recommendedReps = Math.max(1, maxReps - targetRIR);
+  return {
+    target,
+    best1RM,
+    pct,
+    progType,
+    maxReps,
+    targetRIR,
+    recommendedReps
+  };
+}
+
+// Manual Rep Max Calculator — trainer picks ANY rep-max/RIR combo directly
+// (e.g. "2RM with 1 RIR"), rather than being locked into the automated
+// Program-Type suggestion. Uses the same inverse-Epley math as everywhere
+// else in the app, for consistency.
+function calcManualRM(sessions, exName, repMax, rir) {
+  const best1RM = getBest1RM(sessions, exName);
+  if (best1RM <= 0) return null;
+  const n = Math.max(1, +repMax || 1);
+  const pct = 30 / (30 + n) * 100;
+  const load = Math.round(best1RM * pct / 100);
+  const repsToExecute = Math.max(1, n - Math.max(0, +rir || 0));
+  return {
+    best1RM,
+    pct: +pct.toFixed(1),
+    load,
+    repMax: n,
+    rir: Math.max(0, +rir || 0),
+    repsToExecute
+  };
+}
+function calcRecommendedLoad(sessions, exName) {
+  const relevant = sessions.filter(s => s.entries.some(e => e.ex === exName && e.load > 0 && !isOvrcIso(e.type))).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+  if (relevant.length === 0) return null;
+  const lastSession = relevant[relevant.length - 1];
+  const lastEntries = lastSession.entries.filter(e => e.ex === exName && e.load > 0 && !isOvrcIso(e.type));
+  if (lastEntries.length === 0) return null;
+  const lastLoad = Math.max(...lastEntries.map(e => e.load));
+  const avgRPE = lastEntries.reduce((s, e) => s + (e.rpe || 7), 0) / lastEntries.length;
+  const avgReps = lastEntries.reduce((s, e) => s + (e.reps || 8), 0) / lastEntries.length;
+
+  // Base % increment from RPE (autoregulation)
+  let basePct;
+  if (avgRPE <= 7) basePct = 5;else if (avgRPE < 8.5) basePct = 2.5;else if (avgRPE < 9.5) basePct = 0;else basePct = 0; // RPE 10 — hold, flag for review
+
+  // Rep-range scaling: heavier/lower-rep work (Max Strength 1-6 reps, and Power —
+  // which is also low-rep/explosive by nature) gets smaller jumps, since there's
+  // less margin for error near-maximal, and for Power specifically, overloading
+  // too fast degrades bar speed, defeating the point of that zone. Higher-rep
+  // work has more margin, so slightly bigger jumps are reasonable there.
+  const repRangeScale = avgReps <= 6 ? 0.6 : avgReps <= 12 ? 1.0 : 1.15;
+  const repRangeLabel = avgReps <= 6 ? "low-rep/strength-power zone" : avgReps <= 12 ? "moderate-rep zone" : "high-rep zone";
+
+  // Weekly frequency: sessions with this exercise in the last 7 days (from last session's date)
+  const lastDate = new Date(lastSession.date);
+  const weekStart = new Date(lastDate);
+  weekStart.setDate(weekStart.getDate() - 6);
+  const freq = relevant.filter(s => {
+    const d = new Date(s.date);
+    return d >= weekStart && d <= lastDate;
+  }).length;
+  const freqScale = freq <= 1 ? 1.25 : freq === 2 ? 1.0 : freq === 3 ? 0.5 : 0.35;
+  let pct = basePct * freqScale * repRangeScale;
+
+  // Plateau bonus: same load (±1kg) for the last 3+ sessions with RPE not climbing
+  const last3 = relevant.slice(-3);
+  let plateauBonus = 0;
+  if (last3.length === 3) {
+    const loads3 = last3.map(s => {
+      const ee = s.entries.filter(e => e.ex === exName && e.load > 0 && !isOvrcIso(e.type));
+      return ee.length ? Math.max(...ee.map(e => e.load)) : null;
+    });
+    const rpes3 = last3.map(s => {
+      const ee = s.entries.filter(e => e.ex === exName && e.load > 0 && !isOvrcIso(e.type));
+      return ee.length ? ee.reduce((sum, e) => sum + (e.rpe || 7), 0) / ee.length : null;
+    });
+    const samePlateau = loads3.every(l => l != null && Math.abs(l - loads3[0]) <= 1);
+    const rpeNotClimbing = rpes3.every(r => r != null && r <= 8.5);
+    if (samePlateau && rpeNotClimbing && basePct === 0) {
+      plateauBonus = 2.5 * repRangeScale;
+      pct += plateauBonus;
+    }
+  }
+  if (pct === 0 && plateauBonus === 0) {
+    const timeline = avgRPE >= 9.5 ? "Hold — near-maximal effort. Retry at this load for 1-2 more sessions before reassessing." : "Hold — retry at this load next session; expect to progress once RPE drops below 8.5.";
+    return {
+      newLoad: lastLoad,
+      lastLoad,
+      avgRPE: +avgRPE.toFixed(1),
+      freq,
+      pct: 0,
+      reason: `RPE ${avgRPE.toFixed(1)} avg — ${timeline}`
+    };
+  }
+  const rawNew = lastLoad * (1 + pct / 100);
+  const newLoad = Math.round(rawNew); // nearest 1kg
+  if (newLoad <= lastLoad) return {
+    newLoad: lastLoad,
+    lastLoad,
+    avgRPE: +avgRPE.toFixed(1),
+    freq,
+    pct: 0,
+    reason: `RPE ${avgRPE.toFixed(1)} avg — hold at current load`
+  };
+
+  // If this zone (this active program) still has limited session history,
+  // flag that the recommendation will sharpen as more data comes in.
+  const buildingNote = relevant.length < 3 ? ` (${relevant.length} session${relevant.length !== 1 ? "s" : ""} in this program so far — recommendation will refine with more data)` : "";
+  return {
+    newLoad,
+    lastLoad,
+    avgRPE: +avgRPE.toFixed(1),
+    freq,
+    pct: +pct.toFixed(1),
+    reason: `RPE ${avgRPE.toFixed(1)} avg, ${freq}x/week, ${repRangeLabel}${plateauBonus ? ", plateau bonus" : ""} → +${pct.toFixed(1)}%${buildingNote}`
+  };
+}
+
 // Injury Index: % increase in load vs previous session for the same exercise.
 // Decreases/deloads are clamped to 0 (they don't add injury risk).
 // Bigger positive jumps => steeper slope => higher injury risk.
@@ -4398,6 +4578,7 @@ function LogTab({
   onAddSetType,
   clientBW,
   clientName,
+  allClientSessions = [],
   onUpdateExercise,
   equipList,
   latList,
@@ -4417,9 +4598,7 @@ function LogTab({
     year: "numeric"
   });
   const progExNames = program ? program.exercises.map(e => e.name) : [];
-  // All available exercises: program's first, then global list (deduped)
-  const allEx = [...new Set([...progExNames, ...exList])];
-  const [activeEx, setActiveEx] = useState(progExNames[0] || allEx[0] || "");
+  const [activeEx, setActiveEx] = useState(progExNames[0] || "");
   const [form, setForm] = useState({
     reps: "",
     setNo: "1",
@@ -4475,9 +4654,11 @@ function LogTab({
     [k]: v
   }));
 
-  // When program changes, reset to first exercise
+  // When program changes, reset to first exercise (or empty if this program has none —
+  // falling back to the global exercise library here was the bug: it made the Log page
+  // show recommendation data for an exercise that isn't even part of this program).
   useEffect(() => {
-    const first = program?.exercises[0]?.name || exList[0] || "";
+    const first = program?.exercises[0]?.name || "";
     setActiveEx(first);
     setForm({
       reps: "",
@@ -4586,6 +4767,16 @@ function LogTab({
   };
   const bandKgLive = showBand && form.bandLoadKg ? +form.bandLoadKg : 0;
   const bandSignedLive = bandKgLive ? form.bandUsage === "assisted" ? -bandKgLive : bandKgLive : 0;
+
+  // Zone target (load + reps + RIR), shared across the Load/Reps/RIR fields below.
+  const zoneTarget = calcZoneTarget(allClientSessions, activeEx, program?.type);
+
+  // Manual Rep Max Calculator — trainer's own rep-max/RIR choice, independent
+  // of the automated zone-target suggestion above.
+  const [showRMCalc, setShowRMCalc] = useState(false);
+  const [rmCalcN, setRmCalcN] = useState("2");
+  const [rmCalcRIR, setRmCalcRIR] = useState("1");
+  const rmCalc = calcManualRM(allClientSessions, activeEx, rmCalcN, rmCalcRIR);
 
   // When arriving here via a pill tap (quick-switch), jump straight to whichever
   // exercise that client's rest timer belongs to, rather than leaving them on
@@ -4708,6 +4899,23 @@ function LogTab({
       lineHeight: 1.6
     }
   }, "No active program.", /*#__PURE__*/React.createElement("br", null), "Go to Programs to create or select one."));
+  if (progExNames.length === 0) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "48px 24px",
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 42,
+      marginBottom: 14
+    }
+  }, "🏋️"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: C.sub,
+      fontSize: 14,
+      lineHeight: 1.6
+    }
+  }, "\"", program.name, "\" has no exercises yet.", /*#__PURE__*/React.createElement("br", null), "Go to Programs → ✎ Edit to add some."));
   return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "16px 14px"
@@ -5470,7 +5678,46 @@ function LogTab({
         color: C.sub
       } : {})
     }
-  })), isOvrcIso(form.type) ? /*#__PURE__*/React.createElement("div", {
+  }), zoneTarget && !isIsoType(form.type) && !isClusterSet(form.type) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 6,
+      background: C.blue + "12",
+      border: `1px solid ${C.blue}33`,
+      borderRadius: 8,
+      padding: "6px 10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.blue,
+      fontWeight: 700
+    }
+  }, "🎯 ", zoneTarget.maxReps, "RM, ", zoneTarget.targetRIR, " RIR"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: C.muted
+    }
+  }, "→ Execute ", zoneTarget.recommendedReps, " reps")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => upd("reps", zoneTarget.recommendedReps),
+    style: {
+      background: C.blue,
+      color: "#fff",
+      border: "none",
+      borderRadius: 6,
+      padding: "5px 12px",
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: 700,
+      flexShrink: 0
+    }
+  }, "Use"))), isOvrcIso(form.type) ? /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -5522,7 +5769,89 @@ function LogTab({
     value: form.load,
     onChange: e => upd("load", e.target.value),
     style: ss
-  }))), isClusterSet(form.type) && /*#__PURE__*/React.createElement("div", {
+  }), (() => {
+    const rec = calcRecommendedLoad(sessions, activeEx);
+    if (!rec || rec.pct <= 0) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginTop: 6,
+        background: C.gold + "12",
+        border: `1px solid ${C.gold}33`,
+        borderRadius: 8,
+        padding: "6px 10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.gold,
+        fontWeight: 700
+      }
+    }, "💡 Suggested: ", rec.newLoad, "kg"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.muted
+      }
+    }, rec.reason)), /*#__PURE__*/React.createElement("button", {
+      onClick: () => upd("load", rec.newLoad),
+      style: {
+        background: C.gold,
+        color: "#1A1200",
+        border: "none",
+        borderRadius: 6,
+        padding: "5px 12px",
+        cursor: "pointer",
+        fontSize: 11,
+        fontWeight: 700,
+        flexShrink: 0
+      }
+    }, "Use"));
+  })(), zoneTarget && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 6,
+      background: C.blue + "12",
+      border: `1px solid ${C.blue}33`,
+      borderRadius: 8,
+      padding: "6px 10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.blue,
+      fontWeight: 700
+    }
+  }, "🎯 ", zoneTarget.progType, " target: ", zoneTarget.target, "kg"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: C.muted
+    }
+  }, zoneTarget.pct, "% of ~", zoneTarget.best1RM, "kg best Est 1RM (~", zoneTarget.maxReps, "RM at this load)")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => upd("load", zoneTarget.target),
+    style: {
+      background: C.blue,
+      color: "#fff",
+      border: "none",
+      borderRadius: 6,
+      padding: "5px 12px",
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: 700,
+      flexShrink: 0
+    }
+  }, "Use")))), isClusterSet(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#FFB02015",
       borderRadius: 10,
@@ -5946,7 +6275,37 @@ function LogTab({
     style: ss
   }, [0, 1, 2, 3, 4].map(r => /*#__PURE__*/React.createElement("option", {
     key: r
-  }, r)))), /*#__PURE__*/React.createElement("div", {
+  }, r))), zoneTarget && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 6,
+      background: C.blue + "12",
+      border: `1px solid ${C.blue}33`,
+      borderRadius: 8,
+      padding: "6px 10px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.blue,
+      fontWeight: 700
+    }
+  }, "🎯 ", zoneTarget.targetRIR, " RIR"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => upd("rir", zoneTarget.targetRIR),
+    style: {
+      background: C.blue,
+      color: "#fff",
+      border: "none",
+      borderRadius: 6,
+      padding: "5px 12px",
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: 700,
+      flexShrink: 0
+    }
+  }, "Use"))), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -5959,7 +6318,157 @@ function LogTab({
   }, [4, 5, 6, 7, 8, 9, 10].map(r => /*#__PURE__*/React.createElement("option", {
     key: r,
     value: r
-  }, r, " – ", RPE_DESC[r]))))), (() => {
+  }, r, " – ", RPE_DESC[r]))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowRMCalc(s => !s),
+    style: {
+      width: "100%",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      background: C.card2,
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      padding: "10px 14px",
+      cursor: "pointer",
+      color: C.text,
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "🧮 Rep Max Calculator"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.muted,
+      fontSize: 11
+    }
+  }, showRMCalc ? "▲" : "▼")), showRMCalc && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      padding: "14px",
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.sub,
+      marginBottom: 12,
+      lineHeight: 1.5
+    }
+  }, "Pick any rep-max and RIR combo — calculates the %1RM, load, and reps to actually execute, independent of the automated zone target above."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Rep Max (N)"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "1",
+    value: rmCalcN,
+    onChange: e => setRmCalcN(e.target.value),
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "RIR"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: rmCalcRIR,
+    onChange: e => setRmCalcRIR(e.target.value),
+    style: ss
+  }, [0, 1, 2, 3, 4].map(r => /*#__PURE__*/React.createElement("option", {
+    key: r,
+    value: r
+  }, r))))), rmCalc ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.gold + "12",
+      border: `1px solid ${C.gold}33`,
+      borderRadius: 8,
+      padding: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.gold,
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, rmCalc.repMax, "RM, ", rmCalc.rir, " RIR → Execute ", rmCalc.repsToExecute, " rep", rmCalc.repsToExecute !== 1 ? "s" : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 20,
+      fontFamily: "'Bebas Neue',cursive",
+      color: C.text,
+      marginBottom: 4
+    }
+  }, rmCalc.load, "kg ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: C.muted,
+      fontFamily: "inherit"
+    }
+  }, "(", rmCalc.pct, "% of ~", rmCalc.best1RM, "kg best Est 1RM)")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => upd("load", rmCalc.load),
+    style: {
+      flex: 1,
+      background: C.gold,
+      color: "#1A1200",
+      border: "none",
+      borderRadius: 6,
+      padding: "8px",
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "Use Load"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => upd("reps", rmCalc.repsToExecute),
+    style: {
+      flex: 1,
+      background: C.gold,
+      color: "#1A1200",
+      border: "none",
+      borderRadius: 6,
+      padding: "8px",
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "Use Reps"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => upd("rir", rmCalc.rir),
+    style: {
+      flex: 1,
+      background: C.gold,
+      color: "#1A1200",
+      border: "none",
+      borderRadius: 6,
+      padding: "8px",
+      cursor: "pointer",
+      fontSize: 12,
+      fontWeight: 700
+    }
+  }, "Use RIR"))) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted,
+      textAlign: "center",
+      padding: "10px"
+    }
+  }, "No prior load/rep history for ", activeEx, " yet — nothing to calculate a 1RM from."))), (() => {
     const exDef2 = program?.exercises.find(e => e.name === activeEx);
     const genInstr = exDef2?.generalInstructions;
     const exInstr = exDef2?.instructions;
@@ -9909,7 +10418,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v60.1.1")), /*#__PURE__*/React.createElement("button", {
+  }, "v62.1.3")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
@@ -10094,6 +10603,7 @@ function App() {
     onAddSetType: onAddSetType,
     clientBW: activeClient?.bw,
     clientName: activeClient?.name,
+    allClientSessions: activeClient?.programs.flatMap(p => p.sessions) || [],
     equipList: equipList,
     latList: latList,
     restState: restTimers[activeClientId] || {
