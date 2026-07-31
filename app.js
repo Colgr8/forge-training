@@ -10380,7 +10380,10 @@ function App() {
       flexDirection: "column",
       overflow: "hidden"
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("style", null, `
+        button:active { filter: brightness(0.8); transform: scale(0.97); }
+        button { transition: filter 0.08s ease, transform 0.08s ease; }
+      `), /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card,
       padding: "12px 16px",
@@ -10418,7 +10421,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v62.1.3")), /*#__PURE__*/React.createElement("button", {
+  }, "v62.1.4")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
