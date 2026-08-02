@@ -43,6 +43,14 @@ const C = {
   gold: "#FFB020"
 };
 const est1RM = (load, reps) => +(load * (1 + reps / 30)).toFixed(1);
+
+// Manually-built date string (e.g. "11 Aug 2026") — deliberately NOT using
+// toLocaleDateString(), since its output depends on the browser's compiled ICU
+// locale data, which can be incomplete on some mobile browsers/Android WebViews
+// and silently drop options like the year. This guarantees identical output
+// on every device regardless of locale support. Uses the same MONTHS_SHORT
+// array that parseSessionDate() already relies on to read dates back.
+const fmtDateDMY = d => `${String(d.getDate()).padStart(2, "0")} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
 // Load-velocity relationship: v = 0.15 + 1.0 × (1 − load/1RM), floored at 0.15 m/s
 const estVelocity = (load, oneRM) => +Math.max(0.15, 0.15 + 1.0 * (1 - load / Math.max(oneRM, load))).toFixed(2);
 const calcPower = (load, vel) => Math.round(load * 9.81 * vel); // Watts (mean per rep)
@@ -392,6 +400,20 @@ const injuryIndex = (curr, prev) => {
 };
 const initials = name => name.trim().split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
 const AV_COLS = [C.accent, C.blue, "#AA44FF", C.gold, "#FF5060", "#FF8020", "#44AAFF", "#FF44AA"];
+
+// Complex (superset/tri-set/giant set) — auto-labeled by member count, auto-coloured.
+const COMPLEX_COLORS = ["#FF8020", "#44AAFF", "#AA44FF", "#00C896", "#FF44AA", "#FFB020"];
+const complexLabel = n => n <= 2 ? "SS" : n === 3 ? "TS" : "GS";
+const complexColorFor = idx => COMPLEX_COLORS[idx % COMPLEX_COLORS.length];
+// Display text for a complex's rest config, matching the individual-exercise pattern
+// e.g. "💤 1:30 (+10s/round)" or "💤 90s (🌊 2 turns)" or flat "💤 90s".
+function fmtComplexRest(cx) {
+  if (cx.restSecs == null) return fmtRest(cx.restBetweenRounds); // legacy complexes
+  const base = fmtRest(cx.restSecs);
+  if (!cx.restIncrementAmt) return base;
+  if ((cx.restTurns || []).length > 0) return `${base} (🌊 wave, ${cx.restTurns.length} turn${cx.restTurns.length !== 1 ? "s" : ""})`;
+  return `${base} (${cx.restIncrementDir}${fmtRest(cx.restIncrementAmt)}/round)`;
+}
 const avCol = idx => AV_COLS[idx % AV_COLS.length];
 
 // Isometric helpers
@@ -3012,6 +3034,376 @@ function SessionDetailSheet({
 
 // ─── Client Switcher ──────────────────────────────────────────────────────────
 
+function ComplexEditorModal({
+  exerciseNames,
+  complex,
+  colorIdx,
+  onSave,
+  onDelete,
+  onClose,
+  isOverrideMode
+}) {
+  const [picked, setPicked] = useState(complex?.exerciseNames || []);
+  const [restSecs, setRestSecs] = useState(complex?.restSecs ? String(complex.restSecs) : complex?.restBetweenRounds ? String(complex.restBetweenRounds) : "90");
+  const [restIncrementDir, setRestIncrementDir] = useState(complex?.restIncrementDir || "+");
+  const [restIncrementAmt, setRestIncrementAmt] = useState(complex?.restIncrementAmt != null ? String(complex.restIncrementAmt) : "0");
+  const [restTurns, setRestTurns] = useState(complex?.restTurns || []);
+  const [confirmingDelete, setConfirmingDelete] = useState(!!complex?._startDeleteConfirm);
+  const toggle = name => setPicked(p => p.includes(name) ? p.filter(x => x !== name) : [...p, name]);
+  const label = complexLabel(picked.length);
+  const color = complexColorFor(colorIdx);
+  if (confirmingDelete) {
+    return /*#__PURE__*/React.createElement(Sheet, {
+      title: isOverrideMode ? "↺ REVERT TO ORIGINAL?" : "🗑 DELETE COMPLEX?",
+      onClose: () => setConfirmingDelete(false)
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 14,
+        color: C.text,
+        lineHeight: 1.6,
+        marginBottom: 20,
+        textAlign: "center"
+      }
+    }, isOverrideMode ? /*#__PURE__*/React.createElement(React.Fragment, null, "Clear your session adjustment?", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: C.muted
+      }
+    }, "Reverts back to the program's original complex for the rest of this session. Nothing permanent is affected.")) : /*#__PURE__*/React.createElement(React.Fragment, null, "Delete this complex?", /*#__PURE__*/React.createElement("br", null), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: C.muted
+      }
+    }, "The exercises themselves are unaffected — only the grouping is removed."))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setConfirmingDelete(false),
+      style: {
+        flex: 1,
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 10,
+        padding: "13px",
+        color: C.sub,
+        cursor: "pointer",
+        fontSize: 14,
+        fontWeight: 700
+      }
+    }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+      onClick: onDelete,
+      style: {
+        flex: 1,
+        background: isOverrideMode ? C.gold : C.warn,
+        color: isOverrideMode ? "#1A1200" : "#fff",
+        border: "none",
+        borderRadius: 10,
+        padding: "13px",
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: 18,
+        letterSpacing: 2,
+        cursor: "pointer"
+      }
+    }, isOverrideMode ? "REVERT" : "DELETE")));
+  }
+  return /*#__PURE__*/React.createElement(Sheet, {
+    title: isOverrideMode ? "✎ ADJUST FOR TODAY" : complex ? "✎ EDIT COMPLEX" : "🔗 NEW COMPLEX",
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.sub,
+      lineHeight: 1.6,
+      marginBottom: 16
+    }
+  }, "Select 2 or more exercises to link into a superset/tri-set/giant set. No rest between exercises within a round — the rest you set here applies once, after completing the last exercise, before the round repeats."), picked.length >= 2 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: color + "18",
+      border: `1px solid ${color}55`,
+      borderRadius: 10,
+      padding: "8px 12px",
+      marginBottom: 14,
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 18,
+      letterSpacing: 1,
+      color
+    }
+  }, label, " · ", picked.length, " exercises")), /*#__PURE__*/React.createElement(Lbl, {
+    t: "Exercises in this complex (in order)"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxHeight: 280,
+      overflowY: "auto",
+      marginTop: 4,
+      marginBottom: 16
+    }
+  }, exerciseNames.map(name => {
+    const isPicked = picked.includes(name);
+    const orderNum = picked.indexOf(name) + 1;
+    return /*#__PURE__*/React.createElement("div", {
+      key: name,
+      onClick: () => toggle(name),
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 12px",
+        background: isPicked ? C.card2 : "transparent",
+        borderRadius: 10,
+        marginBottom: 6,
+        border: `1px solid ${isPicked ? color + "77" : C.border}`,
+        cursor: "pointer"
+      }
+    }, isPicked && /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 22,
+        height: 22,
+        borderRadius: "50%",
+        background: color,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 11,
+        color: "#1A0800",
+        fontWeight: 700,
+        flexShrink: 0
+      }
+    }, orderNum), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: 600,
+        color: C.text
+      }
+    }, name), !isPicked && /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        border: `1.5px solid ${C.border}`
+      }
+    }));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Rest between rounds (base)"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: restSecs,
+    onChange: e => setRestSecs(e.target.value),
+    style: ss
+  }, REST_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, fmtRest(v))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 70
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Trend"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: restIncrementDir,
+    onChange: e => setRestIncrementDir(e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "+"
+  }, "+"), /*#__PURE__*/React.createElement("option", {
+    value: "-"
+  }, "−"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Increment per round"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: restIncrementAmt,
+    onChange: e => setRestIncrementAmt(e.target.value),
+    style: ss
+  }, INCREMENT_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v === 0 ? "None (flat rest)" : fmtRest(v)))))), +restIncrementAmt > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, restTurns.map((t, ti) => /*#__PURE__*/React.createElement("div", {
+    key: ti,
+    style: {
+      background: C.card,
+      borderRadius: 8,
+      padding: "10px",
+      marginBottom: 8,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase"
+    }
+  }, "🌊 Turn ", ti + 1), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setRestTurns(rt => rt.filter((_, i) => i !== ti)),
+    style: {
+      background: "none",
+      border: "none",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 12
+    }
+  }, "🗑 Remove")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Switch trend after round #"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.afterSet,
+    onChange: e => {
+      const nt = [...restTurns];
+      nt[ti] = {
+        ...nt[ti],
+        afterSet: +e.target.value
+      };
+      setRestTurns(nt);
+    },
+    style: ss
+  }, TURN_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, "Round ", v)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 70
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "New trend"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.dir,
+    onChange: e => {
+      const nt = [...restTurns];
+      nt[ti] = {
+        ...nt[ti],
+        dir: e.target.value
+      };
+      setRestTurns(nt);
+    },
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "+"
+  }, "+"), /*#__PURE__*/React.createElement("option", {
+    value: "-"
+  }, "−"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "New increment"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.amt,
+    onChange: e => {
+      const nt = [...restTurns];
+      nt[ti] = {
+        ...nt[ti],
+        amt: +e.target.value
+      };
+      setRestTurns(nt);
+    },
+    style: ss
+  }, INCREMENT_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v === 0 ? "None (flat)" : fmtRest(v)))))))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const lastRound = restTurns.length ? restTurns[restTurns.length - 1].afterSet : 3;
+      setRestTurns(rt => [...rt, {
+        afterSet: Math.min(20, lastRound + 2),
+        dir: "+",
+        amt: 0
+      }]);
+    },
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px dashed ${color}55`,
+      borderRadius: 8,
+      padding: "8px",
+      cursor: "pointer",
+      color,
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 8
+    }
+  }, "🌊 + Add trend change")), +restIncrementAmt > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color,
+      marginBottom: 16,
+      fontWeight: 600,
+      lineHeight: 1.6
+    }
+  }, "Preview: ", [1, 2, 3, 4, 5, 6].map(n => `Rd${n}→${n + 1} ${fmtRest(calcIncrementalRest(+restSecs, restIncrementDir, +restIncrementAmt, n, restTurns))}`).join(" · ")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, complex && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirmingDelete(true),
+    style: {
+      flex: 1,
+      background: "none",
+      border: `1px solid ${isOverrideMode ? C.gold : C.warn}55`,
+      borderRadius: 10,
+      padding: "12px",
+      color: isOverrideMode ? C.gold : C.warn,
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, isOverrideMode ? "↺ Revert to Original" : "🗑 Delete"), /*#__PURE__*/React.createElement("button", {
+    disabled: picked.length < 2,
+    onClick: () => onSave({
+      exerciseNames: picked,
+      restSecs: +restSecs,
+      restIncrementDir,
+      restIncrementAmt: +restIncrementAmt,
+      restTurns
+    }),
+    style: {
+      flex: 2,
+      background: picked.length < 2 ? C.border : color,
+      color: "#1A0800",
+      border: "none",
+      borderRadius: 10,
+      padding: "13px",
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 20,
+      letterSpacing: 2,
+      cursor: picked.length < 2 ? "default" : "pointer"
+    }
+  }, "SAVE COMPLEX")));
+}
 function GroupEditorModal({
   clients,
   group,
@@ -3860,6 +4252,10 @@ function EditProgramModal({
   const [exercises, setExercises] = useState(program.exercises.map(e => ({
     ...e
   })));
+  const [complexes, setComplexes] = useState(program.complexes ? program.complexes.map(c => ({
+    ...c
+  })) : []);
+  const [editingComplex, setEditingComplex] = useState(undefined); // undefined=closed, null=new, {..}=edit
   const [confirmDeleteProgram, setConfirmDeleteProgram] = useState(false);
   const upd = (k, v) => setForm(f => ({
     ...f,
@@ -3870,7 +4266,8 @@ function EditProgramModal({
     onSave({
       ...program,
       ...form,
-      exercises
+      exercises,
+      complexes
     });
     onClose();
   };
@@ -3989,6 +4386,116 @@ function EditProgramModal({
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginTop: 18,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Complexes (Permanent)"
+  }), exercises.length >= 2 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditingComplex(null),
+    style: {
+      background: "none",
+      border: `1px dashed ${C.border}`,
+      borderRadius: 8,
+      padding: "5px 10px",
+      cursor: "pointer",
+      color: C.gold,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, "🔗 New Complex")), exercises.length < 2 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted,
+      marginBottom: 8
+    }
+  }, "Add at least 2 exercises above to create a complex.") : complexes.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      borderRadius: 12,
+      padding: "14px",
+      textAlign: "center",
+      border: `1px dashed ${C.border}`,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.muted
+    }
+  }, "No permanent complexes yet — this program logs each exercise independently.")) : complexes.map((cx, idx) => {
+    const color = complexColorFor(idx);
+    return /*#__PURE__*/React.createElement("div", {
+      key: idx,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        background: C.card,
+        borderRadius: 12,
+        padding: "10px 12px",
+        marginBottom: 8,
+        border: `1px solid ${color}44`
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: 16,
+        color,
+        letterSpacing: 1,
+        flexShrink: 0
+      }
+    }, complexLabel(cx.exerciseNames.length)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.text
+      }
+    }, cx.exerciseNames.join(" → ")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.muted
+      }
+    }, "💤 ", fmtComplexRest(cx))), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditingComplex({
+        ...cx,
+        _idx: idx
+      }),
+      style: {
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        cursor: "pointer",
+        color: C.sub,
+        fontSize: 12,
+        flexShrink: 0
+      }
+    }, "✎"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditingComplex({
+        ...cx,
+        _idx: idx,
+        _startDeleteConfirm: true
+      }),
+      style: {
+        background: "none",
+        border: `1px solid ${C.warn}44`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        cursor: "pointer",
+        color: C.warn,
+        fontSize: 12,
+        flexShrink: 0
+      }
+    }, "🗑"));
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
       gap: 10,
       marginTop: 18,
       flexDirection: "column"
@@ -4038,7 +4545,20 @@ function EditProgramModal({
       letterSpacing: 2,
       cursor: "pointer"
     }
-  }, "SAVE CHANGES"))));
+  }, "SAVE CHANGES"))), editingComplex !== undefined && /*#__PURE__*/React.createElement(ComplexEditorModal, {
+    exerciseNames: exercises.map(e => e.name),
+    complex: editingComplex,
+    colorIdx: editingComplex ? editingComplex._idx : complexes.length,
+    onSave: fields => {
+      if (editingComplex) setComplexes(cs => cs.map((c, i) => i === editingComplex._idx ? fields : c));else setComplexes(cs => [...cs, fields]);
+      setEditingComplex(undefined);
+    },
+    onDelete: () => {
+      setComplexes(cs => cs.filter((_, i) => i !== editingComplex._idx));
+      setEditingComplex(undefined);
+    },
+    onClose: () => setEditingComplex(undefined)
+  }));
 }
 
 // ─── Programs Tab ─────────────────────────────────────────────────────────────
@@ -4592,12 +5112,47 @@ function LogTab({
   onDeleteEntry,
   onUpdateEntry
 }) {
-  const today = new Date().toLocaleDateString("en-ZA", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  });
+  const today = fmtDateDMY(new Date());
   const progExNames = program ? program.exercises.map(e => e.name) : [];
+
+  // Session-only complexes (superset/tri-set/giant set) — created fresh in the
+  // Log tab, distinct from a program's permanent Complexes. Reset whenever the
+  // active program changes, since they're tied to that program's own exercises.
+  const [sessionComplexes, setSessionComplexes] = useState([]);
+  const [editingSessionComplex, setEditingSessionComplex] = useState(undefined);
+
+  // Session-only OVERRIDE of a permanent complex — lets the trainer adjust a
+  // program-level complex just for today (different members, different rest
+  // pattern) without touching the permanent definition. Keyed by the permanent
+  // complex's index in program.complexes. Resets on program change, same as above.
+  const [sessionComplexOverrides, setSessionComplexOverrides] = useState({});
+  const [editingComplexOverrideIdx, setEditingComplexOverrideIdx] = useState(undefined);
+
+  // Session-only VOID of a permanent complex — for when the trainer decides on
+  // the day to have the client perform each exercise independently, without
+  // deleting or editing the complex's permanent definition. Just a toggle:
+  // voided complexes are excluded from grouping/timer behaviour but stay listed
+  // (dimmed) so they're easy to re-enable. Resets on program change.
+  const [voidedComplexIdxs, setVoidedComplexIdxs] = useState([]);
+
+  // Merge permanent (program-level) and session-only complexes for use in the
+  // pill bar and rest-timer logic below. Each gets a stable colour index across
+  // both sources so permanent and session complexes never accidentally share a colour.
+  const allComplexes = [...(program?.complexes || []).map((c, i) => ({
+    ...c,
+    ...(sessionComplexOverrides[i] || {}),
+    _colorIdx: i,
+    _permanent: true,
+    _srcIdx: i,
+    _overridden: !!sessionComplexOverrides[i],
+    _voided: voidedComplexIdxs.includes(i)
+  })), ...sessionComplexes.map((c, i) => ({
+    ...c,
+    _colorIdx: (program?.complexes?.length || 0) + i,
+    _permanent: false,
+    _srcIdx: i
+  }))];
+  const complexForEx = name => allComplexes.find(c => !c._voided && c.exerciseNames.includes(name));
   const [activeEx, setActiveEx] = useState(progExNames[0] || "");
   const [form, setForm] = useState({
     reps: "",
@@ -4687,6 +5242,9 @@ function LogTab({
       conSecs: ""
     });
     setEditingTempo(false);
+    setSessionComplexes([]);
+    setSessionComplexOverrides({});
+    setVoidedComplexIdxs([]);
   }, [program?.id]);
 
   // When switching exercise, clear reps/load but keep set type & rpe/rir
@@ -4694,6 +5252,7 @@ function LogTab({
     setActiveEx(name);
     setForm(f => ({
       ...f,
+      setNo: String(nextSetNumber(name)),
       reps: "",
       load: "",
       velocity: "",
@@ -4790,6 +5349,19 @@ function LogTab({
   const effLoadLive = Math.max(0, (form.load ? +form.load : 0) + bandSignedLive);
   const vol = form.reps && effLoadLive ? +form.reps * effLoadLive : 0;
   const sessions = program?.sessions || [];
+
+  // Suggested Set # = smallest positive integer not already used today for this
+  // exercise. Naturally auto-increments in the normal case (1,2,3 logged → next
+  // is 4), but also fills gaps left by a deleted set (1,3 logged, 2 missing →
+  // next suggestion is 2, so redoing a deleted set reuses its original number).
+  const nextSetNumber = (exName, extraUsed) => {
+    const todaySession = sessions.at(-1);
+    const used = new Set(todaySession && todaySession.date === today ? todaySession.entries.filter(e => e.ex === exName).map(e => e.set) : []);
+    if (extraUsed != null) used.add(extraUsed);
+    let n = 1;
+    while (used.has(n)) n++;
+    return n;
+  };
   // Group recent history by session (last 5 sessions that have this exercise)
   const recentSessions = sessions.filter(s => s.entries.some(e => e.ex === activeEx)).slice(-5).reverse().map(s => ({
     sid: s.id,
@@ -4859,6 +5431,7 @@ function LogTab({
     }
     setForm(f => ({
       ...f,
+      setNo: String(nextSetNumber(activeEx, +f.setNo)),
       reps: "",
       load: "",
       velocity: "",
@@ -4878,9 +5451,29 @@ function LogTab({
     setShowBand(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-    // Auto-start countdown only when the Rest Timer toggle is on, and only for
-    // freshly-logged sets — editing a past mistake shouldn't kick off a new rest.
-    if (!editingEntryRef && restTimerOn && restApplied) startRestTimer(restApplied);
+
+    // Complex-aware rest + auto-advance: within a round, no rest and move
+    // straight to the next exercise; at the end of a round, rest using the
+    // COMPLEX's own duration (not the individual exercise's setting), then
+    // cycle back to the first exercise, ready for the next round.
+    const cxForActive = !editingEntryRef ? complexForEx(activeEx) : null;
+    if (cxForActive) {
+      const idx = cxForActive.exerciseNames.indexOf(activeEx);
+      const isLastInRound = idx === cxForActive.exerciseNames.length - 1;
+      if (isLastInRound) {
+        if (restTimerOn) {
+          const roundRest = cxForActive.restSecs != null ? calcIncrementalRest(cxForActive.restSecs, cxForActive.restIncrementDir, cxForActive.restIncrementAmt, +form.setNo, cxForActive.restTurns) : cxForActive.restBetweenRounds; // legacy complexes saved before the wave system
+          startRestTimer(roundRest);
+        }
+        switchEx(cxForActive.exerciseNames[0]);
+      } else {
+        switchEx(cxForActive.exerciseNames[idx + 1]);
+      }
+    } else if (!editingEntryRef && restTimerOn && restApplied) {
+      // Auto-start countdown only when the Rest Timer toggle is on, and only for
+      // freshly-logged sets — editing a past mistake shouldn't kick off a new rest.
+      startRestTimer(restApplied);
+    }
   };
   if (!program) return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4957,6 +5550,18 @@ function LogTab({
   }, "Cancel"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       onDeleteEntry(confirmDelete.sessionId, confirmDelete.entryIdx);
+      // Deleted sets now cascade-renumber (Set 2 becomes Set 1, etc.),
+      // so the next suggested Set # for this exercise is simply the
+      // original count before deletion — after removing one and
+      // renumbering, that's exactly where the sequence continues from.
+      const todaySession = sessions.at(-1);
+      if (confirmDelete.ex === activeEx && todaySession && todaySession.date === today && confirmDelete.sessionId === todaySession.id) {
+        const originalCount = todaySession.entries.filter(e => e.ex === confirmDelete.ex).length;
+        setForm(f => ({
+          ...f,
+          setNo: String(originalCount)
+        }));
+      }
       setConfirmDelete(null);
     },
     style: {
@@ -4971,7 +5576,50 @@ function LogTab({
       letterSpacing: 2,
       cursor: "pointer"
     }
-  }, "DELETE"))), /*#__PURE__*/React.createElement("div", {
+  }, "DELETE"))), editingSessionComplex !== undefined && /*#__PURE__*/React.createElement(ComplexEditorModal, {
+    exerciseNames: progExNames,
+    complex: editingSessionComplex,
+    colorIdx: editingSessionComplex ? (program?.complexes?.length || 0) + editingSessionComplex._srcIdx : allComplexes.length,
+    onSave: fields => {
+      if (editingSessionComplex) setSessionComplexes(cs => cs.map((c, i) => i === editingSessionComplex._srcIdx ? fields : c));else setSessionComplexes(cs => [...cs, fields]);
+      setEditingSessionComplex(undefined);
+    },
+    onDelete: () => {
+      setSessionComplexes(cs => cs.filter((_, i) => i !== editingSessionComplex._srcIdx));
+      setEditingSessionComplex(undefined);
+    },
+    onClose: () => setEditingSessionComplex(undefined)
+  }), editingComplexOverrideIdx !== undefined && (() => {
+    const effective = allComplexes.find(c => c._permanent && c._srcIdx === editingComplexOverrideIdx);
+    if (!effective) return null;
+    return /*#__PURE__*/React.createElement(ComplexEditorModal, {
+      exerciseNames: progExNames,
+      complex: effective,
+      colorIdx: editingComplexOverrideIdx,
+      isOverrideMode: true,
+      onSave: fields => {
+        setSessionComplexOverrides(o => ({
+          ...o,
+          [editingComplexOverrideIdx]: fields
+        }));
+        setEditingComplexOverrideIdx(undefined);
+      },
+      onDelete: () => {
+        // "Delete" here means clearing the session-only override, reverting
+        // to the program's original permanent complex — never actually
+        // deletes the permanent complex itself, which stays Programs-only.
+        setSessionComplexOverrides(o => {
+          const n = {
+            ...o
+          };
+          delete n[editingComplexOverrideIdx];
+          return n;
+        });
+        setEditingComplexOverrideIdx(undefined);
+      },
+      onClose: () => setEditingComplexOverrideIdx(undefined)
+    });
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
@@ -4990,13 +5638,15 @@ function LogTab({
     const isActive = name === activeEx;
     // count today's sets already logged for this exercise
     const todaySets = sessions.at(-1)?.date === today ? sessions.at(-1).entries.filter(e => e.ex === name).length : 0;
+    const cx = complexForEx(name);
+    const cxColor = cx ? complexColorFor(cx._colorIdx) : null;
     return /*#__PURE__*/React.createElement("button", {
       key: name,
       onClick: () => switchEx(name),
       style: {
-        background: isActive ? C.accent : C.card2,
-        color: isActive ? "#001A12" : C.sub,
-        border: `1.5px solid ${isActive ? C.accent : C.border}`,
+        background: isActive ? cxColor || C.accent : C.card2,
+        color: isActive ? "#1A0800" : C.sub,
+        border: `1.5px solid ${isActive ? cxColor || C.accent : cxColor || C.border}`,
         borderRadius: 22,
         padding: "8px 14px",
         fontSize: 12,
@@ -5010,7 +5660,30 @@ function LogTab({
         minWidth: 80,
         position: "relative"
       }
-    }, /*#__PURE__*/React.createElement("span", {
+    }, cx && /*#__PURE__*/React.createElement("span", {
+      onClick: e => {
+        if (!cx._permanent) {
+          e.stopPropagation();
+          setEditingSessionComplex({
+            ...cx,
+            _srcIdx: cx._srcIdx
+          });
+        }
+      },
+      style: {
+        position: "absolute",
+        top: -7,
+        right: -4,
+        background: cxColor,
+        color: "#1A0800",
+        fontSize: 9,
+        fontWeight: 700,
+        borderRadius: 8,
+        padding: "1px 5px",
+        lineHeight: 1.4,
+        cursor: cx._permanent ? "default" : "pointer"
+      }
+    }, complexLabel(cx.exerciseNames.length)), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12
       }
@@ -5021,6 +5694,21 @@ function LogTab({
       }
     }, todaySets, " set", todaySets !== 1 ? "s" : ""));
   }), progExNames.length > 1 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditingSessionComplex(null),
+    style: {
+      background: C.gold + "15",
+      border: `1px dashed ${C.gold + "55"}`,
+      borderRadius: 22,
+      padding: "8px 12px",
+      fontSize: 11,
+      color: C.gold,
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      gap: 4,
+      cursor: "pointer"
+    }
+  }, "🔗 Create Complex"), progExNames.length > 1 && /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowSupersetInfo(true),
     style: {
       background: C.gold + "15",
@@ -5035,7 +5723,140 @@ function LogTab({
       gap: 4,
       cursor: "pointer"
     }
-  }, "⚡ Complex sets"))), /*#__PURE__*/React.createElement("div", {
+  }, "⚡ Complex sets"))), allComplexes.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(SecLabel, {
+    text: "Active Complexes"
+  }), allComplexes.map((cx, i) => {
+    const color = complexColorFor(cx._colorIdx);
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        background: C.card,
+        borderRadius: 12,
+        padding: "10px 12px",
+        marginBottom: 8,
+        border: `1px solid ${color}44`,
+        opacity: cx._voided ? 0.55 : 1
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: 16,
+        color,
+        letterSpacing: 1,
+        flexShrink: 0
+      }
+    }, complexLabel(cx.exerciseNames.length)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.text,
+        textDecoration: cx._voided ? "line-through" : "none"
+      }
+    }, cx.exerciseNames.join(" → ")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.muted
+      }
+    }, cx._voided ? "⏸ Voided for today — each exercise runs independently" : /*#__PURE__*/React.createElement(React.Fragment, null, "💤 ", fmtComplexRest(cx), cx._permanent ? cx._overridden ? " · Permanent (session-adjusted)" : " · Permanent" : " · Session only"))), cx._permanent ? cx._voided ? /*#__PURE__*/React.createElement("button", {
+      onClick: () => setVoidedComplexIdxs(v => v.filter(x => x !== cx._srcIdx)),
+      style: {
+        background: C.accent + "18",
+        border: `1px solid ${C.accent}55`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        cursor: "pointer",
+        color: C.accent,
+        fontSize: 11,
+        fontWeight: 700,
+        flexShrink: 0
+      }
+    }, "▶ Re-enable") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditingComplexOverrideIdx(cx._srcIdx),
+      style: {
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        cursor: "pointer",
+        color: C.sub,
+        fontSize: 12,
+        flexShrink: 0
+      }
+    }, "✎"), cx._overridden && /*#__PURE__*/React.createElement("button", {
+      onClick: () => setSessionComplexOverrides(o => {
+        const n = {
+          ...o
+        };
+        delete n[cx._srcIdx];
+        return n;
+      }),
+      title: "Revert to the program's original complex for the rest of this session",
+      style: {
+        background: "none",
+        border: `1px solid ${C.gold}44`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        cursor: "pointer",
+        color: C.gold,
+        fontSize: 12,
+        flexShrink: 0
+      }
+    }, "↺"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setVoidedComplexIdxs(v => [...v, cx._srcIdx]),
+      title: "Skip the complex grouping for today — each exercise runs on its own",
+      style: {
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        cursor: "pointer",
+        color: C.sub,
+        fontSize: 12,
+        flexShrink: 0
+      }
+    }, "⏸")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditingSessionComplex({
+        ...cx,
+        _srcIdx: cx._srcIdx
+      }),
+      style: {
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        cursor: "pointer",
+        color: C.sub,
+        fontSize: 12,
+        flexShrink: 0
+      }
+    }, "✎"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditingSessionComplex({
+        ...cx,
+        _srcIdx: cx._srcIdx,
+        _startDeleteConfirm: true
+      }),
+      style: {
+        background: "none",
+        border: `1px solid ${C.warn}44`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        cursor: "pointer",
+        color: C.warn,
+        fontSize: 12,
+        flexShrink: 0
+      }
+    }, "🗑")));
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -7155,6 +7976,8 @@ function LogTab({
       onClick: () => setConfirmDelete({
         sessionId: todaySessionId,
         entryIdx: idx,
+        ex: e.ex,
+        setNumber: e.set,
         label: `Set ${e.set} (${e.reps}×${e.load}kg)`
       }),
       style: {
@@ -7354,6 +8177,8 @@ function LogTab({
         onClick: () => setConfirmDelete({
           sessionId: s.sid,
           entryIdx: idx,
+          ex: e.ex,
+          setNumber: e.set,
           label: `Set ${e.set} from ${s.date} (${e.reps}×${e.load}kg)`
         }),
         style: {
@@ -9848,6 +10673,35 @@ const TABS = [{
 function App() {
   const [clients, setClients] = useState(() => lsGet('forge_clients', INIT_CLIENTS));
   const [activeClientId, setActiveClientId] = useState(() => lsGet('forge_activeClient', 'c1'));
+
+  // One-time migration: older sessions may have been saved with a date string
+  // missing the year (e.g. "11 Aug" instead of "11 Aug 2026") due to a browser
+  // locale-formatting bug that's now fixed at the source. Backfill the current
+  // year onto any date string that's missing one, so History displays correctly
+  // without needing every affected client to re-log anything.
+  useEffect(() => {
+    setClients(cs => {
+      let changed = false;
+      const fixed = cs.map(c => ({
+        ...c,
+        programs: c.programs.map(p => ({
+          ...p,
+          sessions: (p.sessions || []).map(s => {
+            const parts = (s.date || "").trim().split(/\s+/);
+            if (parts.length === 2) {
+              changed = true;
+              return {
+                ...s,
+                date: `${s.date} ${new Date().getFullYear()}`
+              };
+            }
+            return s;
+          })
+        }))
+      }));
+      return changed ? fixed : cs;
+    });
+  }, []);
   const [tab, setTab] = useState("programs");
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [showAddClient, setShowAddClient] = useState(false);
@@ -10327,7 +11181,10 @@ function App() {
   };
 
   // Delete a single logged set (identified by session id + its index within that
-  // session's entries array), scoped to the currently active program.
+  // session's entries array), scoped to the currently active program. Any
+  // remaining sets for the SAME exercise numbered after the deleted one get
+  // shifted down by one, so the sequence stays continuous (delete Set 1 of 2 →
+  // the old Set 2 becomes the new Set 1) rather than leaving a numbering gap.
   const deleteEntry = (sessionId, entryIdx) => {
     if (!activeProgram) return;
     updClient(activeClientId, c => ({
@@ -10336,9 +11193,22 @@ function App() {
         if (p.id !== c.activeProgramId) return p;
         return {
           ...p,
-          sessions: p.sessions.map(s => s.id !== sessionId ? s : {
-            ...s,
-            entries: s.entries.filter((_, i) => i !== entryIdx)
+          sessions: p.sessions.map(s => {
+            if (s.id !== sessionId) return s;
+            const deleted = s.entries[entryIdx];
+            const remaining = s.entries.filter((_, i) => i !== entryIdx);
+            if (!deleted) return {
+              ...s,
+              entries: remaining
+            };
+            const renumbered = remaining.map(e => e.ex === deleted.ex && e.set > deleted.set ? {
+              ...e,
+              set: e.set - 1
+            } : e);
+            return {
+              ...s,
+              entries: renumbered
+            };
           })
         };
       })
@@ -10421,7 +11291,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v62.1.4")), /*#__PURE__*/React.createElement("button", {
+  }, "v63.1.6")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
