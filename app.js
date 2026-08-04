@@ -434,6 +434,18 @@ const BAND_RANGES = {
 const REST_OPTIONS = Array.from({
   length: (900 - 20) / 5 + 1
 }, (_, i) => 20 + i * 5);
+// Intra-cluster rest starts lower than normal set rest (5s rest-pause is common),
+// so its own base-rest dropdown starts at 5s instead of 20s, same 5s steps.
+// Intra-cluster base rest: 5s-60s range (rest-pause style, much shorter than
+// normal set rest), in 1s steps for fine-grained control.
+const CLUSTER_REST_OPTIONS = Array.from({
+  length: 60 - 5 + 1
+}, (_, i) => 5 + i);
+// Intra-cluster increment per gap: 1s-30s range, 1s steps — much finer than
+// the 5s+ steps used for normal rest-between-sets increments.
+const CLUSTER_INCREMENT_OPTIONS = [0, ...Array.from({
+  length: 30
+}, (_, i) => i + 1)];
 
 // Increment magnitude options for incremental rest: fine steps early, coarser further out
 const INCREMENT_OPTIONS = [...Array.from({
@@ -465,6 +477,33 @@ function calcIncrementalRest(baseSecs, dir0, amt0, completedSetNo, turns) {
   if (!baseSecs) return null;
   const clamp = v => Math.min(900, Math.max(10, v));
   const n = Math.max(1, completedSetNo || 1);
+  const phases = [{
+    start: 1,
+    dir: dir0,
+    amt: amt0
+  }, ...(turns || []).filter(t => t && t.afterSet).map(t => ({
+    start: +t.afterSet,
+    dir: t.dir,
+    amt: +t.amt || 0
+  }))].sort((a, b) => a.start - b.start);
+  let rest = baseSecs;
+  for (let s = 2; s <= n; s++) {
+    let active = phases[0];
+    for (const p of phases) {
+      if (p.start <= s - 1) active = p;
+    }
+    rest = clamp(rest + (active.amt || 0) * (active.dir === "-" ? -1 : 1));
+  }
+  return clamp(rest);
+}
+// Same wave logic as calcIncrementalRest, but for intra-cluster gaps specifically —
+// deliberately a much lower floor (1s vs 10s), since rest-pause style cluster
+// training legitimately uses very short gaps (5s and below), which the normal
+// rest-between-sets floor would otherwise incorrectly clamp upward.
+function calcClusterGapRest(baseSecs, dir0, amt0, gapNo, turns) {
+  if (!baseSecs) return null;
+  const clamp = v => Math.min(900, Math.max(1, v));
+  const n = Math.max(1, gapNo || 1);
   const phases = [{
     start: 1,
     dir: dir0,
@@ -2940,12 +2979,12 @@ function SessionDetailSheet({
       fontSize: 11,
       color: C.warn
     }
-  }, "🔴 ", e.bandLength, " ", e.bandStrength, " (", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", e.bandUsage, ")", e.rawLoad != null && e.bandLoadKg ? ` — ${e.rawLoad}kg plate ${e.bandUsage === "assisted" ? "−" : "+"} ${e.bandLoadKg}kg band = ${e.load}kg effective` : ""), e.clusterReps && /*#__PURE__*/React.createElement("div", {
+  }, "🔴 ", e.bandLength, " ", e.bandStrength, " (", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", e.bandUsage, ")", e.rawLoad != null && e.bandLoadKg ? ` — ${e.rawLoad}kg plate ${e.bandUsage === "assisted" ? "−" : "+"} ${e.bandLoadKg}kg band = ${e.load}kg effective` : ""), (e.clusterRepsArr?.length || e.clusterReps) && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: C.gold
     }
-  }, "⏱ ", e.clusterCount, "×", e.clusterReps, " clusters", e.clusterRest ? ` (${e.clusterRest}s rest)` : ""), e.restApplied && /*#__PURE__*/React.createElement("div", {
+  }, "⏱ ", e.clusterRepsArr?.length ? e.clusterRepsArr.join("+") + " reps" : `${e.clusterCount}×${e.clusterReps}`, " clusters", e.clusterGaps?.length ? ` (${e.clusterGaps.map(g => fmtRest(g)).join(" → ")} rest)` : e.clusterRest ? ` (${e.clusterRest}s rest)` : ""), e.restApplied && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: C.blue
@@ -5172,6 +5211,7 @@ function LogTab({
     bandLoadKg: "",
     comment: "",
     clusterReps: "",
+    clusterRepsArr: [],
     clusterCount: "",
     clusterRest: ""
   });
@@ -5233,6 +5273,7 @@ function LogTab({
       bandLoadKg: "",
       comment: "",
       clusterReps: "",
+      clusterRepsArr: [],
       clusterCount: "",
       clusterRest: ""
     });
@@ -5266,6 +5307,7 @@ function LogTab({
       bandLoadKg: "",
       comment: "",
       clusterReps: "",
+      clusterRepsArr: [],
       clusterCount: "",
       clusterRest: ""
     }));
@@ -5309,6 +5351,7 @@ function LogTab({
       bandLoadKg: entry.bandLoadKg != null ? String(entry.bandLoadKg) : "",
       comment: entry.comment || "",
       clusterReps: entry.clusterReps != null ? String(entry.clusterReps) : "",
+      clusterRepsArr: entry.clusterRepsArr?.length ? entry.clusterRepsArr.map(String) : entry.clusterReps != null && entry.clusterCount != null ? Array(entry.clusterCount).fill(String(entry.clusterReps)) : [],
       clusterCount: entry.clusterCount != null ? String(entry.clusterCount) : "",
       clusterRest: entry.clusterRest != null ? String(entry.clusterRest) : ""
     }));
@@ -5336,6 +5379,25 @@ function LogTab({
   const [rmCalcN, setRmCalcN] = useState("2");
   const [rmCalcRIR, setRmCalcRIR] = useState("1");
   const rmCalc = calcManualRM(allClientSessions, activeEx, rmCalcN, rmCalcRIR);
+
+  // Intra-cluster rest — escalates PER GAP BETWEEN CLUSTERS within one set
+  // (Gap 1→2, Gap 2→3...), NOT per set. Auto-resets to a clean default (5s,
+  // flat) every time Set # changes, but stays fully editable so any specific
+  // set can be given its own base/trend/increment manually.
+  const [clusterRestBase, setClusterRestBase] = useState("5");
+  const [clusterRestDir, setClusterRestDir] = useState("+");
+  const [clusterRestIncAmt, setClusterRestIncAmt] = useState("0");
+  const [clusterRestTurnsCfg, setClusterRestTurnsCfg] = useState([]);
+  const prevSetNoRef = React.useRef(form.setNo);
+  useEffect(() => {
+    if (prevSetNoRef.current !== form.setNo) {
+      setClusterRestBase("5");
+      setClusterRestDir("+");
+      setClusterRestIncAmt("0");
+      setClusterRestTurnsCfg([]);
+      prevSetNoRef.current = form.setNo;
+    }
+  }, [form.setNo]);
 
   // When arriving here via a pill tap (quick-switch), jump straight to whichever
   // exercise that client's rest timer belongs to, rather than leaving them on
@@ -5411,8 +5473,19 @@ function LogTab({
       bandLoadKg: bandKg || null,
       comment: form.comment || null,
       clusterReps: isClusterSet(form.type) && form.clusterReps ? +form.clusterReps : null,
+      // legacy uniform value, kept for older data
+      clusterRepsArr: isClusterSet(form.type) && (form.clusterRepsArr || []).length > 0 ? form.clusterRepsArr.map(v => +v || 0) : null,
       clusterCount: isClusterSet(form.type) && form.clusterCount ? +form.clusterCount : null,
+      clusterGaps: (() => {
+        if (!isClusterSet(form.type) || !clusterRestBase) return null;
+        const numGaps = Math.max(0, (+form.clusterCount || 0) - 1);
+        if (numGaps <= 0) return null;
+        return Array.from({
+          length: numGaps
+        }, (_, i) => calcClusterGapRest(+clusterRestBase, clusterRestDir, +clusterRestIncAmt, i + 1, clusterRestTurnsCfg));
+      })(),
       clusterRest: isClusterSet(form.type) && form.clusterRest ? +form.clusterRest : null,
+      // legacy field, kept for older data compatibility
       restApplied: restApplied || null,
       equipUsed: equipOverride || null,
       latUsed: latOverride || null,
@@ -5445,6 +5518,7 @@ function LogTab({
       bandLoadKg: "",
       comment: "",
       clusterReps: "",
+      clusterRepsArr: [],
       clusterCount: "",
       clusterRest: ""
     }));
@@ -6691,31 +6765,7 @@ function LogTab({
     }
   }, "⏱ Cluster Set breakdown"), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      gap: 10,
       marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement(Lbl, {
-    t: "Reps per cluster"
-  }), /*#__PURE__*/React.createElement("input", {
-    type: "number",
-    min: "1",
-    placeholder: "2",
-    value: form.clusterReps,
-    onChange: e => {
-      const cr = e.target.value;
-      upd("clusterReps", cr);
-      const cc = form.clusterCount;
-      if (cr && cc) upd("reps", String(+cr * +cc));
-    },
-    style: ss
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
     t: "Number of clusters"
@@ -6725,35 +6775,308 @@ function LogTab({
     placeholder: "3",
     value: form.clusterCount,
     onChange: e => {
-      const cc = e.target.value;
-      upd("clusterCount", cc);
-      const cr = form.clusterReps;
-      if (cr && cc) upd("reps", String(+cr * +cc));
+      const cc = Math.max(0, +e.target.value || 0);
+      upd("clusterCount", e.target.value);
+      // Resize the per-cluster reps array to match, preserving
+      // existing values and padding new slots with the last entry.
+      setForm(f => {
+        const arr = [...(f.clusterRepsArr || [])];
+        const fill = arr.length ? arr[arr.length - 1] : "2";
+        while (arr.length < cc) arr.push(fill);
+        arr.length = cc;
+        const total = arr.reduce((s, v) => s + (+v || 0), 0);
+        return {
+          ...f,
+          clusterRepsArr: arr,
+          reps: total > 0 ? String(total) : f.reps
+        };
+      });
     },
     style: ss
-  }))), /*#__PURE__*/React.createElement("div", {
+  })), (+form.clusterCount || 0) > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 4
+      marginBottom: 8
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
-    t: "Intra-cluster rest (s)"
+    t: "Reps per cluster (each cluster can differ)"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap"
+    }
+  }, (form.clusterRepsArr || []).map((v, ci) => /*#__PURE__*/React.createElement("div", {
+    key: ci,
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 2
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 9,
+      color: C.muted
+    }
+  }, "Cluster ", ci + 1), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0",
+    value: v,
+    placeholder: "2",
+    onChange: e => {
+      const val = e.target.value;
+      setForm(f => {
+        const arr = [...(f.clusterRepsArr || [])];
+        arr[ci] = val;
+        const total = arr.reduce((s, x) => s + (+x || 0), 0);
+        return {
+          ...f,
+          clusterRepsArr: arr,
+          reps: total > 0 ? String(total) : f.reps
+        };
+      });
+    },
+    style: {
+      ...ss,
+      width: 52,
+      padding: "6px 4px",
+      textAlign: "center"
+    }
+  }))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.gold,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 8
+    }
+  }, "Rest between clusters (this set)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Base rest (s)"
   }), /*#__PURE__*/React.createElement("select", {
-    value: form.clusterRest,
-    onChange: e => upd("clusterRest", e.target.value),
+    value: clusterRestBase,
+    onChange: e => setClusterRestBase(e.target.value),
     style: ss
   }, /*#__PURE__*/React.createElement("option", {
     value: ""
-  }, "Select…"), [5, 10, 15, 20, 25, 30].map(v => /*#__PURE__*/React.createElement("option", {
+  }, "Select…"), CLUSTER_REST_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
     key: v,
     value: v
-  }, v, "s (", v === 5 ? "rest-pause" : "cluster", ")")))), form.clusterReps && form.clusterCount && /*#__PURE__*/React.createElement("div", {
+  }, fmtRest(v))))), clusterRestBase && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
-      color: C.gold,
-      marginTop: 8,
-      fontWeight: 600
+      display: "flex",
+      gap: 8,
+      marginBottom: 6
     }
-  }, form.clusterCount, " clusters × ", form.clusterReps, " reps", form.clusterRest ? ` (${form.clusterRest}s rest between)` : "", " = ", /*#__PURE__*/React.createElement("strong", null, +form.clusterReps * +form.clusterCount, " total reps"))), isIsoType(form.type) && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 70
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Trend"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: clusterRestDir,
+    onChange: e => setClusterRestDir(e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "+"
+  }, "+"), /*#__PURE__*/React.createElement("option", {
+    value: "-"
+  }, "−"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Increment per gap"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: clusterRestIncAmt,
+    onChange: e => setClusterRestIncAmt(e.target.value),
+    style: ss
+  }, CLUSTER_INCREMENT_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v === 0 ? "None (flat rest)" : fmtRest(v)))))), +clusterRestIncAmt > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, clusterRestTurnsCfg.map((t, ti) => /*#__PURE__*/React.createElement("div", {
+    key: ti,
+    style: {
+      background: C.card,
+      borderRadius: 8,
+      padding: "10px",
+      marginBottom: 8,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: C.gold,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase"
+    }
+  }, "🌊 Turn ", ti + 1), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setClusterRestTurnsCfg(rt => rt.filter((_, i) => i !== ti)),
+    style: {
+      background: "none",
+      border: "none",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 12
+    }
+  }, "🗑 Remove")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Switch trend after gap #"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.afterSet,
+    onChange: e => {
+      const nt = [...clusterRestTurnsCfg];
+      nt[ti] = {
+        ...nt[ti],
+        afterSet: +e.target.value
+      };
+      setClusterRestTurnsCfg(nt);
+    },
+    style: ss
+  }, TURN_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, "Gap ", v)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 70
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "New trend"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.dir,
+    onChange: e => {
+      const nt = [...clusterRestTurnsCfg];
+      nt[ti] = {
+        ...nt[ti],
+        dir: e.target.value
+      };
+      setClusterRestTurnsCfg(nt);
+    },
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "+"
+  }, "+"), /*#__PURE__*/React.createElement("option", {
+    value: "-"
+  }, "−"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "New increment"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.amt,
+    onChange: e => {
+      const nt = [...clusterRestTurnsCfg];
+      nt[ti] = {
+        ...nt[ti],
+        amt: +e.target.value
+      };
+      setClusterRestTurnsCfg(nt);
+    },
+    style: ss
+  }, CLUSTER_INCREMENT_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v === 0 ? "None (flat)" : fmtRest(v)))))))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const lastGap = clusterRestTurnsCfg.length ? clusterRestTurnsCfg[clusterRestTurnsCfg.length - 1].afterSet : 2;
+      setClusterRestTurnsCfg(rt => [...rt, {
+        afterSet: Math.min(20, lastGap + 1),
+        dir: "+",
+        amt: 0
+      }]);
+    },
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px dashed ${C.gold}55`,
+      borderRadius: 8,
+      padding: "8px",
+      cursor: "pointer",
+      color: C.gold,
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 8
+    }
+  }, "🌊 + Add trend change")), (() => {
+    const numGaps = Math.max(0, (+form.clusterCount || 0) - 1);
+    if (numGaps <= 0) return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.gold + "12",
+        border: `1px solid ${C.gold}33`,
+        borderRadius: 8,
+        padding: "8px 10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.gold,
+        fontWeight: 700
+      }
+    }, "⚠️ Set \"Number of clusters\" above to 2 or more to see the gap pattern"));
+    const gaps = Array.from({
+      length: numGaps
+    }, (_, i) => calcClusterGapRest(+clusterRestBase, clusterRestDir, +clusterRestIncAmt, i + 1, clusterRestTurnsCfg));
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.gold + "12",
+        border: `1px solid ${C.gold}33`,
+        borderRadius: 8,
+        padding: "8px 10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.gold,
+        fontWeight: 700
+      }
+    }, "Gap pattern: ", gaps.map(g => fmtRest(g)).join(" → ")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        marginTop: 2
+      }
+    }, form.clusterCount, " clusters → ", numGaps, " gap", numGaps !== 1 ? "s" : "", " · resets to 5s flat for the next set unless you change it again"));
+  })())), (form.clusterRepsArr || []).length > 0 && (() => {
+    const numGaps = Math.max(0, (+form.clusterCount || 0) - 1);
+    const gaps = clusterRestBase && numGaps > 0 ? Array.from({
+      length: numGaps
+    }, (_, i) => calcClusterGapRest(+clusterRestBase, clusterRestDir, +clusterRestIncAmt, i + 1, clusterRestTurnsCfg)) : [];
+    const total = form.clusterRepsArr.reduce((s, v) => s + (+v || 0), 0);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.gold,
+        marginTop: 8,
+        fontWeight: 600
+      }
+    }, form.clusterRepsArr.map(v => v || "0").join("+"), " reps", gaps.length > 0 ? ` (${gaps.map(g => fmtRest(g)).join(" → ")} rest between)` : "", " = ", /*#__PURE__*/React.createElement("strong", null, total, " total reps"));
+  })()), isIsoType(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.card2,
       borderRadius: 10,
@@ -8084,12 +8407,12 @@ function LogTab({
           fontSize: 12,
           color: C.warn
         }
-      }, " · 🔴 ", e.bandLength, " ", e.bandStrength, " ", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", "(", e.bandUsage, ")"), e.clusterReps && /*#__PURE__*/React.createElement("span", {
+      }, " · 🔴 ", e.bandLength, " ", e.bandStrength, " ", e.bandLoadKg ? `${e.bandLoadKg}kg ` : "", "(", e.bandUsage, ")"), (e.clusterRepsArr?.length || e.clusterReps) && /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 12,
           color: C.gold
         }
-      }, " · ⏱ ", e.clusterCount, "×", e.clusterReps, " clusters"), e.restApplied && /*#__PURE__*/React.createElement("span", {
+      }, " · ⏱ ", e.clusterRepsArr?.length ? e.clusterRepsArr.join("+") + " reps" : `${e.clusterCount}×${e.clusterReps}`, " clusters", e.clusterGaps?.length ? ` (${e.clusterGaps.map(g => fmtRest(g)).join(" → ")})` : ""), e.restApplied && /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 12,
           color: C.blue
@@ -11117,7 +11440,9 @@ function App() {
     bandLoadKg,
     comment,
     clusterReps,
+    clusterRepsArr,
     clusterCount,
+    clusterGaps,
     clusterRest,
     restApplied,
     equipUsed,
@@ -11148,7 +11473,9 @@ function App() {
       bandLoadKg,
       comment,
       clusterReps,
+      clusterRepsArr,
       clusterCount,
+      clusterGaps,
       clusterRest,
       restApplied,
       equipUsed,
@@ -11291,7 +11618,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v63.1.6")), /*#__PURE__*/React.createElement("button", {
+  }, "v64.1.0")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
