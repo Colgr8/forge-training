@@ -100,12 +100,13 @@ function getBest1RM(sessions, exName) {
   return best1RM;
 }
 function calcZoneTarget(sessions, exName, progType) {
-  // General Strength is the baseline-discovery phase — the load is found
-  // through direct trial/feel, not derived from an existing 1RM. A formula-based
-  // target here would be circular (you'd need a real 1RM to compute a target,
-  // but that's exactly what General Strength hasn't established yet). Once real
-  // sessions exist, the separate within-block progression box takes over instead.
-  if (progType === "General Strength") return null;
+  // General Strength and Activation Strength are baseline-discovery phases —
+  // the load is found through direct trial/feel, not derived from an existing
+  // 1RM. A formula-based target here would be circular (you'd need a real 1RM
+  // to compute a target, but that's exactly what these phases haven't
+  // established yet). Once real sessions exist, the separate within-block
+  // progression box (calcRecommendedLoad) takes over instead.
+  if (progType === "General Strength" || progType === "Activation Strength") return null;
   const pct = ZONE_PCT_1RM[progType];
   if (!pct) return null;
   const best1RM = getBest1RM(sessions, exName);
@@ -202,37 +203,126 @@ function calcRecommendedLoad(sessions, exName) {
   }
   if (pct === 0 && plateauBonus === 0) {
     const timeline = avgRPE >= 9.5 ? "Hold — near-maximal effort. Retry at this load for 1-2 more sessions before reassessing." : "Hold — retry at this load next session; expect to progress once RPE drops below 8.5.";
+    const repTarget = Math.max(1, Math.round(avgReps));
     return {
       newLoad: lastLoad,
       lastLoad,
       avgRPE: +avgRPE.toFixed(1),
       freq,
       pct: 0,
+      est1RM: est1RM(lastLoad, avgReps),
+      repRangeLo: Math.max(1, repTarget - 1),
+      repRangeHi: repTarget + 3,
+      suggestedRIR: Math.min(2, Math.max(0, Math.round(10 - avgRPE))),
       reason: `RPE ${avgRPE.toFixed(1)} avg — ${timeline}`
     };
   }
   const rawNew = lastLoad * (1 + pct / 100);
   const newLoad = Math.round(rawNew); // nearest 1kg
-  if (newLoad <= lastLoad) return {
-    newLoad: lastLoad,
-    lastLoad,
-    avgRPE: +avgRPE.toFixed(1),
-    freq,
-    pct: 0,
-    reason: `RPE ${avgRPE.toFixed(1)} avg — hold at current load`
-  };
+  if (newLoad <= lastLoad) {
+    const repTarget = Math.max(1, Math.round(avgReps));
+    return {
+      newLoad: lastLoad,
+      lastLoad,
+      avgRPE: +avgRPE.toFixed(1),
+      freq,
+      pct: 0,
+      est1RM: est1RM(lastLoad, avgReps),
+      repRangeLo: Math.max(1, repTarget - 1),
+      repRangeHi: repTarget + 3,
+      suggestedRIR: Math.min(2, Math.max(0, Math.round(10 - avgRPE))),
+      reason: `RPE ${avgRPE.toFixed(1)} avg — hold at current load`
+    };
+  }
 
   // If this zone (this active program) still has limited session history,
   // flag that the recommendation will sharpen as more data comes in.
   const buildingNote = relevant.length < 3 ? ` (${relevant.length} session${relevant.length !== 1 ? "s" : ""} in this program so far — recommendation will refine with more data)` : "";
+  const repTarget = Math.max(1, Math.round(avgReps));
   return {
     newLoad,
     lastLoad,
     avgRPE: +avgRPE.toFixed(1),
     freq,
     pct: +pct.toFixed(1),
+    est1RM: est1RM(lastLoad, avgReps),
+    // based on actual last performance, not a hypothetical projection at the new load
+    repRangeLo: Math.max(1, repTarget - 1),
+    repRangeHi: repTarget + 3,
+    suggestedRIR: Math.min(2, Math.max(0, Math.round(10 - avgRPE))),
     reason: `RPE ${avgRPE.toFixed(1)} avg, ${freq}x/week, ${repRangeLabel}${plateauBonus ? ", plateau bonus" : ""} → +${pct.toFixed(1)}%${buildingNote}`
   };
+}
+
+// Activation Strength graduation check — a beginner is considered ready to
+// move to a proper General Strength program once:
+//  1. 6+ logged sessions for this exercise (accumulated practice matters more
+//     than elapsed calendar time for motor learning)
+//  2. Load has increased at least twice across those sessions (the movement
+//     pattern is solidifying, not just being maintained)
+//  3. Average RPE over the last 3 sessions is <=7 (handling the current load
+//     comfortably, with room to spare — the ceiling on Activation-level
+//     loading has been reached)
+//
+// General Strength -> Max Strength uses stricter criteria (12 sessions, 3
+// load increases, 8 weeks minimum elapsed) — this transition genuinely needs
+// more than just practice reps: tendon and connective tissue adapt far slower
+// than muscle (commonly cited at 8-12+ weeks of consistent loading before
+// they're robust enough for regular near-maximal work), and the technical
+// margin for error shrinks dramatically near 1RM, so a sustained trend matters
+// more than a couple of good sessions.
+function calcGraduationReadiness(sessions, exName, {
+  minSessions,
+  minIncreases,
+  maxAvgRPE,
+  minWeeksElapsed = 0
+}) {
+  const relevant = sessions.filter(s => s.entries.some(e => e.ex === exName && e.load > 0 && !isOvrcIso(e.type))).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+  if (relevant.length < minSessions) return {
+    ready: false,
+    sessionCount: relevant.length
+  };
+
+  // Best load logged per session, in chronological order
+  const loadsPerSession = relevant.map(s => {
+    const entries = s.entries.filter(e => e.ex === exName && e.load > 0 && !isOvrcIso(e.type));
+    return Math.max(...entries.map(e => e.load));
+  });
+  let increases = 0;
+  for (let i = 1; i < loadsPerSession.length; i++) {
+    if (loadsPerSession[i] > loadsPerSession[i - 1]) increases++;
+  }
+  const last3 = relevant.slice(-3);
+  const last3Entries = last3.flatMap(s => s.entries.filter(e => e.ex === exName && e.load > 0 && !isOvrcIso(e.type)));
+  const avgRPE3 = last3Entries.length ? last3Entries.reduce((s, e) => s + (e.rpe || 7), 0) / last3Entries.length : 7;
+  const daySpan = (parseSessionDate(relevant[relevant.length - 1].date) - parseSessionDate(relevant[0].date)) / 86400000;
+  const weeksElapsed = daySpan / 7;
+  const weeks = Math.max(1, weeksElapsed);
+  const freqPerWeek = +(relevant.length / weeks).toFixed(1);
+  const ready = increases >= minIncreases && avgRPE3 <= maxAvgRPE && weeksElapsed >= minWeeksElapsed;
+  return {
+    ready,
+    sessionCount: relevant.length,
+    increases,
+    avgRPE3: +avgRPE3.toFixed(1),
+    freqPerWeek,
+    weeksElapsed: +weeksElapsed.toFixed(1)
+  };
+}
+function calcActivationGraduation(sessions, exName) {
+  return calcGraduationReadiness(sessions, exName, {
+    minSessions: 6,
+    minIncreases: 2,
+    maxAvgRPE: 7
+  });
+}
+function calcGeneralStrengthGraduation(sessions, exName) {
+  return calcGraduationReadiness(sessions, exName, {
+    minSessions: 12,
+    minIncreases: 3,
+    maxAvgRPE: 7,
+    minWeeksElapsed: 8
+  });
 }
 
 // Injury Index: % increase in load vs previous session for the same exercise.
@@ -405,6 +495,21 @@ const AV_COLS = [C.accent, C.blue, "#AA44FF", C.gold, "#FF5060", "#FF8020", "#44
 const COMPLEX_COLORS = ["#FF8020", "#44AAFF", "#AA44FF", "#00C896", "#FF44AA", "#FFB020"];
 const complexLabel = n => n <= 2 ? "SS" : n === 3 ? "TS" : "GS";
 const complexColorFor = idx => COMPLEX_COLORS[idx % COMPLEX_COLORS.length];
+// Numbered label for a complex within a list of complexes — e.g. "SS1"/"SS2" if
+// there are two supersets, but just "SS" if there's only one (numbering only
+// appears when it's actually needed to disambiguate). Numbering is scoped PER
+// TYPE: two supersets and one tri-set gives "SS1", "TS", "SS2", not "1,2,3".
+// `complexesArr` is the full list this complex belongs to; `idx` is its
+// position within that same array.
+function complexLabelNumbered(complexesArr, idx) {
+  const type = complexLabel(complexesArr[idx].exerciseNames.length);
+  const sameTypeIndices = complexesArr.map((c, i) => ({
+    i,
+    type: complexLabel(c.exerciseNames.length)
+  })).filter(x => x.type === type).map(x => x.i);
+  if (sameTypeIndices.length <= 1) return type;
+  return `${type}${sameTypeIndices.indexOf(idx) + 1}`;
+}
 // Display text for a complex's rest config, matching the individual-exercise pattern
 // e.g. "💤 1:30 (+10s/round)" or "💤 90s (🌊 2 turns)" or flat "💤 90s".
 function fmtComplexRest(cx) {
@@ -486,7 +591,7 @@ function calcIncrementalRest(baseSecs, dir0, amt0, completedSetNo, turns) {
     dir: t.dir,
     amt: +t.amt || 0
   }))].sort((a, b) => a.start - b.start);
-  let rest = baseSecs;
+  let rest = +baseSecs;
   for (let s = 2; s <= n; s++) {
     let active = phases[0];
     for (const p of phases) {
@@ -513,7 +618,7 @@ function calcClusterGapRest(baseSecs, dir0, amt0, gapNo, turns) {
     dir: t.dir,
     amt: +t.amt || 0
   }))].sort((a, b) => a.start - b.start);
-  let rest = baseSecs;
+  let rest = +baseSecs;
   for (let s = 2; s <= n; s++) {
     let active = phases[0];
     for (const p of phases) {
@@ -606,7 +711,7 @@ function SessionXTick({
   }, date));
 }
 const CATEGORIES = ["Strength", "Power", "Stability", "Mobility"];
-const PROG_TYPES = ["General Strength", "Hypertrophy", "Endurance Strength", "Max Strength", "Power", "Muscular Endurance", "Hybrid"];
+const PROG_TYPES = ["Activation Strength", "General Strength", "Hypertrophy", "Endurance Strength", "Max Strength", "Power", "Muscular Endurance", "Hybrid"];
 const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Negative", "Cluster Set", "Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Yielding Iso-Holds", "Yielding Iso-GPP"];
 const EQUIP_LIST = ["Barbell", "Dumbbell", "Cable machine", "Bodyweight", "Kettlebell", "Long band", "Short band", "Medicine ball", "Trap(Hex) bar"];
 const LAT_LIST = ["Bilateral", "Unilateral - Left", "Unilateral - Right", "Alternating", "Contralateral"];
@@ -3773,6 +3878,31 @@ function ClientSwitcher({
   const [showArchived, setShowArchived] = useState(false);
   const active = clients.filter(c => !c.archived);
   const archived = clients.filter(c => c.archived);
+
+  // How many of this client's Activation Strength exercises have met the
+  // graduation criteria (see calcActivationGraduation) — surfaced as a badge
+  // so it's visible without needing to open Log and check each exercise.
+  const graduationReadyExercises = c => {
+    const items = []; // {name, target}
+    c.programs.forEach(p => {
+      if (p.type === "Activation Strength") {
+        [...new Set(p.exercises.map(e => e.name))].forEach(name => {
+          if (calcActivationGraduation(p.sessions || [], name).ready) items.push({
+            name,
+            target: "General Strength"
+          });
+        });
+      } else if (p.type === "General Strength") {
+        [...new Set(p.exercises.map(e => e.name))].forEach(name => {
+          if (calcGeneralStrengthGraduation(p.sessions || [], name).ready) items.push({
+            name,
+            target: "Max Strength"
+          });
+        });
+      }
+    });
+    return items;
+  };
   return /*#__PURE__*/React.createElement(Sheet, {
     title: "CLIENTS",
     onClose: onClose
@@ -3780,114 +3910,139 @@ function ClientSwitcher({
     style: {
       marginBottom: 10
     }
-  }, active.map((c, i) => /*#__PURE__*/React.createElement("div", {
-    key: c.id,
-    style: {
-      background: c.id === activeId ? C.accent + "18" : C.card2,
-      borderRadius: 14,
-      border: `1.5px solid ${c.id === activeId ? C.accent + "66" : C.border}`,
-      marginBottom: 8,
-      overflow: "hidden"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    onClick: () => {
-      onSwitch(c.id);
-      onClose();
-    },
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 14,
-      padding: "12px 14px",
-      cursor: "pointer"
-    }
-  }, /*#__PURE__*/React.createElement(Avatar, {
-    name: c.name,
-    idx: clients.indexOf(c),
-    size: 46
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      fontSize: 15
-    }
-  }, c.name), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: C.sub,
-      marginTop: 2
-    }
-  }, c.programs.length, " program", c.programs.length !== 1 ? "s" : "", c.bw ? ` · ${c.bw} kg` : ""), savedGroups.filter(g => g.clientIds.includes(c.id)).length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 5,
-      flexWrap: "wrap",
-      marginTop: 5
-    }
-  }, savedGroups.filter(g => g.clientIds.includes(c.id)).map(g => /*#__PURE__*/React.createElement("button", {
-    key: g.id,
-    onClick: e => {
-      e.stopPropagation();
-      onEditGroup(g);
-    },
-    style: {
-      background: g.color + "22",
-      border: `1px solid ${g.color}55`,
-      borderRadius: 10,
-      padding: "2px 8px",
-      cursor: "pointer",
-      color: g.color,
-      fontSize: 10,
-      fontWeight: 700
-    }
-  }, g.name)))), c.id === activeId && /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: C.accent,
-      fontSize: 20,
-      fontWeight: 700
-    }
-  }, "✓")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      borderTop: `1px solid ${C.border}`
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      onEditClient(c);
-      onClose();
-    },
-    style: {
-      flex: 1,
-      background: "none",
-      border: "none",
-      borderRight: `1px solid ${C.border}`,
-      padding: "8px",
-      color: C.sub,
-      cursor: "pointer",
-      fontSize: 12,
-      fontWeight: 700
-    }
-  }, "✎ Edit Profile"), /*#__PURE__*/React.createElement("button", {
-    onClick: e => {
-      e.stopPropagation();
-      onArchive(c.id);
-      if (c.id === activeId) onClose();
-    },
-    style: {
-      flex: 1,
-      background: "none",
-      border: "none",
-      padding: "8px",
-      color: C.warn,
-      cursor: "pointer",
-      fontSize: 12,
-      fontWeight: 700
-    }
-  }, "📦 Archive"))))), /*#__PURE__*/React.createElement("button", {
+  }, active.map((c, i) => {
+    const gradReady = graduationReadyExercises(c);
+    return /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      style: {
+        background: c.id === activeId ? C.accent + "18" : C.card2,
+        borderRadius: 14,
+        border: `1.5px solid ${c.id === activeId ? C.accent + "66" : C.border}`,
+        marginBottom: 8,
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      onClick: () => {
+        onSwitch(c.id);
+        onClose();
+      },
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        padding: "12px 14px",
+        cursor: "pointer"
+      }
+    }, /*#__PURE__*/React.createElement(Avatar, {
+      name: c.name,
+      idx: clients.indexOf(c),
+      size: 46
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 15
+      }
+    }, c.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.sub,
+        marginTop: 2
+      }
+    }, c.programs.length, " program", c.programs.length !== 1 ? "s" : "", c.bw ? ` · ${c.bw} kg` : ""), gradReady.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 5,
+        marginTop: 5
+      }
+    }, [...new Set(gradReady.map(g => g.target))].map(target => {
+      const count = gradReady.filter(g => g.target === target).length;
+      return /*#__PURE__*/React.createElement("div", {
+        key: target,
+        style: {
+          display: "inline-block",
+          background: C.accent + "22",
+          border: `1px solid ${C.accent}55`,
+          borderRadius: 10,
+          padding: "2px 8px",
+          color: C.accent,
+          fontSize: 10,
+          fontWeight: 700
+        }
+      }, "✅ Ready for ", target, " (", count, ")");
+    })), savedGroups.filter(g => g.clientIds.includes(c.id)).length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 5,
+        flexWrap: "wrap",
+        marginTop: 5
+      }
+    }, savedGroups.filter(g => g.clientIds.includes(c.id)).map(g => /*#__PURE__*/React.createElement("button", {
+      key: g.id,
+      onClick: e => {
+        e.stopPropagation();
+        onEditGroup(g);
+      },
+      style: {
+        background: g.color + "22",
+        border: `1px solid ${g.color}55`,
+        borderRadius: 10,
+        padding: "2px 8px",
+        cursor: "pointer",
+        color: g.color,
+        fontSize: 10,
+        fontWeight: 700
+      }
+    }, g.name)))), c.id === activeId && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.accent,
+        fontSize: 20,
+        fontWeight: 700
+      }
+    }, "✓")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        borderTop: `1px solid ${C.border}`
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: e => {
+        e.stopPropagation();
+        onEditClient(c);
+        onClose();
+      },
+      style: {
+        flex: 1,
+        background: "none",
+        border: "none",
+        borderRight: `1px solid ${C.border}`,
+        padding: "8px",
+        color: C.sub,
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 700
+      }
+    }, "✎ Edit Profile"), /*#__PURE__*/React.createElement("button", {
+      onClick: e => {
+        e.stopPropagation();
+        onArchive(c.id);
+        if (c.id === activeId) onClose();
+      },
+      style: {
+        flex: 1,
+        background: "none",
+        border: "none",
+        padding: "8px",
+        color: C.warn,
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 700
+      }
+    }, "📦 Archive")));
+  })), /*#__PURE__*/React.createElement("button", {
     onClick: onAddClient,
     style: {
       width: "100%",
@@ -4486,7 +4641,7 @@ function EditProgramModal({
         letterSpacing: 1,
         flexShrink: 0
       }
-    }, complexLabel(cx.exerciseNames.length)), /*#__PURE__*/React.createElement("div", {
+    }, complexLabelNumbered(complexes, idx)), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1
       }
@@ -5286,6 +5441,7 @@ function LogTab({
     setSessionComplexes([]);
     setSessionComplexOverrides({});
     setVoidedComplexIdxs([]);
+    setSetTypePerEx({});
   }, [program?.id]);
 
   // When switching exercise, clear reps/load but keep set type & rpe/rir
@@ -5293,6 +5449,7 @@ function LogTab({
     setActiveEx(name);
     setForm(f => ({
       ...f,
+      type: setTypePerEx[name] || "Normal",
       setNo: String(nextSetNumber(name)),
       reps: "",
       load: "",
@@ -5380,6 +5537,15 @@ function LogTab({
   const [rmCalcRIR, setRmCalcRIR] = useState("1");
   const rmCalc = calcManualRM(allClientSessions, activeEx, rmCalcN, rmCalcRIR);
 
+  // Per-exercise Set Type memory — each exercise remembers its own Set Type
+  // (Normal, Cluster Set, etc.) independently, session-only. Without this,
+  // switching between exercises (manually or via a complex's auto-advance)
+  // would just carry over whichever Set Type happened to be active, silently
+  // turning one exercise's Cluster Set into another's, or vice versa. A newly
+  // visited exercise always starts at Normal unless the trainer has already
+  // set something else for it this session.
+  const [setTypePerEx, setSetTypePerEx] = useState({});
+
   // Intra-cluster rest — escalates PER GAP BETWEEN CLUSTERS within one set
   // (Gap 1→2, Gap 2→3...), NOT per set. Auto-resets to a clean default (5s,
   // flat) every time Set # changes, but stays fully editable so any specific
@@ -5398,6 +5564,69 @@ function LogTab({
       prevSetNoRef.current = form.setNo;
     }
   }, [form.setNo]);
+
+  // Live intra-cluster mini-timer sequence — walks the trainer through each
+  // cluster in order, auto-counting down the computed gap rest between them
+  // with its own short chime, before enabling the next cluster. Entirely
+  // local/session-only; doesn't touch the main between-set rest timer at all.
+  const [clusterSeqActive, setClusterSeqActive] = useState(false);
+  const [clusterSeqIdx, setClusterSeqIdx] = useState(0); // 0-based: which cluster is currently active
+  const [clusterSeqRemaining, setClusterSeqRemaining] = useState(0); // seconds left in the current gap countdown, 0 = not resting
+  // True the moment a gap countdown finishes, until the trainer explicitly taps
+  // "Continue" to move on — keeps the heading correctly showing which cluster
+  // JUST finished (not the next one) all the way through the rest, only
+  // advancing once the trainer confirms it's time to move on.
+  const [clusterSeqCompleted, setClusterSeqCompleted] = useState(false);
+  const clusterCountNum = +form.clusterCount || 0;
+  const clusterNumGaps = Math.max(0, clusterCountNum - 1);
+  const clusterGapSeq = clusterRestBase && clusterNumGaps > 0 ? Array.from({
+    length: clusterNumGaps
+  }, (_, i) => calcClusterGapRest(+clusterRestBase, clusterRestDir, +clusterRestIncAmt, i + 1, clusterRestTurnsCfg)) : [];
+
+  // Reset the sequence whenever the cluster setup changes meaningfully, so a
+  // stale in-progress sequence never lingers against a different configuration.
+  useEffect(() => {
+    setClusterSeqActive(false);
+    setClusterSeqIdx(0);
+    setClusterSeqRemaining(0);
+    setClusterSeqCompleted(false);
+  }, [form.setNo, form.clusterCount, activeEx]);
+  const playClusterChime = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [880, 1175].forEach((freq, i) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.type = "sine";
+        o.frequency.value = freq;
+        g.gain.value = 0.15;
+        const startAt = ctx.currentTime + i * 0.11;
+        o.start(startAt);
+        o.stop(startAt + 0.12);
+      });
+    } catch {}
+    try {
+      navigator.vibrate && navigator.vibrate(120);
+    } catch {}
+  };
+
+  // 1s tick for the cluster mini-timer, independent of the main rest timer.
+  useEffect(() => {
+    if (clusterSeqRemaining <= 0) return;
+    const t = setTimeout(() => {
+      setClusterSeqRemaining(r => {
+        if (r <= 1) {
+          playClusterChime();
+          setClusterSeqCompleted(true);
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [clusterSeqRemaining]);
 
   // When arriving here via a pill tap (quick-switch), jump straight to whichever
   // exercise that client's rest timer belongs to, rather than leaving them on
@@ -5587,7 +5816,34 @@ function LogTab({
     style: {
       padding: "16px 14px"
     }
-  }, confirmDelete && /*#__PURE__*/React.createElement(Sheet, {
+  }, (program?.type === "Activation Strength" || program?.type === "General Strength") && (() => {
+    const isActivation = program.type === "Activation Strength";
+    const target = isActivation ? "General Strength" : "Max Strength";
+    const checkFn = isActivation ? calcActivationGraduation : calcGeneralStrengthGraduation;
+    const readyNames = [...new Set(program.exercises.map(e => e.name))].filter(name => checkFn(sessions, name).ready);
+    if (readyNames.length === 0) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.accent + "18",
+        border: `1px solid ${C.accent}55`,
+        borderRadius: 10,
+        padding: "10px 14px",
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.accent,
+        fontWeight: 700
+      }
+    }, "✅ ", readyNames.length, " exercise", readyNames.length !== 1 ? "s" : "", " ready to graduate to ", target, ": ", readyNames.join(", ")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.sub,
+        marginTop: 2
+      }
+    }, isActivation ? `Consistent sessions, load progressing, comfortable RPE — consider moving ${clientName || "this client"} to a General Strength program.` : `12+ sessions, load progressing, 8+ weeks of consistent training, comfortable RPE — consider moving ${clientName || "this client"} to a Max Strength program.`));
+  })(), confirmDelete && /*#__PURE__*/React.createElement(Sheet, {
     title: "🗑 DELETE SET?",
     onClose: () => setConfirmDelete(null)
   }, /*#__PURE__*/React.createElement("div", {
@@ -5704,7 +5960,9 @@ function LogTab({
       display: "flex",
       gap: 7,
       overflowX: "auto",
+      overflowY: "visible",
       paddingBottom: 6,
+      paddingTop: 10,
       scrollbarWidth: "none",
       msOverflowStyle: "none"
     }
@@ -5746,18 +6004,19 @@ function LogTab({
       },
       style: {
         position: "absolute",
-        top: -7,
+        top: -9,
         right: -4,
         background: cxColor,
         color: "#1A0800",
         fontSize: 9,
         fontWeight: 700,
         borderRadius: 8,
-        padding: "1px 5px",
+        padding: "1px 6px",
         lineHeight: 1.4,
+        whiteSpace: "nowrap",
         cursor: cx._permanent ? "default" : "pointer"
       }
-    }, complexLabel(cx.exerciseNames.length)), /*#__PURE__*/React.createElement("span", {
+    }, complexLabelNumbered(allComplexes, cx._colorIdx)), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12
       }
@@ -5826,7 +6085,7 @@ function LogTab({
         letterSpacing: 1,
         flexShrink: 0
       }
-    }, complexLabel(cx.exerciseNames.length)), /*#__PURE__*/React.createElement("div", {
+    }, complexLabelNumbered(allComplexes, cx._colorIdx)), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1
       }
@@ -6066,7 +6325,25 @@ function LogTab({
       fontSize: 12,
       fontWeight: 700
     }
-  }, "✕"))), (() => {
+  }, "✕")), restRemaining > 0 && (() => {
+    const cx = complexForEx(activeEx);
+    if (!cx || cx.exerciseNames[0] !== activeEx) return null;
+    return /*#__PURE__*/React.createElement("button", {
+      onClick: () => onDismissRest(),
+      style: {
+        width: "100%",
+        marginTop: 8,
+        background: "none",
+        border: `1px dashed ${C.border}`,
+        borderRadius: 8,
+        padding: "8px",
+        cursor: "pointer",
+        color: C.sub,
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, "✓ Done with ", complexLabelNumbered(allComplexes, cx._colorIdx), " — Skip Rest & Continue");
+  })()), (() => {
     const exDefR = program?.exercises.find(e => e.name === activeEx);
     const baseRest = exDefR?.restSecs;
     const calcRest = calcIncrementalRest(baseRest, exDefR?.restIncrementDir, exDefR?.restIncrementAmt, +form.setNo, exDefR?.restTurns);
@@ -6666,8 +6943,99 @@ function LogTab({
     style: ss
   }), (() => {
     const rec = calcRecommendedLoad(sessions, activeEx);
-    if (!rec || rec.pct <= 0) return null;
-    return /*#__PURE__*/React.createElement("div", {
+    const isActivation = program?.type === "Activation Strength";
+
+    // True beginner, zero session history yet — no numeric load exists to
+    // suggest, so give qualitative guidance instead of a fabricated number.
+    if (!rec && isActivation) {
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: 6,
+          background: C.accent + "12",
+          border: `1px solid ${C.accent}33`,
+          borderRadius: 8,
+          padding: "8px 10px"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: C.accent,
+          fontWeight: 700,
+          marginBottom: 4
+        }
+      }, "🌱 No load history yet"), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: C.sub,
+          lineHeight: 1.5,
+          marginBottom: 6
+        }
+      }, "Start light — empty bar, bodyweight, or the lightest plates available. Priority is learning the movement, not the number."), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 9,
+          color: C.accent
+        }
+      }, "Aim for 12-15 reps, 4-5 RIR — this should feel easy."), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 8,
+          marginTop: 8
+        }
+      }, /*#__PURE__*/React.createElement("button", {
+        onClick: () => upd("reps", 13),
+        style: {
+          flex: 1,
+          background: "none",
+          border: `1px solid ${C.accent}55`,
+          borderRadius: 6,
+          padding: "6px 10px",
+          cursor: "pointer",
+          fontSize: 11,
+          fontWeight: 700,
+          color: C.accent
+        }
+      }, "Use Reps (13)"), /*#__PURE__*/React.createElement("button", {
+        onClick: () => upd("rir", 4),
+        style: {
+          flex: 1,
+          background: "none",
+          border: `1px solid ${C.accent}55`,
+          borderRadius: 6,
+          padding: "6px 10px",
+          cursor: "pointer",
+          fontSize: 11,
+          fontWeight: 700,
+          color: C.accent
+        }
+      }, "Use RIR (4)")));
+    }
+    if (!rec) return null;
+
+    // Real session data now exists — show the normal gold recommendation,
+    // plus (for Activation Strength specifically) a graduation-readiness check.
+    const grad = isActivation ? calcActivationGraduation(sessions, activeEx) : null;
+    return /*#__PURE__*/React.createElement(React.Fragment, null, grad?.ready && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 6,
+        background: C.accent + "18",
+        border: `1px solid ${C.accent}55`,
+        borderRadius: 8,
+        padding: "8px 10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.accent,
+        fontWeight: 700
+      }
+    }, "✅ Ready to graduate"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.sub,
+        marginTop: 2,
+        lineHeight: 1.5
+      }
+    }, grad.sessionCount, " sessions completed (", grad.freqPerWeek, "x/week avg), load progressing, RPE ", grad.avgRPE3, " avg — comfortable at this level. Consider moving ", clientName || "this client", " to a General Strength program.")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "center",
@@ -6688,12 +7056,25 @@ function LogTab({
         color: C.gold,
         fontWeight: 700
       }
-    }, "💡 Suggested: ", rec.newLoad, "kg"), /*#__PURE__*/React.createElement("div", {
+    }, "💡 Suggested: ", rec.newLoad, "kg", rec.est1RM ? ` · Est 1RM ~${rec.est1RM}kg` : ""), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 9,
         color: C.muted
       }
-    }, rec.reason)), /*#__PURE__*/React.createElement("button", {
+    }, rec.reason), rec.repRangeLo && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.gold,
+        marginTop: 2
+      }
+    }, "Aim for ", rec.repRangeLo, "-", rec.repRangeHi, " reps", rec.suggestedRIR != null ? `, ${rec.suggestedRIR} RIR` : "")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        flexShrink: 0
+      }
+    }, /*#__PURE__*/React.createElement("button", {
       onClick: () => upd("load", rec.newLoad),
       style: {
         background: C.gold,
@@ -6703,10 +7084,50 @@ function LogTab({
         padding: "5px 12px",
         cursor: "pointer",
         fontSize: 11,
-        fontWeight: 700,
-        flexShrink: 0
+        fontWeight: 700
       }
-    }, "Use"));
+    }, "Use Load"), rec.repRangeLo && /*#__PURE__*/React.createElement("button", {
+      onClick: () => upd("reps", Math.round((rec.repRangeLo + rec.repRangeHi) / 2)),
+      style: {
+        background: "none",
+        border: `1px solid ${C.gold}55`,
+        borderRadius: 6,
+        padding: "5px 12px",
+        cursor: "pointer",
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.gold
+      }
+    }, "Use Reps"), rec.suggestedRIR != null && /*#__PURE__*/React.createElement("button", {
+      onClick: () => upd("rir", rec.suggestedRIR),
+      style: {
+        background: "none",
+        border: `1px solid ${C.gold}55`,
+        borderRadius: 6,
+        padding: "5px 12px",
+        cursor: "pointer",
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.gold
+      }
+    }, "Use RIR"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setForm(f => ({
+        ...f,
+        load: "",
+        reps: "",
+        rir: 2
+      })),
+      style: {
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "5px 12px",
+        cursor: "pointer",
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.sub
+      }
+    }, "↺ Reset"))));
   })(), zoneTarget && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -6746,7 +7167,26 @@ function LogTab({
       fontWeight: 700,
       flexShrink: 0
     }
-  }, "Use")))), isClusterSet(form.type) && /*#__PURE__*/React.createElement("div", {
+  }, "Use"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setForm(f => ({
+      ...f,
+      load: "",
+      reps: "",
+      rir: 2
+    })),
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "5px 12px",
+      cursor: "pointer",
+      fontSize: 11,
+      fontWeight: 700,
+      color: C.sub,
+      flexShrink: 0,
+      marginLeft: 6
+    }
+  }, "↺ Reset")))), isClusterSet(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#FFB02015",
       borderRadius: 10,
@@ -6763,7 +7203,35 @@ function LogTab({
       textTransform: "uppercase",
       marginBottom: 10
     }
-  }, "⏱ Cluster Set breakdown"), /*#__PURE__*/React.createElement("div", {
+  }, "⏱ Cluster Set breakdown"), (() => {
+    const cx = complexForEx(activeEx);
+    if (!cx) return null;
+    const idx = cx.exerciseNames.indexOf(activeEx);
+    const isLast = idx === cx.exerciseNames.length - 1;
+    const label = complexLabelNumbered(allComplexes, cx._colorIdx);
+    const color = complexColorFor(cx._colorIdx);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: color + "18",
+        border: `1px solid ${color}44`,
+        borderRadius: 8,
+        padding: "8px 10px",
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color,
+        fontWeight: 700
+      }
+    }, "🔗 Part of ", label, ": ", cx.exerciseNames.join(" → ")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.sub,
+        marginTop: 2
+      }
+    }, isLast ? "Logging this completes the round — rest timer starts, then cycles back to " + cx.exerciseNames[0] + "." : `Logging this will jump straight to ${cx.exerciseNames[idx + 1]} — no rest.`));
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 8
     }
@@ -7062,7 +7530,135 @@ function LogTab({
         marginTop: 2
       }
     }, form.clusterCount, " clusters → ", numGaps, " gap", numGaps !== 1 ? "s" : "", " · resets to 5s flat for the next set unless you change it again"));
-  })())), (form.clusterRepsArr || []).length > 0 && (() => {
+  })())), (form.clusterRepsArr || []).length >= 2 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTop: `1px solid #FFB02033`
+    }
+  }, !clusterSeqActive ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setClusterSeqActive(true);
+      setClusterSeqIdx(0);
+      setClusterSeqRemaining(0);
+      setClusterSeqCompleted(false);
+    },
+    style: {
+      width: "100%",
+      background: C.gold,
+      color: "#1A1200",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "▶ Start Cluster Sequence") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      border: `1px solid ${C.gold}55`,
+      borderRadius: 10,
+      padding: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 8,
+      color: clusterSeqCompleted ? C.accent : C.gold
+    }
+  }, "Cluster ", clusterSeqIdx + 1, " of ", form.clusterRepsArr.length, " — ", form.clusterRepsArr[clusterSeqIdx] || "?", " reps", clusterSeqCompleted ? " COMPLETED!" : ""), clusterSeqRemaining > 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 36,
+      color: C.gold,
+      letterSpacing: 1
+    }
+  }, clusterSeqRemaining, "s"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 8
+    }
+  }, "Resting before Cluster ", clusterSeqIdx + 2), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setClusterSeqRemaining(0);
+      setClusterSeqCompleted(true);
+    },
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.sub,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, "Skip Rest")) : clusterSeqCompleted ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setClusterSeqIdx(i => i + 1);
+      setClusterSeqCompleted(false);
+    },
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "Continue to Cluster ", clusterSeqIdx + 2) : clusterSeqIdx < form.clusterRepsArr.length - 1 ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const gap = clusterGapSeq[clusterSeqIdx] || 5;
+      setClusterSeqRemaining(gap);
+    },
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "Complete Cluster ", clusterSeqIdx + 1, " — Rest ", clusterGapSeq[clusterSeqIdx] || 5, "s") : /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const cx = complexForEx(activeEx);
+      if (cx) {
+        // Part of an active complex — completing the last cluster IS
+        // effectively "logging this set", so submit immediately and let
+        // the existing complex logic auto-advance to the next exercise
+        // (or complete the round + rest, if this was the last one).
+        submit();
+      } else {
+        setClusterSeqActive(false);
+      }
+    },
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, complexForEx(activeEx) ? `✓ Complete Final Cluster — Log & Continue` : `✓ Complete Final Cluster — Ready to Log Set`))), (form.clusterRepsArr || []).length > 0 && (() => {
     const numGaps = Math.max(0, (+form.clusterCount || 0) - 1);
     const gaps = clusterRestBase && numGaps > 0 ? Array.from({
       length: numGaps
@@ -7397,7 +7993,13 @@ function LogTab({
     t: "Set type"
   }), /*#__PURE__*/React.createElement(AddableSelect, {
     value: form.type,
-    onChange: v => upd("type", v),
+    onChange: v => {
+      upd("type", v);
+      setSetTypePerEx(m => ({
+        ...m,
+        [activeEx]: v
+      }));
+    },
     options: setTypeList,
     onAddOption: onAddSetType,
     addLabel: "Add set type"
@@ -8249,7 +8851,16 @@ function LogTab({
         marginBottom: 6,
         color: name === activeEx ? C.accent : C.text
       }
-    }, name), /*#__PURE__*/React.createElement("div", {
+    }, name, (() => {
+      const cx = complexForEx(name);
+      if (!cx) return null;
+      return /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: complexColorFor(cx._colorIdx),
+          marginLeft: 5
+        }
+      }, "(", complexLabelNumbered(allComplexes, cx._colorIdx), ")");
+    })()), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -8273,7 +8884,7 @@ function LogTab({
       style: {
         fontSize: 12
       }
-    }, "Set ", e.set, ": ", e.reps, "×", e.load, "kg"), /*#__PURE__*/React.createElement("div", {
+    }, e.clusterRepsArr?.length ? `Set ${e.set}: ${e.reps}(${e.clusterRepsArr.join("; ")})*${e.load}kg` : `Set ${e.set}: ${e.reps}×${e.load}kg`), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 6,
@@ -11037,6 +11648,15 @@ function App() {
   const [customProgTypes, setCustomProgTypes] = useState(() => migrateList('forge_customPT', PROG_TYPES));
   const [customSetTypes, setCustomSetTypes] = useState(() => lsGet('forge_customST', []));
 
+  // One-time migration: "Activation Strength" was added as a new default
+  // Program Type after most users had already migrated their Program Type
+  // list once (migrateList only merges defaults in on that very first run),
+  // so it would otherwise never appear for existing installs. Backfill it in
+  // if it's missing, without disturbing anything else the trainer has added.
+  useEffect(() => {
+    setCustomProgTypes(pts => pts.includes("Activation Strength") ? pts : ["Activation Strength", ...pts]);
+  }, []);
+
   // ── Multi-client rest timer — keyed by clientId so each client's countdown
   // runs independently, even while viewing a different client's screen. ──────
   const [restTimers, setRestTimers] = useState({}); // { [clientId]: {remaining, running, total, label} }
@@ -11618,7 +12238,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v64.1.0")), /*#__PURE__*/React.createElement("button", {
+  }, "v65.6.1")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
