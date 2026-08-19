@@ -44,6 +44,29 @@ const C = {
 };
 const est1RM = (load, reps) => +(load * (1 + reps / 30)).toFixed(1);
 
+// For a Drop Set entry, e.reps is the COMBINED total across the main set AND
+// every drop — pairing that with e.load (the main set's load) would badly
+// inflate any 1RM/RPE-based estimate, since those reps were NOT all performed
+// at that load. effReps() returns the reps ACTUALLY performed at e.load (the
+// main set's own reps for Drop Sets, e.reps unchanged for everything else) —
+// use this instead of e.reps anywhere a load+reps pair feeds a 1RM, velocity,
+// power, or average-reps calculation.
+const effReps = e => e.dropSetMainReps != null && e.dropSetMainReps > 0 ? e.dropSetMainReps : e.reps;
+
+// Total volume load (Σ load×reps) for a single entry, correctly accounting for
+// a Drop Set's multiple different loads — main load × main reps, PLUS each
+// drop's own load × its own reps — rather than naively multiplying the full
+// combined rep count by just the (heaviest) main load, which would overstate
+// volume by attributing every rep to the top weight.
+const effVolume = e => {
+  if (e.dropSetLoads?.length) {
+    const mainVol = e.load * effReps(e);
+    const dropVol = e.dropSetLoads.reduce((s, l, i) => s + l * (+e.dropSetReps?.[i] || 0), 0);
+    return mainVol + dropVol;
+  }
+  return e.load * e.reps;
+};
+
 // Manually-built date string (e.g. "11 Aug 2026") — deliberately NOT using
 // toLocaleDateString(), since its output depends on the browser's compiled ICU
 // locale data, which can be incomplete on some mobile browsers/Android WebViews
@@ -92,7 +115,7 @@ function getBest1RM(sessions, exName) {
   sessions.forEach(s => {
     s.entries.forEach(e => {
       if (e.ex === exName && e.load > 0 && e.reps > 0 && !isOvrcIso(e.type)) {
-        const rm = est1RM(e.load, e.reps);
+        const rm = est1RM(e.load, effReps(e));
         if (rm > best1RM) best1RM = rm;
       }
     });
@@ -157,7 +180,7 @@ function calcRecommendedLoad(sessions, exName) {
   if (lastEntries.length === 0) return null;
   const lastLoad = Math.max(...lastEntries.map(e => e.load));
   const avgRPE = lastEntries.reduce((s, e) => s + (e.rpe || 7), 0) / lastEntries.length;
-  const avgReps = lastEntries.reduce((s, e) => s + (e.reps || 8), 0) / lastEntries.length;
+  const avgReps = lastEntries.reduce((s, e) => s + (effReps(e) || 8), 0) / lastEntries.length;
 
   // Base % increment from RPE (autoregulation)
   let basePct;
@@ -336,7 +359,7 @@ const calcACWR = (sessions, exName, currentIndex) => {
   // Compute volume per session for this exercise
   const vols = sessions.map(s => {
     const entries = s.entries.filter(e => e.ex === exName);
-    return entries.reduce((sum, e) => sum + e.load * e.reps, 0);
+    return entries.reduce((sum, e) => sum + effVolume(e), 0);
   });
   const acute = vols[currentIndex];
   if (!acute) return null;
@@ -522,10 +545,12 @@ function fmtComplexRest(cx) {
 const avCol = idx => AV_COLS[idx % AV_COLS.length];
 
 // Isometric helpers
-const isIsoType = t => ["Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Yielding Iso-Holds", "Yielding Iso-GPP"].includes(t);
-const isOvrcIso = t => t === "Ovrc Iso-Ballistic" || t === "Ovrc Iso-Max";
+const isIsoType = t => ["Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Ovrc Iso-Endurance", "Ovrc Iso-Sustained", "Yielding Iso-Holds", "Yielding Iso-GPP"].includes(t);
+const isOvrcIso = t => t === "Ovrc Iso-Ballistic" || t === "Ovrc Iso-Max" || t === "Ovrc Iso-Endurance" || t === "Ovrc Iso-Sustained";
 const isYieldIso = t => t === "Yielding Iso-Holds" || t === "Yielding Iso-GPP";
 const isClusterSet = t => t === "Cluster Set";
+const isDropSet = t => t === "Drop Set";
+const isNegativeSet = t => t === "Negative";
 
 // Band strength → kg load ranges (increments of 1kg)
 const BAND_RANGES = {
@@ -632,6 +657,55 @@ const TURN_OPTIONS = Array.from({
   length: 19
 }, (_, i) => i + 2);
 const fmtRest = s => s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} min` : `${s}s`;
+
+// Same wave logic as calcClusterGapRest, but for the drop PERCENTAGE itself —
+// clamped to a 1-60% range (percentages, not seconds). "dropNo" is which
+// transition this is (1 = Drop1→Drop2, 2 = Drop2→Drop3, etc.).
+function calcDropPct(basePct, dir0, amt0, dropNo, turns) {
+  if (!basePct) return null;
+  const clamp = v => Math.min(60, Math.max(1, v));
+  const n = Math.max(1, dropNo || 1);
+  const phases = [{
+    start: 1,
+    dir: dir0,
+    amt: amt0
+  }, ...(turns || []).filter(t => t && t.afterSet).map(t => ({
+    start: +t.afterSet,
+    dir: t.dir,
+    amt: +t.amt || 0
+  }))].sort((a, b) => a.start - b.start);
+  let pct = +basePct;
+  for (let s = 2; s <= n; s++) {
+    let active = phases[0];
+    for (const p of phases) {
+      if (p.start <= s - 1) active = p;
+    }
+    pct = clamp(pct + (active.amt || 0) * (active.dir === "-" ? -1 : 1));
+  }
+  return clamp(pct);
+}
+
+// Drop Set load sequence — the MAIN/top set (mainLoad) is the client's regular
+// working set, logged normally via the main Load/Reps fields; it is NOT itself
+// counted as "Drop 1". Drop 1 is the FIRST reduction after the top set, Drop 2
+// reduces from Drop 1, and so on — using a PER-TRANSITION percentage from the
+// wave above (so the drop % can escalate/de-escalate across the sequence).
+// 20-25% is the well-established standard starting point: enough reduction to
+// keep training productively despite accumulated fatigue, without dropping so
+// much the set becomes trivial. Rounded to the nearest 2.5kg since plates and
+// most dumbbells come in fixed increments, not arbitrary decimals. Returns an
+// array of exactly `numDrops` loads (the drops only, main load excluded).
+function calcDropSetLoads(mainLoad, basePct, dir, incAmt, turns, numDrops) {
+  if (!mainLoad || numDrops <= 0) return [];
+  const loads = [];
+  let load = mainLoad;
+  for (let i = 0; i < numDrops; i++) {
+    const pct = calcDropPct(basePct, dir, incAmt, i + 1, turns) ?? 20;
+    load = load * (1 - pct / 100);
+    loads.push(Math.round(load / 2.5) * 2.5);
+  }
+  return loads;
+}
 const bandRangeOptions = strength => {
   const r = BAND_RANGES[strength];
   if (!r) return [];
@@ -657,12 +731,28 @@ const ISO_META = {
     holdTarget: "3s",
     setsReps: "4 sets × 3 reps"
   },
+  "Ovrc Iso-Endurance": {
+    color: "#D4A017",
+    icon: "🔥",
+    label: "Overcoming Iso — Endurance",
+    desc: "6–10s sustained near-maximal push, past peak force into short-duration capacity. No external load.",
+    holdTarget: "6–10s",
+    setsReps: "3–4 sets × 6–10s"
+  },
+  "Ovrc Iso-Sustained": {
+    color: "#C2410C",
+    icon: "🌋",
+    label: "Overcoming Iso — Sustained",
+    desc: "Maximal-effort push held from the start through 15–20s, accepting the natural decline in force as fatigue sets in — a further extension of Endurance into short-duration fatigue tolerance. No external load.",
+    holdTarget: "15–20s",
+    setsReps: "2–3 sets × 15–20s"
+  },
   "Yielding Iso-Holds": {
     color: "#5060FF",
     icon: "🏋",
     label: "Yielding Iso — Iso Holds",
-    desc: "Hold against gravity. Targets weaker tendon regions. Ideal for tendinopathy rehab.",
-    holdTarget: "30–45s",
+    desc: "Hold against gravity. Targets weaker tendon regions. Ideal for tendinopathy rehab. Standard duration is 45s (the well-established Cook/Rio-style protocol); shorter durations down to 15s are available as a gentler entry point for early-stage or highly irritable presentations.",
+    holdTarget: "15–45s",
     setsReps: "3 sets × 60–85% MVIC"
   },
   "Yielding Iso-GPP": {
@@ -712,7 +802,7 @@ function SessionXTick({
 }
 const CATEGORIES = ["Strength", "Power", "Stability", "Mobility"];
 const PROG_TYPES = ["Activation Strength", "General Strength", "Hypertrophy", "Endurance Strength", "Max Strength", "Power", "Muscular Endurance", "Hybrid"];
-const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Negative", "Cluster Set", "Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Yielding Iso-Holds", "Yielding Iso-GPP"];
+const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Negative", "Cluster Set", "Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Ovrc Iso-Endurance", "Ovrc Iso-Sustained", "Yielding Iso-Holds", "Yielding Iso-GPP"];
 const EQUIP_LIST = ["Barbell", "Dumbbell", "Cable machine", "Bodyweight", "Kettlebell", "Long band", "Short band", "Medicine ball", "Trap(Hex) bar"];
 const LAT_LIST = ["Bilateral", "Unilateral - Left", "Unilateral - Right", "Alternating", "Contralateral"];
 const RPE_DESC = {
@@ -2976,7 +3066,7 @@ function SessionDetailSheet({
     acc[e.ex].push(e);
     return acc;
   }, {});
-  const totalVol = session.entries.reduce((s, e) => s + (e.load * e.reps || 0), 0);
+  const totalVol = session.entries.reduce((s, e) => s + (effVolume(e) || 0), 0);
   const avgRPE = session.entries.length ? (session.entries.reduce((s, e) => s + (e.rpe || 0), 0) / session.entries.length).toFixed(1) : "–";
   return /*#__PURE__*/React.createElement(Sheet, {
     title: `SESSION · ${session.date}`,
@@ -3089,7 +3179,17 @@ function SessionDetailSheet({
       fontSize: 11,
       color: C.gold
     }
-  }, "⏱ ", e.clusterRepsArr?.length ? e.clusterRepsArr.join("+") + " reps" : `${e.clusterCount}×${e.clusterReps}`, " clusters", e.clusterGaps?.length ? ` (${e.clusterGaps.map(g => fmtRest(g)).join(" → ")} rest)` : e.clusterRest ? ` (${e.clusterRest}s rest)` : ""), e.restApplied && /*#__PURE__*/React.createElement("div", {
+  }, "⏱ ", e.clusterRepsArr?.length ? e.clusterRepsArr.join("+") + " reps" : `${e.clusterCount}×${e.clusterReps}`, " clusters", e.clusterGaps?.length ? ` (${e.clusterGaps.map(g => fmtRest(g)).join(" → ")} rest)` : e.clusterRest ? ` (${e.clusterRest}s rest)` : ""), e.dropSetLoads?.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#A855F7'
+    }
+  }, "📉 ", e.load, "kg×", e.dropSetMainReps ?? "?", ", ", e.dropSetLoads.map((l, i) => `${l}kg×${e.dropSetReps?.[i] ?? "?"}`).join(", ")), isNegativeSet(e.type) && (e.eccSecs || e.conSecs) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#38BDF8'
+    }
+  }, "⬇ ", e.eccSecs || "?", "s ecc / ", e.conSecs || "?", "s con"), e.restApplied && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: C.blue
@@ -5290,6 +5390,8 @@ function LogTab({
   onAddEx,
   setTypeList,
   onAddSetType,
+  onEditSetType,
+  onDeleteSetType,
   clientBW,
   clientName,
   allClientSessions = [],
@@ -5368,7 +5470,8 @@ function LogTab({
     clusterReps: "",
     clusterRepsArr: [],
     clusterCount: "",
-    clusterRest: ""
+    clusterRest: "",
+    dropSetCount: ""
   });
   const [showBand, setShowBand] = useState(false);
   const [editingInstr, setEditingInstr] = useState(false);
@@ -5430,7 +5533,8 @@ function LogTab({
       clusterReps: "",
       clusterRepsArr: [],
       clusterCount: "",
-      clusterRest: ""
+      clusterRest: "",
+      dropSetCount: ""
     });
     setShowBand(false);
     setTempoOverride({
@@ -5466,7 +5570,8 @@ function LogTab({
       clusterReps: "",
       clusterRepsArr: [],
       clusterCount: "",
-      clusterRest: ""
+      clusterRest: "",
+      dropSetCount: ""
     }));
     setShowBand(false);
     setTempoOverride({
@@ -5510,8 +5615,11 @@ function LogTab({
       clusterReps: entry.clusterReps != null ? String(entry.clusterReps) : "",
       clusterRepsArr: entry.clusterRepsArr?.length ? entry.clusterRepsArr.map(String) : entry.clusterReps != null && entry.clusterCount != null ? Array(entry.clusterCount).fill(String(entry.clusterReps)) : [],
       clusterCount: entry.clusterCount != null ? String(entry.clusterCount) : "",
-      clusterRest: entry.clusterRest != null ? String(entry.clusterRest) : ""
+      clusterRest: entry.clusterRest != null ? String(entry.clusterRest) : "",
+      dropSetCount: entry.dropSetLoads?.length ? String(entry.dropSetLoads.length) : ""
     }));
+    if (entry.dropSetReps?.length) setDropSetRepsArr(entry.dropSetReps.map(String));
+    if (entry.dropSetMainReps != null) setDropSetMainReps(String(entry.dropSetMainReps));
     setShowBand(!!entry.bandStrength);
     const sessionDate = sessions.find(s => s.id === sessionId)?.date || today;
     setEditingEntryRef({
@@ -5628,6 +5736,82 @@ function LogTab({
     return () => clearTimeout(t);
   }, [clusterSeqRemaining]);
 
+  // Drop Set sequence — same state-machine shape as the Cluster Set sequence,
+  // but reps are entered AFTER each drop (since actual reps-to-fatigue can't be
+  // predicted in advance), and the "rest" is really just a short transition
+  // (~15s) for changing the load — true drop sets deliberately use minimal/no
+  // rest, since the whole mechanism relies on continuing under accumulated
+  // fatigue rather than recovering from it. The main/top set (form.load,
+  // form.reps) is the client's regular working set — it is NOT itself "Drop
+  // 1"; Drop 1 is the first reduction AFTER it.
+  const [dropSetPct, setDropSetPct] = useState("20"); // base % (Main set -> Drop 1)
+  const [dropPctDir, setDropPctDir] = useState("+");
+  const [dropPctIncAmt, setDropPctIncAmt] = useState("0");
+  const [dropPctTurnsCfg, setDropPctTurnsCfg] = useState([]);
+  const [dropSetRepsArr, setDropSetRepsArr] = useState([]); // filled in AFTER each drop completes
+  const [dropSetMainReps, setDropSetMainReps] = useState(""); // snapshot of the top set's reps, taken when the sequence starts
+  const [dropSetActive, setDropSetActive] = useState(false);
+  const [dropSetIdx, setDropSetIdx] = useState(0);
+  const [dropSetRemaining, setDropSetRemaining] = useState(0);
+  const [dropSetCompleted, setDropSetCompleted] = useState(false);
+  const dropSetCountNum = +form.dropSetCount || 0;
+  const dropSetLoads = calcDropSetLoads(+form.load || 0, +dropSetPct, dropPctDir, +dropPctIncAmt, dropPctTurnsCfg, dropSetCountNum);
+  // Reference-only suggestion for each drop's reps. A "fresh 1RM" estimate at
+  // the new load would be scientifically wrong here — it ignores that the
+  // client is already fatigued from the stage just performed. Instead, use the
+  // standard coaching heuristic: a well-calibrated ~20-25% drop is specifically
+  // sized to let the client repeat a SIMILAR rep count to the stage before it
+  // (weight decrease roughly offsets accumulated fatigue) — so suggest the
+  // PREVIOUS stage's actual reps (main set for Drop 1, prior drop after that).
+  // Falls back recursively through earlier drops (ultimately to the main set)
+  // if a nearer actual hasn't been entered yet, so every drop box always has a
+  // suggestion — 1 drop or 10, filled in order or not.
+  const dropSetSuggestedReps = dropIdx => {
+    if (dropIdx === 0) {
+      const mainReps = +dropSetMainReps || +form.reps;
+      return mainReps > 0 ? mainReps : null;
+    }
+    const prevActual = +dropSetRepsArr[dropIdx - 1];
+    return prevActual > 0 ? prevActual : dropSetSuggestedReps(dropIdx - 1);
+  };
+  useEffect(() => {
+    setDropSetActive(false);
+    setDropSetIdx(0);
+    setDropSetRemaining(0);
+    setDropSetCompleted(false);
+    setDropSetRepsArr(Array(dropSetCountNum).fill(""));
+    setDropSetMainReps("");
+  }, [form.setNo, form.dropSetCount, activeEx]);
+
+  // Negative Set breakdown — deliberately a SEPARATE, dedicated eccentric/
+  // concentric input from the general tempo override editor elsewhere on this
+  // page (not synced with it), since a true "Negative" set is an intentional,
+  // focused technique with its own tempo decisions, not just an adjustment to
+  // the exercise's usual prescribed tempo. Resets when switching exercises
+  // (tempo is exercise-specific) but persists across sets of the same
+  // exercise, since the eccentric/concentric timing is usually consistent
+  // for the whole exercise within a session.
+  const [negEccSecs, setNegEccSecs] = useState("4");
+  const [negConSecs, setNegConSecs] = useState("1");
+  useEffect(() => {
+    setNegEccSecs("4");
+    setNegConSecs("1");
+  }, [activeEx]);
+  useEffect(() => {
+    if (dropSetRemaining <= 0) return;
+    const t = setTimeout(() => {
+      setDropSetRemaining(r => {
+        if (r <= 1) {
+          playClusterChime();
+          setDropSetCompleted(true);
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [dropSetRemaining]);
+
   // When arriving here via a pill tap (quick-switch), jump straight to whichever
   // exercise that client's rest timer belongs to, rather than leaving them on
   // whatever exercise happened to be selected last.
@@ -5675,10 +5859,13 @@ function LogTab({
     const velFromRepT_ = form.repTime ? +(0.45 / +form.repTime).toFixed(2) : null;
     const vel = form.velocity ? +form.velocity : velFromRepT_ ? velFromRepT_ : estVelocity(effLoad, oneRM);
     const power = calcPower(effLoad, vel);
-    // Effective tempo: session override > program-prescribed default
+    // Effective tempo: for Negative sets, the dedicated Negative breakdown
+    // fields take priority (they're intentionally a separate, focused input —
+    // not synced with the general tempo override); otherwise session override
+    // > program-prescribed default, as before.
     const exDefSub = program?.exercises.find(e => e.name === activeEx);
-    const eccUsed = tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDefSub?.eccSecs || null;
-    const conUsed = tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDefSub?.conSecs || null;
+    const eccUsed = isNegativeSet(form.type) && negEccSecs !== "" ? +negEccSecs : tempoOverride.eccSecs !== "" ? +tempoOverride.eccSecs : exDefSub?.eccSecs || null;
+    const conUsed = isNegativeSet(form.type) && negConSecs !== "" ? +negConSecs : tempoOverride.conSecs !== "" ? +tempoOverride.conSecs : exDefSub?.conSecs || null;
     // Rest applied to this set: session override > exercise default (recorded regardless of timer toggle)
     const restApplied = restOverride !== "" ? +restOverride : calcIncrementalRest(exDefSub?.restSecs, exDefSub?.restIncrementDir, exDefSub?.restIncrementAmt, +form.setNo, exDefSub?.restTurns);
     const entryFields = {
@@ -5715,6 +5902,9 @@ function LogTab({
       })(),
       clusterRest: isClusterSet(form.type) && form.clusterRest ? +form.clusterRest : null,
       // legacy field, kept for older data compatibility
+      dropSetLoads: isDropSet(form.type) && dropSetLoads.length > 0 ? dropSetLoads : null,
+      dropSetReps: isDropSet(form.type) && dropSetLoads.length > 0 ? dropSetLoads.map((_, i) => +dropSetRepsArr[i] || 0) : null,
+      dropSetMainReps: isDropSet(form.type) && dropSetLoads.length > 0 ? +dropSetMainReps || +form.reps || 0 : null,
       restApplied: restApplied || null,
       equipUsed: equipOverride || null,
       latUsed: latOverride || null,
@@ -5749,7 +5939,8 @@ function LogTab({
       clusterReps: "",
       clusterRepsArr: [],
       clusterCount: "",
-      clusterRest: ""
+      clusterRest: "",
+      dropSetCount: ""
     }));
     setShowBand(false);
     setSaved(true);
@@ -6830,16 +7021,16 @@ function LogTab({
       gap: 10,
       marginBottom: 12
     }
-  }, /*#__PURE__*/React.createElement("div", {
+  }, !isIsoType(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
-    t: isIsoType(form.type) ? "Contractions" : isClusterSet(form.type) ? "Total Reps (auto)" : "Reps"
+    t: isClusterSet(form.type) ? "Total Reps (auto)" : "Reps"
   }), /*#__PURE__*/React.createElement("input", {
     type: "number",
     min: "1",
-    placeholder: isOvrcIso(form.type) ? "3" : isYieldIso(form.type) ? "1" : "8",
+    placeholder: "8",
     value: form.reps,
     onChange: e => upd("reps", e.target.value),
     readOnly: isClusterSet(form.type),
@@ -6850,7 +7041,7 @@ function LogTab({
         color: C.sub
       } : {})
     }
-  }), zoneTarget && !isIsoType(form.type) && !isClusterSet(form.type) && /*#__PURE__*/React.createElement("div", {
+  }), zoneTarget && !isClusterSet(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -6889,25 +7080,7 @@ function LogTab({
       fontWeight: 700,
       flexShrink: 0
     }
-  }, "Use"))), isOvrcIso(form.type) ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement(Lbl, {
-    t: "Hold Duration (s)"
-  }), /*#__PURE__*/React.createElement("select", {
-    value: form.holdDuration,
-    onChange: e => upd("holdDuration", e.target.value),
-    style: ss
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Select…"), form.type === "Ovrc Iso-Ballistic" ? [0.5, 1].map(v => /*#__PURE__*/React.createElement("option", {
-    key: v,
-    value: v
-  }, v, "s")) : [3].map(v => /*#__PURE__*/React.createElement("option", {
-    key: v,
-    value: v
-  }, v, "s")))) : /*#__PURE__*/React.createElement("div", {
+  }, "Use"))), !isOvrcIso(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -7672,97 +7845,566 @@ function LogTab({
         fontWeight: 600
       }
     }, form.clusterRepsArr.map(v => v || "0").join("+"), " reps", gaps.length > 0 ? ` (${gaps.map(g => fmtRest(g)).join(" → ")} rest between)` : "", " = ", /*#__PURE__*/React.createElement("strong", null, total, " total reps"));
-  })()), isIsoType(form.type) && /*#__PURE__*/React.createElement("div", {
+  })()), isDropSet(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
-      background: C.card2,
+      background: "#A855F715",
       borderRadius: 10,
       padding: "12px 14px",
-      border: `1px solid ${C.border}`,
+      border: `1px solid #A855F733`,
       marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
-      color: C.muted,
+      color: '#A855F7',
+      fontWeight: 700,
       letterSpacing: 1.5,
       textTransform: "uppercase",
-      fontWeight: 700,
       marginBottom: 10
     }
-  }, "⚡ Force measurement", /*#__PURE__*/React.createElement("span", {
+  }, "📉 Drop Set breakdown"), (() => {
+    const cx = complexForEx(activeEx);
+    if (!cx) return null;
+    const idx = cx.exerciseNames.indexOf(activeEx);
+    const isLast = idx === cx.exerciseNames.length - 1;
+    const label = complexLabelNumbered(allComplexes, cx._colorIdx);
+    const color = complexColorFor(cx._colorIdx);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: color + "18",
+        border: `1px solid ${color}44`,
+        borderRadius: 8,
+        padding: "8px 10px",
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color,
+        fontWeight: 700
+      }
+    }, "🔗 Part of ", label, ": ", cx.exerciseNames.join(" → ")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.sub,
+        marginTop: 2
+      }
+    }, isLast ? "Logging this completes the round — rest timer starts, then cycles back to " + cx.exerciseNames[0] + "." : `Logging this will jump straight to ${cx.exerciseNames[idx + 1]} — no rest.`));
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
-      color: C.muted + "88",
-      fontWeight: 400,
-      textTransform: "none",
-      letterSpacing: 0
+      marginBottom: 8
     }
-  }, " — optional, requires a device")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Number of drops"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "1",
+    placeholder: "3",
+    value: form.dropSetCount,
+    onChange: e => {
+      const dc = Math.max(0, +e.target.value || 0);
+      upd("dropSetCount", e.target.value);
+      setDropSetRepsArr(arr => {
+        const na = [...arr];
+        while (na.length < dc) na.push("");
+        na.length = dc;
+        return na;
+      });
+    },
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Base Drop % (Main set → Drop 1)"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: dropSetPct,
+    onChange: e => setDropSetPct(e.target.value),
+    style: ss
+  }, [5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "%")))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      gap: 10,
-      marginBottom: 8
+      gap: 8,
+      marginBottom: 6
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
+      width: 70
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Trend"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: dropPctDir,
+    onChange: e => setDropPctDir(e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "+"
+  }, "+"), /*#__PURE__*/React.createElement("option", {
+    value: "-"
+  }, "−"))), /*#__PURE__*/React.createElement("div", {
+    style: {
       flex: 1
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
-    t: "Force (N)"
+    t: "Increment per drop"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: dropPctIncAmt,
+    onChange: e => setDropPctIncAmt(e.target.value),
+    style: ss
+  }, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v === 0 ? "None (flat %)" : `${v}%`))))), +dropPctIncAmt > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, dropPctTurnsCfg.map((t, ti) => /*#__PURE__*/React.createElement("div", {
+    key: ti,
+    style: {
+      background: C.card,
+      borderRadius: 8,
+      padding: "10px",
+      marginBottom: 8,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: '#A855F7',
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase"
+    }
+  }, "🌊 Turn ", ti + 1), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setDropPctTurnsCfg(rt => rt.filter((_, i) => i !== ti)),
+    style: {
+      background: "none",
+      border: "none",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 12
+    }
+  }, "🗑 Remove")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Switch trend after drop #"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.afterSet,
+    onChange: e => {
+      const nt = [...dropPctTurnsCfg];
+      nt[ti] = {
+        ...nt[ti],
+        afterSet: +e.target.value
+      };
+      setDropPctTurnsCfg(nt);
+    },
+    style: ss
+  }, TURN_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, "Drop ", v)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 70
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "New trend"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.dir,
+    onChange: e => {
+      const nt = [...dropPctTurnsCfg];
+      nt[ti] = {
+        ...nt[ti],
+        dir: e.target.value
+      };
+      setDropPctTurnsCfg(nt);
+    },
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "+"
+  }, "+"), /*#__PURE__*/React.createElement("option", {
+    value: "-"
+  }, "−"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "New increment"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.amt,
+    onChange: e => {
+      const nt = [...dropPctTurnsCfg];
+      nt[ti] = {
+        ...nt[ti],
+        amt: +e.target.value
+      };
+      setDropPctTurnsCfg(nt);
+    },
+    style: ss
+  }, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v === 0 ? "None (flat)" : `${v}%`))))))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const lastDrop = dropPctTurnsCfg.length ? dropPctTurnsCfg[dropPctTurnsCfg.length - 1].afterSet : 2;
+      setDropPctTurnsCfg(rt => [...rt, {
+        afterSet: Math.min(20, lastDrop + 1),
+        dir: "+",
+        amt: 0
+      }]);
+    },
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px dashed ${'#A855F7'}55`,
+      borderRadius: 8,
+      padding: "8px",
+      cursor: "pointer",
+      color: '#A855F7',
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 8
+    }
+  }, "🌊 + Add trend change")), +dropPctIncAmt > 0 && dropSetCountNum >= 1 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#A855F7',
+      marginBottom: 8,
+      fontWeight: 600,
+      lineHeight: 1.6
+    }
+  }, "Preview: ", Array.from({
+    length: dropSetCountNum
+  }, (_, i) => `${i === 0 ? "Main" : "Drop" + i}→Drop${i + 1} ${calcDropPct(+dropSetPct, dropPctDir, +dropPctIncAmt, i + 1, dropPctTurnsCfg)}%`).join(" · ")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: C.muted,
+      marginBottom: 10,
+      lineHeight: 1.4
+    }
+  }, "True drop sets use minimal-to-no rest between drops — the load reduction itself is what lets you keep training despite accumulated fatigue."), dropSetLoads.length > 0 && (() => {
+    // Reuse the SAME session-history recommendation already powering
+    // the gold box elsewhere on this page — no new formula, just the
+    // same rep-range logic applied here too, for consistency. Only
+    // available once real session history exists for this exercise;
+    // for the first few sessions this stays blank and the trainer's
+    // own judgment is the suggestion, same as it's always been.
+    const mainSetRec = calcRecommendedLoad(sessions, activeEx);
+    const mainSetSuggestedReps = mainSetRec?.repRangeLo ? Math.round((mainSetRec.repRangeLo + mainSetRec.repRangeHi) / 2) : null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: '#A855F7',
+        fontWeight: 700,
+        width: 60,
+        flexShrink: 0
+      }
+    }, "Main set"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card2,
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        fontSize: 12,
+        color: C.text,
+        flex: 1
+      }
+    }, form.load || "—", "kg"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.muted,
+        width: 64,
+        textAlign: "center"
+      }
+    }, form.reps || "—", " reps"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        width: 38,
+        flexShrink: 0
+      }
+    }, mainSetSuggestedReps != null ? `~${mainSetSuggestedReps}r` : "")), /*#__PURE__*/React.createElement(Lbl, {
+      t: "Drop loads (auto) & reps (fill in after each drop)"
+    }), dropSetLoads.map((load, di) => /*#__PURE__*/React.createElement("div", {
+      key: di,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        width: 44,
+        flexShrink: 0
+      }
+    }, "Drop ", di + 1), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card2,
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        fontSize: 12,
+        color: C.text,
+        flex: 1
+      }
+    }, load, "kg"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      placeholder: "reps",
+      value: dropSetRepsArr[di] || "",
+      onChange: e => setDropSetRepsArr(arr => {
+        const na = [...arr];
+        na[di] = e.target.value;
+        return na;
+      }),
+      style: {
+        ...ss,
+        width: 64,
+        textAlign: "center"
+      }
+    }), dropSetSuggestedReps(di) != null && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        width: 38,
+        flexShrink: 0
+      }
+    }, "~", dropSetSuggestedReps(di), "r"))));
+  })(), dropSetLoads.length >= 1 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTop: `1px solid #A855F733`
+    }
+  }, !dropSetActive ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setDropSetActive(true);
+      setDropSetIdx(0);
+      setDropSetRemaining(0);
+      setDropSetCompleted(false);
+      setDropSetMainReps(form.reps || "");
+    },
+    style: {
+      width: "100%",
+      background: '#A855F7',
+      color: "#1A1200",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "▶ Start Drop Sequence") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      border: `1px solid ${'#A855F7'}55`,
+      borderRadius: 10,
+      padding: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 8,
+      color: dropSetCompleted ? C.accent : '#A855F7'
+    }
+  }, "Drop ", dropSetIdx + 1, " of ", dropSetLoads.length, " — ", dropSetLoads[dropSetIdx], "kg", dropSetCompleted ? " COMPLETED!" : ""), dropSetRemaining > 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 36,
+      color: '#A855F7',
+      letterSpacing: 1
+    }
+  }, dropSetRemaining, "s"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 8
+    }
+  }, "Changing load to ", dropSetLoads[dropSetIdx + 1], "kg"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setDropSetRemaining(0);
+      setDropSetCompleted(true);
+    },
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.sub,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, "Skip")) : dropSetCompleted ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setDropSetIdx(i => i + 1);
+      setDropSetCompleted(false);
+    },
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "Continue to Drop ", dropSetIdx + 2) : dropSetIdx < dropSetLoads.length - 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: `Reps completed at ${dropSetLoads[dropSetIdx]}kg`
   }), /*#__PURE__*/React.createElement("input", {
     type: "number",
     min: "0",
-    step: "1",
-    placeholder: "e.g. 450",
-    value: form.force,
-    onChange: e => upd("force", e.target.value),
+    autoFocus: true,
+    value: dropSetRepsArr[dropSetIdx] || "",
+    onChange: e => setDropSetRepsArr(arr => {
+      const na = [...arr];
+      na[dropSetIdx] = e.target.value;
+      return na;
+    }),
     style: ss
-  })), form.force && /*#__PURE__*/React.createElement("div", {
+  }), dropSetSuggestedReps(dropSetIdx) != null && /*#__PURE__*/React.createElement("div", {
     style: {
-      flex: 1
+      fontSize: 9,
+      color: C.muted,
+      marginTop: 3
+    }
+  }, "~", dropSetSuggestedReps(dropSetIdx), " reps — similar to the previous stage (a well-calibrated drop % roughly offsets the added fatigue)")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setDropSetRemaining(15),
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "Complete Drop ", dropSetIdx + 1, " — Change to ", dropSetLoads[dropSetIdx + 1], "kg")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
-    t: "= kgf"
-  }), /*#__PURE__*/React.createElement("div", {
+    t: `Reps completed at ${dropSetLoads[dropSetIdx]}kg`
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0",
+    autoFocus: true,
+    value: dropSetRepsArr[dropSetIdx] || "",
+    onChange: e => setDropSetRepsArr(arr => {
+      const na = [...arr];
+      na[dropSetIdx] = e.target.value;
+      return na;
+    }),
+    style: ss
+  }), dropSetSuggestedReps(dropSetIdx) != null && /*#__PURE__*/React.createElement("div", {
     style: {
-      background: C.card,
-      border: `1px solid ${C.border}`,
-      borderRadius: 8,
-      padding: "10px 12px",
-      fontFamily: "'Bebas Neue',cursive",
-      fontSize: 22,
-      color: C.accent,
-      letterSpacing: 1
+      fontSize: 9,
+      color: C.muted,
+      marginTop: 3
     }
-  }, (+form.force / 9.81).toFixed(1), " kgf"))), /*#__PURE__*/React.createElement("div", {
+  }, "~", dropSetSuggestedReps(dropSetIdx), " reps — similar to the previous stage (a well-calibrated drop % roughly offsets the added fatigue)")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      upd("reps", (+dropSetMainReps || +form.reps || 0) + dropSetRepsArr.reduce((s, v) => s + (+v || 0), 0));
+      const cx = complexForEx(activeEx);
+      if (cx) submit();else setDropSetActive(false);
+    },
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, complexForEx(activeEx) ? `✓ Complete Final Drop — Log & Continue` : `✓ Complete Final Drop — Ready to Log Set`)))), (form.reps || dropSetRepsArr.some(v => v)) && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
-      color: C.muted,
-      lineHeight: 1.5
+      color: '#A855F7',
+      marginTop: 8,
+      fontWeight: 600
     }
-  }, "Enter peak force from a force plate, dynamometer or load cell.", isYieldIso(form.type) && form.mvic && form.force ? ` Estimated 100% MVIC ≈ ${(+form.force / (+form.mvic / 100)).toFixed(0)} N (${(+form.force / (+form.mvic / 100) / 9.81).toFixed(1)} kgf).` : "")), isYieldIso(form.type) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, form.load, "kg×", form.reps || "?", ", ", dropSetLoads.map((l, i) => `${l}kg×${dropSetRepsArr[i] || "?"}`).join(", "), " = ", /*#__PURE__*/React.createElement("strong", null, (+form.reps || 0) + dropSetRepsArr.reduce((s, v) => s + (+v || 0), 0), " total reps"))), isNegativeSet(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      gap: 10,
+      background: "#38BDF815",
+      borderRadius: 10,
+      padding: "12px 14px",
+      border: `1px solid #38BDF833`,
       marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
+      fontSize: 10,
+      color: '#38BDF8',
+      fontWeight: 700,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      marginBottom: 10
+    }
+  }, "⬇ Negative Set breakdown"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
       flex: 1
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
-    t: "Hold Duration (s)"
+    t: "Eccentric (lowering)"
   }), /*#__PURE__*/React.createElement("select", {
-    value: form.holdDuration,
-    onChange: e => upd("holdDuration", e.target.value),
+    value: negEccSecs,
+    onChange: e => setNegEccSecs(e.target.value),
     style: ss
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Select…"), form.type === "Yielding Iso-GPP" ? Array.from({
-    length: 13
-  }, (_, i) => 60 + i * 10).map(v => /*#__PURE__*/React.createElement("option", {
-    key: v,
-    value: v
-  }, v, "s (", Math.floor(v / 60), ":", String(v % 60).padStart(2, "0"), " min)")) : [30, 35, 40, 45].map(v => /*#__PURE__*/React.createElement("option", {
+  }, Array.from({
+    length: 12
+  }, (_, i) => i + 1).map(v => /*#__PURE__*/React.createElement("option", {
     key: v,
     value: v
   }, v, "s")))), /*#__PURE__*/React.createElement("div", {
@@ -7770,76 +8412,271 @@ function LogTab({
       flex: 1
     }
   }, /*#__PURE__*/React.createElement(Lbl, {
-    t: "% MVIC"
+    t: "Concentric (lifting)"
   }), /*#__PURE__*/React.createElement("select", {
-    value: form.mvic,
-    onChange: e => upd("mvic", e.target.value),
+    value: negConSecs,
+    onChange: e => setNegConSecs(e.target.value),
     style: ss
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Select…"), Array.from({
-    length: 26
-  }, (_, i) => 60 + i).map(v => /*#__PURE__*/React.createElement("option", {
+  }, Array.from({
+    length: 8
+  }, (_, i) => i + 1).map(v => /*#__PURE__*/React.createElement("option", {
     key: v,
     value: v
-  }, v, "%"))), /*#__PURE__*/React.createElement("div", {
+  }, v, "s"))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#38BDF8',
+      fontWeight: 600,
+      marginBottom: 10
+    }
+  }, "Reps: ", form.reps || "—", " · Target TUT: ", form.reps ? `${Math.round(+form.reps * (+negEccSecs + +negConSecs))}s` : "—"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 9,
       color: C.muted,
-      marginTop: 2
+      lineHeight: 1.5
     }
-  }, "% max voluntary contraction"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: C.blue + "15",
-      borderRadius: 10,
-      padding: "12px 14px",
-      border: `1px solid ${C.blue + "33"}`,
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.blue,
-      marginBottom: 6
-    }
-  }, "What is MVIC?"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.sub,
-      lineHeight: 1.6,
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("strong", {
-    style: {
-      color: C.text
-    }
-  }, "MVIC = Maximum Voluntary Isometric Contraction"), " — the absolute maximum force a muscle can produce in a static (non-moving) contraction. Essentially your ceiling for isometric strength. When you prescribe 60–85% MVIC you are telling the client to hold at that percentage of their maximum possible isometric effort for that position."), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.sub,
-      lineHeight: 1.8
-    }
-  }, /*#__PURE__*/React.createElement("div", null, "🔵 ", /*#__PURE__*/React.createElement("strong", {
-    style: {
-      color: C.text
-    }
-  }, "60% MVIC"), " — moderate effort, sustainable for longer holds, good for beginners or acute tendinopathy"), /*#__PURE__*/React.createElement("div", null, "🟡 ", /*#__PURE__*/React.createElement("strong", {
-    style: {
-      color: C.text
-    }
-  }, "70–75% MVIC"), " — typical sweet spot for tendon adaptation"), /*#__PURE__*/React.createElement("div", null, "🔴 ", /*#__PURE__*/React.createElement("strong", {
-    style: {
-      color: C.text
-    }
-  }, "85% MVIC"), " — near-maximal, shorter sustainable duration, more advanced")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: C.muted,
-      marginTop: 8,
-      fontStyle: "italic"
-    }
-  }, "Estimated subjectively (similar to RPE) unless you have force measurement equipment. Guide: 60% = moderately challenging · 75% = hard but holdable · 85% = very difficult."))), !isOvrcIso(form.type) && /*#__PURE__*/React.createElement("div", {
+  }, "Eccentric strength typically exceeds concentric strength by roughly 20-40%, which is the basis for negatives — the muscle can handle more load, or more time under tension, being lowered than it could lift unassisted. If using a heavier-than-normal load (supra-maximal), a spotter is usually needed to assist the concentric (lifting) phase. Research generally supports 2-6s eccentric durations for a meaningful stimulus; longer \"super slow\" protocols exist but evidence for added benefit beyond that range is weaker.")), isIsoType(form.type) && (() => {
+    const meta = ISO_META[form.type];
+    const yielding = isYieldIso(form.type);
+    const overcoming = isOvrcIso(form.type);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: meta.color + "15",
+        borderRadius: 10,
+        padding: "12px 14px",
+        border: `1px solid ${meta.color}33`,
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: meta.color,
+        letterSpacing: 1.5,
+        textTransform: "uppercase",
+        fontWeight: 700,
+        marginBottom: 10
+      }
+    }, meta.icon, " ", meta.label), overcoming ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10,
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Contractions"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "1",
+      placeholder: "3",
+      value: form.reps,
+      onChange: e => upd("reps", e.target.value),
+      style: ss
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Hold Duration (s)"
+    }), /*#__PURE__*/React.createElement("select", {
+      value: form.holdDuration,
+      onChange: e => upd("holdDuration", e.target.value),
+      style: ss
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "Select…"), form.type === "Ovrc Iso-Ballistic" ? [0.5, 1].map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v, "s")) : form.type === "Ovrc Iso-Max" ? [3, 4, 5].map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v, "s")) : form.type === "Ovrc Iso-Endurance" ? [6, 7, 8, 9, 10].map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v, "s")) : Array.from({
+      length: 6
+    }, (_, i) => 15 + i).map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v, "s"))))) : /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Contractions"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "1",
+      placeholder: "1",
+      value: form.reps,
+      onChange: e => upd("reps", e.target.value),
+      style: ss
+    })), yielding && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10,
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Hold Duration (s)"
+    }), /*#__PURE__*/React.createElement("select", {
+      value: form.holdDuration,
+      onChange: e => upd("holdDuration", e.target.value),
+      style: ss
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "Select…"), form.type === "Yielding Iso-GPP" ? Array.from({
+      length: 13
+    }, (_, i) => 60 + i * 10).map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v, "s (", Math.floor(v / 60), ":", String(v % 60).padStart(2, "0"), " min)")) : Array.from({
+      length: 7
+    }, (_, i) => 15 + i * 5).map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v, "s")))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "% MVIC"
+    }), /*#__PURE__*/React.createElement("select", {
+      value: form.mvic,
+      onChange: e => upd("mvic", e.target.value),
+      style: ss
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "Select…"), Array.from({
+      length: 26
+    }, (_, i) => 60 + i).map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v, "%"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        marginTop: 2
+      }
+    }, "% max voluntary contraction"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: meta.color + "15",
+        borderRadius: 10,
+        padding: "12px 14px",
+        border: `1px solid ${meta.color}33`,
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: meta.color,
+        marginBottom: 6
+      }
+    }, "What is MVIC?"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.sub,
+        lineHeight: 1.6,
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("strong", {
+      style: {
+        color: C.text
+      }
+    }, "MVIC = Maximum Voluntary Isometric Contraction"), " — the absolute maximum force a muscle can produce in a static (non-moving) contraction. Essentially your ceiling for isometric strength. When you prescribe 60–85% MVIC you are telling the client to hold at that percentage of their maximum possible isometric effort for that position."), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.sub,
+        lineHeight: 1.8
+      }
+    }, /*#__PURE__*/React.createElement("div", null, "🔵 ", /*#__PURE__*/React.createElement("strong", {
+      style: {
+        color: C.text
+      }
+    }, "60% MVIC"), " — moderate effort, sustainable for longer holds, good for beginners or acute tendinopathy"), /*#__PURE__*/React.createElement("div", null, "🟡 ", /*#__PURE__*/React.createElement("strong", {
+      style: {
+        color: C.text
+      }
+    }, "70–75% MVIC"), " — typical sweet spot for tendon adaptation"), /*#__PURE__*/React.createElement("div", null, "🔴 ", /*#__PURE__*/React.createElement("strong", {
+      style: {
+        color: C.text
+      }
+    }, "85% MVIC"), " — near-maximal, shorter sustainable duration, more advanced")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        marginTop: 8,
+        fontStyle: "italic"
+      }
+    }, "Estimated subjectively (similar to RPE) unless you have force measurement equipment. Guide: 60% = moderately challenging · 75% = hard but holdable · 85% = very difficult."))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: meta.color + "cc",
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        fontWeight: 700,
+        marginBottom: 8
+      }
+    }, "⚡ Force measurement", /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.muted,
+        fontWeight: 400,
+        textTransform: "none",
+        letterSpacing: 0
+      }
+    }, " — optional, requires a device")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 10,
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Force (N)"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      step: "1",
+      placeholder: "e.g. 450",
+      value: form.force,
+      onChange: e => upd("force", e.target.value),
+      style: ss
+    })), form.force && /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "= kgf"
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card,
+        border: `1px solid ${C.border}`,
+        borderRadius: 8,
+        padding: "10px 12px",
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: 22,
+        color: meta.color,
+        letterSpacing: 1
+      }
+    }, (+form.force / 9.81).toFixed(1), " kgf"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.muted,
+        lineHeight: 1.5
+      }
+    }, "Enter peak force from a force plate, dynamometer or load cell.", yielding && form.mvic && form.force ? ` Estimated 100% MVIC ≈ ${(+form.force / (+form.mvic / 100)).toFixed(0)} N (${(+form.force / (+form.mvic / 100) / 9.81).toFixed(1)} kgf).` : ""));
+  })(), !isOvrcIso(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 12
     }
@@ -8002,7 +8839,9 @@ function LogTab({
     },
     options: setTypeList,
     onAddOption: onAddSetType,
-    addLabel: "Add set type"
+    addLabel: "Add set type",
+    onEditOption: onEditSetType,
+    onDeleteOption: onDeleteSetType
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -8884,7 +9723,7 @@ function LogTab({
       style: {
         fontSize: 12
       }
-    }, e.clusterRepsArr?.length ? `Set ${e.set}: ${e.reps}(${e.clusterRepsArr.join("; ")})*${e.load}kg` : `Set ${e.set}: ${e.reps}×${e.load}kg`), /*#__PURE__*/React.createElement("div", {
+    }, e.clusterRepsArr?.length ? `Set ${e.set}: ${e.reps}(${e.clusterRepsArr.join("; ")})*${e.load}kg` : e.dropSetLoads?.length > 0 ? `Set ${e.set}: ${e.load}kg×${e.dropSetMainReps ?? "?"}, ${e.dropSetLoads.map((l, i) => `${l}kg×${e.dropSetReps?.[i] ?? "?"}`).join(", ")}` : isNegativeSet(e.type) && (e.eccSecs || e.conSecs) ? `Set ${e.set}: ${e.reps}×${e.load}kg (${e.eccSecs || "?"}s ecc / ${e.conSecs || "?"}s con)` : `Set ${e.set}: ${e.reps}×${e.load}kg`), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 6,
@@ -9023,7 +9862,17 @@ function LogTab({
           fontSize: 12,
           color: C.gold
         }
-      }, " · ⏱ ", e.clusterRepsArr?.length ? e.clusterRepsArr.join("+") + " reps" : `${e.clusterCount}×${e.clusterReps}`, " clusters", e.clusterGaps?.length ? ` (${e.clusterGaps.map(g => fmtRest(g)).join(" → ")})` : ""), e.restApplied && /*#__PURE__*/React.createElement("span", {
+      }, " · ⏱ ", e.clusterRepsArr?.length ? e.clusterRepsArr.join("+") + " reps" : `${e.clusterCount}×${e.clusterReps}`, " clusters", e.clusterGaps?.length ? ` (${e.clusterGaps.map(g => fmtRest(g)).join(" → ")})` : ""), e.dropSetLoads?.length > 0 && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: '#A855F7'
+        }
+      }, " · 📉 ", e.load, "kg×", e.dropSetMainReps ?? "?", ", ", e.dropSetLoads.map((l, i) => `${l}kg×${e.dropSetReps?.[i] ?? "?"}`).join(", ")), isNegativeSet(e.type) && (e.eccSecs || e.conSecs) && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: '#38BDF8'
+        }
+      }, " · ⬇ ", e.eccSecs || "?", "s ecc / ", e.conSecs || "?", "s con"), e.restApplied && /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 12,
           color: C.blue
@@ -9079,7 +9928,7 @@ function LogTab({
           fontSize: 10,
           color: C.sub
         }
-      }, "~", est1RM(e.load, e.reps), " 1RM")) : /*#__PURE__*/React.createElement("div", {
+      }, "~", est1RM(e.load, effReps(e)), " 1RM")) : /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 11,
           color: C.warn,
@@ -9154,17 +10003,17 @@ function ProgressTab({
       if (!ee.length) return null;
       const maxLoad = Math.max(...ee.map(e => e.load));
       const top = ee.find(e => e.load === maxLoad);
-      const oneRM = est1RM(maxLoad, top.reps);
+      const oneRM = est1RM(maxLoad, effReps(top));
       const vel = top.velocity || estVelocity(maxLoad, oneRM);
       const power = top.power || calcPower(maxLoad, vel);
       // Max reps across all sets this session for this exercise
-      const maxReps = Math.max(...ee.map(e => e.reps));
-      const totalVol = ee.reduce((sum, e) => sum + e.load * e.reps, 0);
-      const avgReps = ee.reduce((sum, e) => sum + e.reps, 0) / ee.length;
+      const maxReps = Math.max(...ee.map(effReps));
+      const totalVol = ee.reduce((sum, e) => sum + effVolume(e), 0);
+      const avgReps = ee.reduce((sum, e) => sum + effReps(e), 0) / ee.length;
       // TUT: prefer actual logged tempo per entry (session adjustment), else program default
       const exDef = sessions.length ? program?.exercises?.find(e => e.name === sel) : null;
       const loggedTempo = ee.filter(e => e.eccSecs || e.conSecs);
-      const avgTUT = loggedTempo.length ? ee.reduce((sum, e) => sum + e.reps * ((e.eccSecs || exDef?.eccSecs || 2) + (e.conSecs || exDef?.conSecs || 1)), 0) / ee.length : exDef?.eccSecs || exDef?.conSecs ? top.reps * ((exDef.eccSecs || 2) + (exDef.conSecs || 1)) : null;
+      const avgTUT = loggedTempo.length ? ee.reduce((sum, e) => sum + effReps(e) * ((e.eccSecs || exDef?.eccSecs || 2) + (e.conSecs || exDef?.conSecs || 1)), 0) / ee.length : exDef?.eccSecs || exDef?.conSecs ? effReps(top) * ((exDef.eccSecs || 2) + (exDef.conSecs || 1)) : null;
       const totalRestSecs = ee.reduce((sum, e) => sum + (e.restApplied || 0), 0);
       const totalWorkSecs = ee.reduce((sum, e) => sum + estSetWorkSecs(e, exDef), 0);
       return {
@@ -10450,19 +11299,19 @@ function ReportTab({
         if (!ee.length) return;
         const maxLoad = Math.max(...ee.map(e => e.load));
         const top = ee.find(e => e.load === maxLoad) || ee[0];
-        const oneRM = est1RM(maxLoad, top.reps);
+        const oneRM = est1RM(maxLoad, effReps(top));
         const vel = top.velocity || estVelocity(maxLoad, oneRM);
         row[`load_${ex.name}`] = maxLoad;
         row[`onerm_${ex.name}`] = oneRM;
         row[`power_${ex.name}`] = top.power || calcPower(maxLoad, vel);
-        const totalVol = ee.reduce((sum, e) => sum + e.load * e.reps, 0);
-        const avgReps = ee.reduce((sum, e) => sum + e.reps, 0) / ee.length;
+        const totalVol = ee.reduce((sum, e) => sum + effVolume(e), 0);
+        const avgReps = ee.reduce((sum, e) => sum + effReps(e), 0) / ee.length;
         // TUT: prefer actual logged tempo per entry, else program-prescribed default
         const prescEx = (program?.exercises || []).find(e => e.name === ex.name);
         const loggedT = ee.filter(e => e.eccSecs || e.conSecs);
         // TUT: for iso sets use holdDuration×reps; else use tempo
         const isoEntries = ee.filter(e => e.holdDuration);
-        const avgTUT = isoEntries.length ? isoEntries.reduce((sum, e) => sum + e.holdDuration * e.reps, 0) / isoEntries.length : loggedT.length ? ee.reduce((sum, e) => sum + e.reps * ((e.eccSecs || prescEx?.eccSecs || 2) + (e.conSecs || prescEx?.conSecs || 1)), 0) / ee.length : prescEx?.eccSecs || prescEx?.conSecs ? Math.max(...ee.map(e => e.reps)) * ((prescEx.eccSecs || 2) + (prescEx.conSecs || 1)) : null;
+        const avgTUT = isoEntries.length ? isoEntries.reduce((sum, e) => sum + e.holdDuration * e.reps, 0) / isoEntries.length : loggedT.length ? ee.reduce((sum, e) => sum + effReps(e) * ((e.eccSecs || prescEx?.eccSecs || 2) + (e.conSecs || prescEx?.conSecs || 1)), 0) / ee.length : prescEx?.eccSecs || prescEx?.conSecs ? Math.max(...ee.map(e => e.reps)) * ((prescEx.eccSecs || 2) + (prescEx.conSecs || 1)) : null;
         row[`reps_${ex.name}`] = Math.max(...ee.map(e => e.reps));
         row[`hyp_${ex.name}`] = calcHypIndex(totalVol, oneRM, avgReps, avgTUT);
         row[`msi_${ex.name}`] = calcMSI(maxLoad, oneRM);
@@ -10498,7 +11347,7 @@ function ReportTab({
     const top = all.find(e => e.load === bestLoad) || {
       reps: 9
     };
-    const b1RM = est1RM(bestLoad, top.reps);
+    const b1RM = est1RM(bestLoad, effReps(top));
     const vel = top.velocity || estVelocity(bestLoad, b1RM);
     const bPow = top.power || calcPower(bestLoad, vel);
     const rel = client.bw ? (b1RM / client.bw).toFixed(2) : "–";
@@ -11646,7 +12495,7 @@ function App() {
   const [customLaterality, setCustomLaterality] = useState(() => migrateList('forge_customLat', LAT_LIST));
   const [customCategories, setCustomCategories] = useState(() => migrateList('forge_customCats', CATEGORIES));
   const [customProgTypes, setCustomProgTypes] = useState(() => migrateList('forge_customPT', PROG_TYPES));
-  const [customSetTypes, setCustomSetTypes] = useState(() => lsGet('forge_customST', []));
+  const [customSetTypes, setCustomSetTypes] = useState(() => migrateList('forge_customST', SET_TYPES));
 
   // One-time migration: "Activation Strength" was added as a new default
   // Program Type after most users had already migrated their Program Type
@@ -11655,6 +12504,35 @@ function App() {
   // if it's missing, without disturbing anything else the trainer has added.
   useEffect(() => {
     setCustomProgTypes(pts => pts.includes("Activation Strength") ? pts : ["Activation Strength", ...pts]);
+  }, []);
+
+  // Same backfill pattern for "Ovrc Iso-Endurance" — added as a new default
+  // Set Type after most users had already migrated their Set Type list once.
+  // Inserted right after "Ovrc Iso-Max" if present, for a sensible ordering
+  // alongside its sibling iso types; otherwise just appended.
+  useEffect(() => {
+    setCustomSetTypes(sts => {
+      if (sts.includes("Ovrc Iso-Endurance")) return sts;
+      const idx = sts.indexOf("Ovrc Iso-Max");
+      if (idx === -1) return [...sts, "Ovrc Iso-Endurance"];
+      return [...sts.slice(0, idx + 1), "Ovrc Iso-Endurance", ...sts.slice(idx + 1)];
+    });
+  }, []);
+
+  // Backfill "Ovrc Iso-Sustained" — inserted right after "Ovrc Iso-Endurance"
+  // (its sibling in the Overcoming family), otherwise appended. Also cleans up
+  // "Yielding Iso-ShortHolds" if present — an earlier, briefly-live name for
+  // effectively the same duration range, since real-world testing showed this
+  // is better framed as an Overcoming (max-effort-to-fatigue) protocol rather
+  // than a submaximal Yielding hold.
+  useEffect(() => {
+    setCustomSetTypes(sts => {
+      let out = sts.filter(t => t !== "Yielding Iso-ShortHolds");
+      if (out.includes("Ovrc Iso-Sustained")) return out;
+      const idx = out.indexOf("Ovrc Iso-Endurance");
+      if (idx === -1) return [...out, "Ovrc Iso-Sustained"];
+      return [...out.slice(0, idx + 1), "Ovrc Iso-Sustained", ...out.slice(idx + 1)];
+    });
   }, []);
 
   // ── Multi-client rest timer — keyed by clientId so each client's countdown
@@ -11806,7 +12684,7 @@ function App() {
   const latList = customLaterality;
   const categoryList = customCategories;
   const progTypeList = customProgTypes;
-  const setTypeList = useMemo(() => [...SET_TYPES, ...customSetTypes], [customSetTypes]);
+  const setTypeList = customSetTypes;
   const onAddEx = name => setCustomExercises(l => [...l, name]);
   const onAddEquip = name => setCustomEquipment(l => [...l, name]);
   const onAddLat = name => setCustomLaterality(l => [...l, name]);
@@ -11817,6 +12695,8 @@ function App() {
   const onEditProgType = (o, n) => setCustomProgTypes(l => l.map(x => x === o ? n : x));
   const onDeleteProgType = v => setCustomProgTypes(l => l.filter(x => x !== v));
   const onAddSetType = name => setCustomSetTypes(l => [...l, name]);
+  const onEditSetType = (o, n) => setCustomSetTypes(l => l.map(x => x === o ? n : x));
+  const onDeleteSetType = v => setCustomSetTypes(l => l.filter(x => x !== v));
 
   // Edit/delete custom list items
   const onEditEx = (o, n) => setCustomExercises(l => l.map(x => x === o ? n : x));
@@ -12064,6 +12944,9 @@ function App() {
     clusterCount,
     clusterGaps,
     clusterRest,
+    dropSetLoads,
+    dropSetReps,
+    dropSetMainReps,
     restApplied,
     equipUsed,
     latUsed,
@@ -12097,6 +12980,9 @@ function App() {
       clusterCount,
       clusterGaps,
       clusterRest,
+      dropSetLoads,
+      dropSetReps,
+      dropSetMainReps,
       restApplied,
       equipUsed,
       latUsed
@@ -12238,7 +13124,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v65.6.1")), /*#__PURE__*/React.createElement("button", {
+  }, "v67.0.1")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
@@ -12421,6 +13307,8 @@ function App() {
     onAddEx: onAddEx,
     setTypeList: setTypeList,
     onAddSetType: onAddSetType,
+    onEditSetType: onEditSetType,
+    onDeleteSetType: onDeleteSetType,
     clientBW: activeClient?.bw,
     clientName: activeClient?.name,
     allClientSessions: activeClient?.programs.flatMap(p => p.sessions) || [],
