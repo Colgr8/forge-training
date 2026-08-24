@@ -545,9 +545,14 @@ function fmtComplexRest(cx) {
 const avCol = idx => AV_COLS[idx % AV_COLS.length];
 
 // Isometric helpers
-const isIsoType = t => ["Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Ovrc Iso-Endurance", "Ovrc Iso-Sustained", "Yielding Iso-Holds", "Yielding Iso-GPP"].includes(t);
-const isOvrcIso = t => t === "Ovrc Iso-Ballistic" || t === "Ovrc Iso-Max" || t === "Ovrc Iso-Endurance" || t === "Ovrc Iso-Sustained";
+const isIsoType = t => ["Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Ovrc Iso-Endurance", "Ovrc Iso-Sustained", "Ovrc Iso-Strength+Hypertrophy", "Yielding Iso-Holds", "Yielding Iso-GPP"].includes(t);
+const isOvrcIso = t => t === "Ovrc Iso-Ballistic" || t === "Ovrc Iso-Max" || t === "Ovrc Iso-Endurance" || t === "Ovrc Iso-Sustained" || t === "Ovrc Iso-Strength+Hypertrophy";
 const isYieldIso = t => t === "Yielding Iso-Holds" || t === "Yielding Iso-GPP";
+// The combo type is structurally different from the other Ovrc types — a
+// genuine two-phase sequence (max-effort rounds, then an extended submaximal
+// hold) rather than a single duration/effort parameter — so it needs its own
+// dedicated breakdown UI, similar in spirit to how Cluster/Drop Set work.
+const isComboIso = t => t === "Ovrc Iso-Strength+Hypertrophy";
 const isClusterSet = t => t === "Cluster Set";
 const isDropSet = t => t === "Drop Set";
 const isNegativeSet = t => t === "Negative";
@@ -714,6 +719,31 @@ const bandRangeOptions = strength => {
     length: hi - lo + 1
   }, (_, i) => lo + i);
 };
+
+// Rest between contractions, scaled to each protocol's own intensity/duration
+// — a brief explosive burst (Ballistic) only needs a short CNS reset, while a
+// longer, more fatiguing bout (Sustained, or the tendon-loading Yielding
+// holds) needs meaningfully more recovery before repeating. Max mirrors the
+// same "3s work, 5s rest" already used in Strength+Hypertrophy's Phase 1.
+const ISO_REST_SECS = {
+  "Ovrc Iso-Ballistic": 5,
+  "Ovrc Iso-Max": 5,
+  "Ovrc Iso-Endurance": 12,
+  "Ovrc Iso-Sustained": 25,
+  "Yielding Iso-Holds": 45,
+  "Yielding Iso-GPP": 45
+};
+
+// Selectable range per protocol — the default above sits within each range,
+// but the trainer can dial it in tighter or longer as needed.
+const ISO_REST_RANGES = {
+  "Ovrc Iso-Ballistic": [2, 3, 4, 5],
+  "Ovrc Iso-Max": [3, 4, 5, 6, 7],
+  "Ovrc Iso-Endurance": [8, 10, 12, 15, 18],
+  "Ovrc Iso-Sustained": [15, 20, 25, 30, 35],
+  "Yielding Iso-Holds": [30, 35, 40, 45, 50, 55, 60],
+  "Yielding Iso-GPP": [20, 30, 40, 45, 50, 60]
+};
 const ISO_META = {
   "Ovrc Iso-Ballistic": {
     color: "#FF5060",
@@ -746,6 +776,14 @@ const ISO_META = {
     desc: "Maximal-effort push held from the start through 15–20s, accepting the natural decline in force as fatigue sets in — a further extension of Endurance into short-duration fatigue tolerance. No external load.",
     holdTarget: "15–20s",
     setsReps: "2–3 sets × 15–20s"
+  },
+  "Ovrc Iso-Strength+Hypertrophy": {
+    color: "#E8398A",
+    icon: "💥",
+    label: "Overcoming Iso — Strength + Hypertrophy",
+    desc: "Two-phase combo: 5 rounds of 3s max-effort contractions (5s rest between), immediately followed by a 30–60s hold at ~50% effort. The max-effort phase primes the nervous system (post-activation potentiation); the extended submaximal hold that follows adds a hypertrophy-focused metabolic stimulus in an already-fatigued state. Train at longer muscle lengths for a stronger stimulus. No external load.",
+    holdTarget: "5×3s + 30–60s",
+    setsReps: "1 combo protocol"
   },
   "Yielding Iso-Holds": {
     color: "#5060FF",
@@ -802,7 +840,7 @@ function SessionXTick({
 }
 const CATEGORIES = ["Strength", "Power", "Stability", "Mobility"];
 const PROG_TYPES = ["Activation Strength", "General Strength", "Hypertrophy", "Endurance Strength", "Max Strength", "Power", "Muscular Endurance", "Hybrid"];
-const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Negative", "Cluster Set", "Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Ovrc Iso-Endurance", "Ovrc Iso-Sustained", "Yielding Iso-Holds", "Yielding Iso-GPP"];
+const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Negative", "Cluster Set", "Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Ovrc Iso-Endurance", "Ovrc Iso-Sustained", "Ovrc Iso-Strength+Hypertrophy", "Yielding Iso-Holds", "Yielding Iso-GPP"];
 const EQUIP_LIST = ["Barbell", "Dumbbell", "Cable machine", "Bodyweight", "Kettlebell", "Long band", "Short band", "Medicine ball", "Trap(Hex) bar"];
 const LAT_LIST = ["Bilateral", "Unilateral - Left", "Unilateral - Right", "Alternating", "Contralateral"];
 const RPE_DESC = {
@@ -5720,6 +5758,58 @@ function LogTab({
     } catch {}
   };
 
+  // Distinct "rest complete" chime — the work-complete chime above rises
+  // (880→1175Hz); this one deliberately falls (1175→700Hz) so the trainer can
+  // tell, by ear alone, whether a contraction just ended (time to rest) or a
+  // rest period just ended (contraction fully complete, ready to continue) —
+  // without needing to look at the screen. Vibration pattern also differs
+  // (double-pulse vs single) for the same reason.
+  const playRestCompleteChime = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [1175, 700].forEach((freq, i) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.type = "sine";
+        o.frequency.value = freq;
+        g.gain.value = 0.15;
+        const startAt = ctx.currentTime + i * 0.11;
+        o.start(startAt);
+        o.stop(startAt + 0.12);
+      });
+    } catch {}
+    try {
+      navigator.vibrate && navigator.vibrate([70, 50, 70]);
+    } catch {}
+  };
+
+  // Ballistic-specific beep — acoustically distinguishes the two possible
+  // durations (0.5s vs 1s) rather than always sounding identical: a short,
+  // sharp single note for the shorter duration, a slightly longer note for
+  // the longer one. Separate from playClusterChime (used everywhere else)
+  // since those durations don't vary and don't need this distinction.
+  const playBallisticBeep = holdSecs => {
+    const isShort = (+holdSecs || 1) <= 0.5;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.type = "sine";
+      o.frequency.value = isShort ? 1400 : 950; // shorter duration -> higher, sharper pitch
+      g.gain.value = 0.18;
+      const dur = isShort ? 0.08 : 0.18; // shorter duration -> shorter beep, longer -> longer beep
+      o.start(ctx.currentTime);
+      o.stop(ctx.currentTime + dur);
+    } catch {}
+    try {
+      navigator.vibrate && navigator.vibrate(isShort ? 60 : 140);
+    } catch {}
+  };
+
   // 1s tick for the cluster mini-timer, independent of the main rest timer.
   useEffect(() => {
     if (clusterSeqRemaining <= 0) return;
@@ -5797,6 +5887,209 @@ function LogTab({
     setNegEccSecs("4");
     setNegConSecs("1");
   }, [activeEx]);
+
+  // Ovrc Iso-Strength+Hypertrophy — a genuine two-phase combo protocol (not a
+  // single-parameter type like the other five Iso types), so it gets its own
+  // dedicated config + live guided sequence, matching the Cluster/Drop Set
+  // pattern rather than the simpler Contractions+Duration Iso box. Config
+  // persists across sets of the same exercise (reset on exercise change),
+  // matching Negative Set's tempo config.
+  const [comboRounds, setComboRounds] = useState("5"); // Phase 1: number of max-effort rounds
+  const [comboContractSecs, setComboContractSecs] = useState("3"); // Phase 1: contraction duration per round
+  const [comboRestSecs, setComboRestSecs] = useState("5"); // Phase 1: rest between rounds
+  const [comboHoldPct, setComboHoldPct] = useState("50"); // Phase 2: submaximal hold effort %
+  const [comboHoldSecs, setComboHoldSecs] = useState("45"); // Phase 2: hold duration
+  const [comboCycleRestSecs, setComboCycleRestSecs] = useState("90"); // dedicated rest before repeating the WHOLE protocol
+  useEffect(() => {
+    setComboRounds("5");
+    setComboContractSecs("3");
+    setComboRestSecs("5");
+    setComboHoldPct("50");
+    setComboHoldSecs("45");
+    setComboCycleRestSecs("90");
+  }, [activeEx]);
+
+  // Live guided sequence — walks through Phase 1 (rounds of contract+rest)
+  // then Phase 2 (the extended submaximal hold), with its own countdown and
+  // chime, mirroring the exact state-machine shape used for Cluster/Drop Sets:
+  // heading stays accurate through each countdown, an explicit "COMPLETED!"
+  // + "Continue" step between phases rather than silently advancing.
+  const [comboActive, setComboActive] = useState(false);
+  const [comboStage, setComboStage] = useState("ready"); // "ready" | "contract" | "rest" | "phase1done" | "hold" | "done"
+  const [comboRoundIdx, setComboRoundIdx] = useState(0); // 0-based, which Phase 1 round
+  const [comboRemaining, setComboRemaining] = useState(0);
+  const [comboPaused, setComboPaused] = useState(false); // pauses the countdown in place, without losing progress
+  useEffect(() => {
+    setComboActive(false);
+    setComboStage("ready");
+    setComboRoundIdx(0);
+    setComboRemaining(0);
+    setComboPaused(false);
+  }, [form.setNo, activeEx]);
+
+  // 1s tick — purely counts down; all stage/round transitions happen in the
+  // separate effect below once remaining actually reaches 0, keeping the two
+  // concerns (ticking vs. transitioning) cleanly separated. Paused simply
+  // skips ticking altogether, leaving comboRemaining exactly where it was.
+  useEffect(() => {
+    if (comboRemaining <= 0 || comboPaused) return;
+    const t = setTimeout(() => {
+      setComboRemaining(r => {
+        if (r <= 1) {
+          // "contract" and "hold" are both active-effort stages (Phase 2's
+          // hold is sustained work, not rest) — use the work-complete chime.
+          // "rest" and "cyclerest" are genuine recovery periods — use the
+          // distinct falling tone instead.
+          if (comboStage === "contract" || comboStage === "hold") playClusterChime();else playRestCompleteChime();
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [comboRemaining, comboPaused]);
+
+  // Transition effect — fires whenever the countdown actually lands on 0
+  // while the sequence is active, advancing to whatever comes next:
+  //  contract   -> rest (more rounds left) or phase1done (that was the last round)
+  //  rest       -> contract, automatically starting the next round's countdown
+  //  hold       -> cyclerest, a dedicated (longer) recovery period before the
+  //                trainer would repeat the WHOLE protocol again — the compound
+  //                fatigue from 5 rounds of max effort PLUS an extended
+  //                submaximal hold genuinely warrants more than the normal
+  //                between-set rest this exercise might otherwise use.
+  //  cyclerest  -> done
+  // "ready" and "phase1done"/"done" are intentionally NOT handled here — they
+  // require an explicit trainer tap (Start / Continue) to proceed, not an
+  // automatic transition.
+  useEffect(() => {
+    if (!comboActive || comboRemaining !== 0) return;
+    if (comboStage === "contract") {
+      if (comboRoundIdx < (+comboRounds || 1) - 1) {
+        setComboStage("rest");
+        setComboRemaining(+comboRestSecs || 5);
+      } else {
+        setComboStage("phase1done");
+      }
+    } else if (comboStage === "rest") {
+      setComboRoundIdx(i => i + 1);
+      setComboStage("contract");
+      setComboRemaining(+comboContractSecs || 3);
+    } else if (comboStage === "hold") {
+      setComboStage("cyclerest");
+      setComboRemaining(+comboCycleRestSecs || 90);
+    } else if (comboStage === "cyclerest") {
+      setComboStage("done");
+    }
+  }, [comboRemaining, comboActive]);
+
+  // Simple timed Iso sequence — for the 5 types that are just "N contractions
+  // at a single fixed duration each" (Max, Endurance, Sustained, Holds, GPP).
+  // Kept deliberately separate from Combo's two-phase machine and Ballistic's
+  // sub-second one, even though the underlying shape (contract, countdown,
+  // beep, explicit Continue, repeat) is similar — matching the existing
+  // pattern of each set type owning its own simple, independent state rather
+  // than a shared configurable engine. Duration comes from form.holdDuration
+  // (already selected per-type in the box above); count comes from
+  // form.reps (Contractions).
+  const [isoSeqActive, setIsoSeqActive] = useState(false);
+  const [isoSeqIdx, setIsoSeqIdx] = useState(0); // 0-based, which contraction
+  const [isoSeqRemaining, setIsoSeqRemaining] = useState(0);
+  const [isoSeqResting, setIsoSeqResting] = useState(false); // true = isoSeqRemaining counts down REST, not the work contraction
+  const [isoSeqCompleted, setIsoSeqCompleted] = useState(false);
+  const [isoSeqPaused, setIsoSeqPaused] = useState(false);
+  const [isoRestSel, setIsoRestSel] = useState(String(ISO_REST_SECS["Ovrc Iso-Max"] || 5)); // configurable rest between contractions
+  useEffect(() => {
+    setIsoSeqActive(false);
+    setIsoSeqIdx(0);
+    setIsoSeqRemaining(0);
+    setIsoSeqResting(false);
+    setIsoSeqCompleted(false);
+    setIsoSeqPaused(false);
+    setIsoRestSel(String(ISO_REST_SECS[form.type] || 5));
+  }, [form.setNo, activeEx, form.type]);
+  useEffect(() => {
+    if (isoSeqRemaining <= 0 || isoSeqPaused) return;
+    const t = setTimeout(() => {
+      setIsoSeqRemaining(r => {
+        if (r > 1) return r - 1;
+        // Landed on 0 — if this was the WORK countdown, chime (rising tone)
+        // and either move into a rest period (more contractions left) or
+        // finish outright (last one, matching Cluster/Drop/Combo's pattern of
+        // never resting after the final stage). If this was the REST
+        // countdown, chime with the DISTINCT falling tone instead, so the
+        // trainer can tell which one just happened without looking.
+        if (!isoSeqResting) {
+          playClusterChime();
+          if (isoSeqIdx < (+form.reps || 1) - 1) {
+            setIsoSeqResting(true);
+            return +isoRestSel || ISO_REST_SECS[form.type] || 5;
+          }
+          setIsoSeqCompleted(true);
+          return 0;
+        }
+        playRestCompleteChime();
+        setIsoSeqResting(false);
+        setIsoSeqCompleted(true);
+        return 0;
+      });
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [isoSeqRemaining, isoSeqPaused]);
+
+  // Ballistic sequence — 0.5-1s contractions are shorter than a single 1s
+  // tick of the countdown system above, so a traditional "3...2...1..."
+  // countdown isn't meaningful here. Instead: tap to start, a "GO!" cue shows
+  // immediately, then a beep fires precisely after the selected duration
+  // (using a raw sub-second timeout rather than the 1s-tick system). The rest
+  // AFTER that beep, though, uses the normal 1s-tick countdown — it's a
+  // multi-second period, so a real countdown genuinely helps there. Pause on
+  // the "ready to start" screen only (nothing meaningful to pause mid-flight
+  // during the sub-second contraction itself); Stop aborts entirely at any point.
+  const [ballisticActive, setBallisticActive] = useState(false);
+  const [ballisticIdx, setBallisticIdx] = useState(0);
+  const [ballisticGo, setBallisticGo] = useState(false); // true while the sub-second timer is running
+  const [ballisticRestRemaining, setBallisticRestRemaining] = useState(0);
+  const [ballisticCompleted, setBallisticCompleted] = useState(false);
+  const [ballisticPaused, setBallisticPaused] = useState(false);
+  const [ballisticRestSel, setBallisticRestSel] = useState(String(ISO_REST_SECS["Ovrc Iso-Ballistic"] || 5)); // configurable rest between contractions
+  useEffect(() => {
+    setBallisticActive(false);
+    setBallisticIdx(0);
+    setBallisticGo(false);
+    setBallisticRestRemaining(0);
+    setBallisticCompleted(false);
+    setBallisticPaused(false);
+    setBallisticRestSel(String(ISO_REST_SECS["Ovrc Iso-Ballistic"] || 5));
+  }, [form.setNo, activeEx, form.type]);
+  useEffect(() => {
+    if (!ballisticGo) return;
+    const ms = Math.round((+form.holdDuration || 0.5) * 1000);
+    const t = setTimeout(() => {
+      playBallisticBeep(form.holdDuration);
+      setBallisticGo(false);
+      if (ballisticIdx < (+form.reps || 1) - 1) {
+        setBallisticRestRemaining(+ballisticRestSel || ISO_REST_SECS["Ovrc Iso-Ballistic"] || 5);
+      } else {
+        setBallisticCompleted(true);
+      }
+    }, ms);
+    return () => clearTimeout(t);
+  }, [ballisticGo]);
+  useEffect(() => {
+    if (ballisticRestRemaining <= 0 || ballisticPaused) return;
+    const t = setTimeout(() => {
+      setBallisticRestRemaining(r => {
+        if (r <= 1) {
+          playRestCompleteChime();
+          setBallisticCompleted(true);
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [ballisticRestRemaining, ballisticPaused]);
   useEffect(() => {
     if (dropSetRemaining <= 0) return;
     const t = setTimeout(() => {
@@ -5905,6 +6198,11 @@ function LogTab({
       dropSetLoads: isDropSet(form.type) && dropSetLoads.length > 0 ? dropSetLoads : null,
       dropSetReps: isDropSet(form.type) && dropSetLoads.length > 0 ? dropSetLoads.map((_, i) => +dropSetRepsArr[i] || 0) : null,
       dropSetMainReps: isDropSet(form.type) && dropSetLoads.length > 0 ? +dropSetMainReps || +form.reps || 0 : null,
+      comboRounds: isComboIso(form.type) ? +comboRounds || null : null,
+      comboContractSecs: isComboIso(form.type) ? +comboContractSecs || null : null,
+      comboRestSecs: isComboIso(form.type) ? +comboRestSecs || null : null,
+      comboHoldPct: isComboIso(form.type) ? +comboHoldPct || null : null,
+      comboHoldSecs: isComboIso(form.type) ? +comboHoldSecs || null : null,
       restApplied: restApplied || null,
       equipUsed: equipOverride || null,
       latUsed: latOverride || null,
@@ -8435,7 +8733,7 @@ function LogTab({
       color: C.muted,
       lineHeight: 1.5
     }
-  }, "Eccentric strength typically exceeds concentric strength by roughly 20-40%, which is the basis for negatives — the muscle can handle more load, or more time under tension, being lowered than it could lift unassisted. If using a heavier-than-normal load (supra-maximal), a spotter is usually needed to assist the concentric (lifting) phase. Research generally supports 2-6s eccentric durations for a meaningful stimulus; longer \"super slow\" protocols exist but evidence for added benefit beyond that range is weaker.")), isIsoType(form.type) && (() => {
+  }, "Eccentric strength typically exceeds concentric strength by roughly 20-40%, which is the basis for negatives — the muscle can handle more load, or more time under tension, being lowered than it could lift unassisted. If using a heavier-than-normal load (supra-maximal), a spotter is usually needed to assist the concentric (lifting) phase. Research generally supports 2-6s eccentric durations for a meaningful stimulus; longer \"super slow\" protocols exist but evidence for added benefit beyond that range is weaker.")), isIsoType(form.type) && !isComboIso(form.type) && (() => {
     const meta = ISO_META[form.type];
     const yielding = isYieldIso(form.type);
     const overcoming = isOvrcIso(form.type);
@@ -8675,8 +8973,914 @@ function LogTab({
         color: C.muted,
         lineHeight: 1.5
       }
-    }, "Enter peak force from a force plate, dynamometer or load cell.", yielding && form.mvic && form.force ? ` Estimated 100% MVIC ≈ ${(+form.force / (+form.mvic / 100)).toFixed(0)} N (${(+form.force / (+form.mvic / 100) / 9.81).toFixed(1)} kgf).` : ""));
-  })(), !isOvrcIso(form.type) && /*#__PURE__*/React.createElement("div", {
+    }, "Enter peak force from a force plate, dynamometer or load cell.", yielding && form.mvic && form.force ? ` Estimated 100% MVIC ≈ ${(+form.force / (+form.mvic / 100)).toFixed(0)} N (${(+form.force / (+form.mvic / 100) / 9.81).toFixed(1)} kgf).` : ""), form.type === "Ovrc Iso-Ballistic" ?
+    // Ballistic: too short (0.5-1s) for a traditional countdown —
+    // tap to start, "GO!" fires immediately, beep lands precisely
+    // after the selected duration via a sub-second timer instead
+    // of the normal 1s-tick system. Pause only applies between
+    // contractions (nothing meaningful to pause mid-flight).
+    (+form.reps || 0) >= 1 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 10,
+        paddingTop: 10,
+        borderTop: `1px solid ${meta.color}33`
+      }
+    }, !ballisticActive && (+form.reps || 0) > 1 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Rest between contractions (s)"
+    }), /*#__PURE__*/React.createElement("select", {
+      value: ballisticRestSel,
+      onChange: e => setBallisticRestSel(e.target.value),
+      style: ss
+    }, (ISO_REST_RANGES["Ovrc Iso-Ballistic"] || [5]).map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v, "s")))), !ballisticActive ? /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setBallisticActive(true);
+        setBallisticIdx(0);
+        setBallisticGo(false);
+        setBallisticCompleted(false);
+        setBallisticPaused(false);
+      },
+      style: {
+        width: "100%",
+        background: meta.color,
+        color: "#fff",
+        border: "none",
+        borderRadius: 8,
+        padding: "10px",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "▶ Start Sequence") : /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card,
+        border: `1px solid ${meta.color}55`,
+        borderRadius: 10,
+        padding: "12px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        marginBottom: 8,
+        color: ballisticCompleted ? C.accent : ballisticRestRemaining > 0 ? C.muted : meta.color
+      }
+    }, ballisticRestRemaining > 0 ? `Resting — Before Contraction ${ballisticIdx + 2}` : `Contraction ${ballisticIdx + 1} of ${form.reps}${ballisticCompleted ? " COMPLETED!" : ""}`), ballisticGo ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: 48,
+        color: meta.color,
+        letterSpacing: 1
+      }
+    }, "GO!"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted
+      }
+    }, "Contract as hard and fast as possible")) : ballisticRestRemaining > 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: 36,
+        color: C.gold,
+        letterSpacing: 1
+      }
+    }, ballisticRestRemaining, "s", ballisticPaused ? " ⏸" : ""), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        marginBottom: 8
+      }
+    }, ballisticPaused ? "Paused" : "Recover before the next contraction"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        justifyContent: "center"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setBallisticPaused(p => !p),
+      style: {
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 14px",
+        cursor: "pointer",
+        color: C.sub,
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, ballisticPaused ? "▶ Resume" : "⏸ Pause"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setBallisticRestRemaining(0);
+        setBallisticCompleted(true);
+      },
+      style: {
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 14px",
+        cursor: "pointer",
+        color: C.sub,
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, "Skip Rest"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setBallisticActive(false);
+        setBallisticIdx(0);
+        setBallisticGo(false);
+        setBallisticRestRemaining(0);
+        setBallisticCompleted(false);
+        setBallisticPaused(false);
+      },
+      style: {
+        background: "none",
+        border: `1px solid ${C.warn}55`,
+        borderRadius: 6,
+        padding: "6px 14px",
+        cursor: "pointer",
+        color: C.warn,
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, "■ Stop"))) : ballisticCompleted ? ballisticIdx < (+form.reps || 1) - 1 ? /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setBallisticIdx(i => i + 1);
+        setBallisticCompleted(false);
+      },
+      style: {
+        width: "100%",
+        background: C.accent,
+        color: "#001A12",
+        border: "none",
+        borderRadius: 8,
+        padding: "10px",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "Continue to Contraction ", ballisticIdx + 2) : /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        const cx = complexForEx(activeEx);
+        if (cx) submit();else setBallisticActive(false);
+      },
+      style: {
+        width: "100%",
+        background: C.accent,
+        color: "#001A12",
+        border: "none",
+        borderRadius: 8,
+        padding: "10px",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, complexForEx(activeEx) ? `✓ Complete — Log & Continue` : `✓ Complete — Ready to Log Set`) : /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center"
+      }
+    }, ballisticPaused ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.muted,
+        marginBottom: 8
+      }
+    }, "Paused") : /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.muted,
+        marginBottom: 8
+      }
+    }, "Ready — tap Go"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        justifyContent: "center"
+      }
+    }, !ballisticPaused && /*#__PURE__*/React.createElement("button", {
+      onClick: () => setBallisticGo(true),
+      style: {
+        background: meta.color,
+        color: "#fff",
+        border: "none",
+        borderRadius: 8,
+        padding: "8px 20px",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "GO"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setBallisticPaused(p => !p),
+      style: {
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "8px 14px",
+        cursor: "pointer",
+        color: C.sub,
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, ballisticPaused ? "▶ Resume" : "⏸ Pause"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setBallisticActive(false);
+        setBallisticIdx(0);
+        setBallisticGo(false);
+        setBallisticCompleted(false);
+        setBallisticPaused(false);
+      },
+      style: {
+        background: "none",
+        border: `1px solid ${C.warn}55`,
+        borderRadius: 6,
+        padding: "8px 14px",
+        cursor: "pointer",
+        color: C.warn,
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, "■ Stop"))))) :
+    // Max, Endurance, Sustained, Holds, GPP — a normal countdown
+    // sequence, cycling through however many Contractions are set,
+    // each held for form.holdDuration (already selected above).
+    (+form.reps || 0) >= 1 && form.holdDuration && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 10,
+        paddingTop: 10,
+        borderTop: `1px solid ${meta.color}33`
+      }
+    }, !isoSeqActive && (+form.reps || 0) > 1 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Rest between contractions (s)"
+    }), /*#__PURE__*/React.createElement("select", {
+      value: isoRestSel,
+      onChange: e => setIsoRestSel(e.target.value),
+      style: ss
+    }, (ISO_REST_RANGES[form.type] || [5]).map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v, "s")))), !isoSeqActive ? /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setIsoSeqActive(true);
+        setIsoSeqIdx(0);
+        setIsoSeqRemaining(0);
+        setIsoSeqCompleted(false);
+        setIsoSeqPaused(false);
+      },
+      style: {
+        width: "100%",
+        background: meta.color,
+        color: "#fff",
+        border: "none",
+        borderRadius: 8,
+        padding: "10px",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "▶ Start Sequence") : /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card,
+        border: `1px solid ${meta.color}55`,
+        borderRadius: 10,
+        padding: "12px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        marginBottom: 8,
+        color: isoSeqCompleted ? C.accent : isoSeqResting ? C.muted : meta.color
+      }
+    }, isoSeqResting ? `Resting — Before Contraction ${isoSeqIdx + 2}` : `Contraction ${isoSeqIdx + 1} of ${form.reps}${isoSeqCompleted ? " COMPLETED!" : ""}`), isoSeqRemaining > 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: isoSeqResting ? 36 : 44,
+        color: isoSeqResting ? C.gold : meta.color,
+        letterSpacing: 1
+      }
+    }, isoSeqRemaining, "s", isoSeqPaused ? " ⏸" : ""), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        marginBottom: 8
+      }
+    }, isoSeqPaused ? "Paused" : isoSeqResting ? "Recover before the next contraction" : overcoming ? "Contract as hard as possible" : `Sustain the hold`), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        justifyContent: "center"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => setIsoSeqPaused(p => !p),
+      style: {
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 14px",
+        cursor: "pointer",
+        color: C.sub,
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, isoSeqPaused ? "▶ Resume" : "⏸ Pause"), isoSeqResting && /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setIsoSeqRemaining(0);
+        setIsoSeqResting(false);
+        setIsoSeqCompleted(true);
+      },
+      style: {
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 14px",
+        cursor: "pointer",
+        color: C.sub,
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, "Skip Rest"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setIsoSeqActive(false);
+        setIsoSeqIdx(0);
+        setIsoSeqRemaining(0);
+        setIsoSeqResting(false);
+        setIsoSeqCompleted(false);
+        setIsoSeqPaused(false);
+      },
+      style: {
+        background: "none",
+        border: `1px solid ${C.warn}55`,
+        borderRadius: 6,
+        padding: "6px 14px",
+        cursor: "pointer",
+        color: C.warn,
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, "■ Stop"))) : isoSeqCompleted ? isoSeqIdx < (+form.reps || 1) - 1 ? /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setIsoSeqIdx(i => i + 1);
+        setIsoSeqCompleted(false);
+      },
+      style: {
+        width: "100%",
+        background: C.accent,
+        color: "#001A12",
+        border: "none",
+        borderRadius: 8,
+        padding: "10px",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "Continue to Contraction ", isoSeqIdx + 2) : /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        const cx = complexForEx(activeEx);
+        if (cx) submit();else setIsoSeqActive(false);
+      },
+      style: {
+        width: "100%",
+        background: C.accent,
+        color: "#001A12",
+        border: "none",
+        borderRadius: 8,
+        padding: "10px",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, complexForEx(activeEx) ? `✓ Complete — Log & Continue` : `✓ Complete — Ready to Log Set`) : /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setIsoSeqResting(false);
+        setIsoSeqRemaining(+form.holdDuration || 3);
+      },
+      style: {
+        width: "100%",
+        background: meta.color,
+        color: "#fff",
+        border: "none",
+        borderRadius: 8,
+        padding: "10px",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "Start Contraction ", isoSeqIdx + 1, " — ", form.holdDuration, "s"))));
+  })(), isComboIso(form.type) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#E8398A15",
+      borderRadius: 10,
+      padding: "12px 14px",
+      border: `1px solid #E8398A33`,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#E8398A",
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      fontWeight: 700,
+      marginBottom: 10
+    }
+  }, "💥 Overcoming Iso — Strength + Hypertrophy"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: C.muted,
+      marginBottom: 10,
+      lineHeight: 1.5
+    }
+  }, "Position the muscle at a longer, stretched length before contracting — this tends to produce a stronger training stimulus. Phase 1 primes the nervous system; Phase 2's extended submaximal hold, done in an already-fatigued state, adds a hypertrophy-focused stimulus on top."), !comboActive && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#E8398A",
+      fontWeight: 700,
+      marginBottom: 6,
+      textTransform: "uppercase",
+      letterSpacing: 1
+    }
+  }, "Phase 1 — Max Effort"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Rounds"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: comboRounds,
+    onChange: e => setComboRounds(e.target.value),
+    style: ss
+  }, [3, 4, 5, 6, 7].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Contract (s)"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: comboContractSecs,
+    onChange: e => setComboContractSecs(e.target.value),
+    style: ss
+  }, [2, 3, 4].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "s")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Rest (s)"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: comboRestSecs,
+    onChange: e => setComboRestSecs(e.target.value),
+    style: ss
+  }, [3, 4, 5, 6, 7, 8].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "s"))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#E8398A",
+      fontWeight: 700,
+      marginBottom: 6,
+      textTransform: "uppercase",
+      letterSpacing: 1
+    }
+  }, "Phase 2 — The Burn"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Effort %"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: comboHoldPct,
+    onChange: e => setComboHoldPct(e.target.value),
+    style: ss
+  }, [30, 40, 50, 60, 70].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "%")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Hold (s)"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: comboHoldSecs,
+    onChange: e => setComboHoldSecs(e.target.value),
+    style: ss
+  }, Array.from({
+    length: 7
+  }, (_, i) => 30 + i * 5).map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "s"))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Rest before repeating the whole protocol (s)"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: comboCycleRestSecs,
+    onChange: e => setComboCycleRestSecs(e.target.value),
+    style: ss
+  }, [60, 75, 90, 105, 120].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "s"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: C.muted,
+      marginTop: 2
+    }
+  }, "5 rounds of max effort plus an extended submaximal hold is genuinely demanding — this gives dedicated recovery before another full cycle, separate from this exercise's normal between-set rest."))), !comboActive ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setComboActive(true);
+      setComboStage("contract");
+      setComboRoundIdx(0);
+      setComboRemaining(+comboContractSecs || 3);
+      setComboPaused(false);
+    },
+    style: {
+      width: "100%",
+      background: "#E8398A",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "▶ Start Protocol") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      border: `1px solid #E8398A55`,
+      borderRadius: 10,
+      padding: "12px"
+    }
+  }, comboStage === "contract" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 8,
+      color: "#E8398A"
+    }
+  }, "Round ", comboRoundIdx + 1, " of ", comboRounds, " — Max Effort"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 44,
+      color: "#E8398A",
+      letterSpacing: 1
+    }
+  }, comboRemaining, "s", comboPaused ? " ⏸" : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 8
+    }
+  }, comboPaused ? "Paused" : "Contract as hard as possible"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setComboPaused(p => !p),
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.sub,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, comboPaused ? "▶ Resume" : "⏸ Pause"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setComboActive(false);
+      setComboStage("ready");
+      setComboRoundIdx(0);
+      setComboRemaining(0);
+      setComboPaused(false);
+    },
+    style: {
+      background: "none",
+      border: `1px solid ${C.warn}55`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.warn,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, "■ Stop")))), comboStage === "rest" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 8,
+      color: C.muted
+    }
+  }, "Round ", comboRoundIdx + 1, " of ", comboRounds, " — Resting"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 36,
+      color: C.gold,
+      letterSpacing: 1
+    }
+  }, comboRemaining, "s", comboPaused ? " ⏸" : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 8
+    }
+  }, comboPaused ? "Paused" : `Rest before Round ${comboRoundIdx + 2}`), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setComboPaused(p => !p),
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.sub,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, comboPaused ? "▶ Resume" : "⏸ Pause"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setComboRemaining(0),
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.sub,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, "Skip Rest"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setComboActive(false);
+      setComboStage("ready");
+      setComboRoundIdx(0);
+      setComboRemaining(0);
+      setComboPaused(false);
+    },
+    style: {
+      background: "none",
+      border: `1px solid ${C.warn}55`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.warn,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, "■ Stop")))), comboStage === "phase1done" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 8,
+      color: C.accent
+    }
+  }, "Phase 1 COMPLETED!"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setComboStage("hold");
+      setComboRemaining(+comboHoldSecs || 45);
+    },
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "Continue to Phase 2 — The Burn")), comboStage === "hold" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 8,
+      color: "#E8398A"
+    }
+  }, "Phase 2 — Hold at ", comboHoldPct, "%"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 44,
+      color: "#E8398A",
+      letterSpacing: 1
+    }
+  }, comboRemaining, "s", comboPaused ? " ⏸" : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 8
+    }
+  }, comboPaused ? "Paused" : `Sustain at ~${comboHoldPct}% effort`), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setComboPaused(p => !p),
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.sub,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, comboPaused ? "▶ Resume" : "⏸ Pause"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setComboActive(false);
+      setComboStage("ready");
+      setComboRoundIdx(0);
+      setComboRemaining(0);
+      setComboPaused(false);
+    },
+    style: {
+      background: "none",
+      border: `1px solid ${C.warn}55`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.warn,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, "■ Stop")))), comboStage === "cyclerest" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 8,
+      color: C.muted
+    }
+  }, "Recovery — Before Repeating the Protocol"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 36,
+      color: C.gold,
+      letterSpacing: 1
+    }
+  }, comboRemaining, "s", comboPaused ? " ⏸" : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 8
+    }
+  }, comboPaused ? "Paused" : "Full recovery before another complete cycle"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      justifyContent: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setComboPaused(p => !p),
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.sub,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, comboPaused ? "▶ Resume" : "⏸ Pause"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setComboRemaining(0),
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.sub,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, "Skip Rest"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setComboActive(false);
+      setComboStage("ready");
+      setComboRoundIdx(0);
+      setComboRemaining(0);
+      setComboPaused(false);
+    },
+    style: {
+      background: "none",
+      border: `1px solid ${C.warn}55`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.warn,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, "■ Stop")))), comboStage === "done" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 8,
+      color: C.accent
+    }
+  }, "COMPLETED!"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      upd("reps", +comboRounds || 5);
+      const cx = complexForEx(activeEx);
+      if (cx) submit();else setComboActive(false);
+    },
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, complexForEx(activeEx) ? `✓ Complete — Log & Continue` : `✓ Complete — Ready to Log Set`)))), !isOvrcIso(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 12
     }
@@ -12535,6 +13739,18 @@ function App() {
     });
   }, []);
 
+  // Backfill "Ovrc Iso-Strength+Hypertrophy" — the two-phase combo protocol —
+  // inserted right after "Ovrc Iso-Sustained" (last of the Overcoming family),
+  // otherwise appended.
+  useEffect(() => {
+    setCustomSetTypes(sts => {
+      if (sts.includes("Ovrc Iso-Strength+Hypertrophy")) return sts;
+      const idx = sts.indexOf("Ovrc Iso-Sustained");
+      if (idx === -1) return [...sts, "Ovrc Iso-Strength+Hypertrophy"];
+      return [...sts.slice(0, idx + 1), "Ovrc Iso-Strength+Hypertrophy", ...sts.slice(idx + 1)];
+    });
+  }, []);
+
   // ── Multi-client rest timer — keyed by clientId so each client's countdown
   // runs independently, even while viewing a different client's screen. ──────
   const [restTimers, setRestTimers] = useState({}); // { [clientId]: {remaining, running, total, label} }
@@ -12947,6 +14163,11 @@ function App() {
     dropSetLoads,
     dropSetReps,
     dropSetMainReps,
+    comboRounds,
+    comboContractSecs,
+    comboRestSecs,
+    comboHoldPct,
+    comboHoldSecs,
     restApplied,
     equipUsed,
     latUsed,
@@ -12983,6 +14204,11 @@ function App() {
       dropSetLoads,
       dropSetReps,
       dropSetMainReps,
+      comboRounds,
+      comboContractSecs,
+      comboRestSecs,
+      comboHoldPct,
+      comboHoldSecs,
       restApplied,
       equipUsed,
       latUsed
@@ -13124,7 +14350,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v67.0.1")), /*#__PURE__*/React.createElement("button", {
+  }, "v67.6.0")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
