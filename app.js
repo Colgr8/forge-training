@@ -48,23 +48,59 @@ const est1RM = (load, reps) => +(load * (1 + reps / 30)).toFixed(1);
 // every drop — pairing that with e.load (the main set's load) would badly
 // inflate any 1RM/RPE-based estimate, since those reps were NOT all performed
 // at that load. effReps() returns the reps ACTUALLY performed at e.load (the
-// main set's own reps for Drop Sets, e.reps unchanged for everything else) —
-// use this instead of e.reps anywhere a load+reps pair feeds a 1RM, velocity,
-// power, or average-reps calculation.
-const effReps = e => e.dropSetMainReps != null && e.dropSetMainReps > 0 ? e.dropSetMainReps : e.reps;
+// main set's own reps for Drop Sets and Ascending Sets, e.reps unchanged for
+// everything else) — use this instead of e.reps anywhere a load+reps pair
+// feeds a 1RM, velocity, power, or average-reps calculation.
+const effReps = e => {
+  if (e.dropSetMainReps != null && e.dropSetMainReps > 0) return e.dropSetMainReps;
+  if (e.ascSetMainReps != null && e.ascSetMainReps > 0) return e.ascSetMainReps;
+  if (e.pyrMainReps != null && e.pyrMainReps > 0) return e.pyrMainReps;
+  return e.reps;
+};
 
-// Total volume load (Σ load×reps) for a single entry, correctly accounting for
-// a Drop Set's multiple different loads — main load × main reps, PLUS each
-// drop's own load × its own reps — rather than naively multiplying the full
-// combined rep count by just the (heaviest) main load, which would overstate
-// volume by attributing every rep to the top weight.
+// Total volume load (Σ load×reps) for a single entry, correctly accounting
+// for multiple different loads within one set — main/starting load × its own
+// reps, PLUS each further stage's own load × its own reps — rather than
+// naively multiplying the full combined rep count by just one load, which
+// would misstate volume by attributing every rep to a single weight.
 const effVolume = e => {
   if (e.dropSetLoads?.length) {
     const mainVol = e.load * effReps(e);
     const dropVol = e.dropSetLoads.reduce((s, l, i) => s + l * (+e.dropSetReps?.[i] || 0), 0);
     return mainVol + dropVol;
   }
+  if (e.ascSetLoads?.length) {
+    const mainVol = e.load * effReps(e);
+    const upVol = e.ascSetLoads.reduce((s, l, i) => s + l * (+e.ascSetReps?.[i] || 0), 0);
+    return mainVol + upVol;
+  }
+  if (e.pyrLoads?.length) {
+    const mainVol = e.load * effReps(e);
+    const stageVol = e.pyrLoads.reduce((s, l, i) => s + l * (+e.pyrReps?.[i] || 0), 0);
+    return mainVol + stageVol;
+  }
   return e.load * e.reps;
+};
+
+// For 1RM estimation specifically: a Drop Set's stored e.load is already its
+// HEAVIEST stage (the top/main set), so effReps() paired with e.load is the
+// right basis. An Ascending Set is the opposite — e.load is its LIGHTEST
+// (starting) stage; the true peak effort is whichever "Up" stage was
+// heaviest, stored separately in ascSetLoads/ascSetReps. A Pyramid Set's
+// peak is likewise NOT its last stage (that's a descending/drop stage) — the
+// peak is specifically the LAST ascending stage, at index pyrUpCount-1.
+// effPeakLoad/effPeakReps return the load+reps pair that best represents an
+// entry's actual peak effort, for anywhere a "best/heaviest set" 1RM is
+// estimated.
+const effPeakLoad = e => {
+  if (e.ascSetLoads?.length) return e.ascSetLoads[e.ascSetLoads.length - 1];
+  if (e.pyrLoads?.length && e.pyrUpCount > 0) return e.pyrLoads[e.pyrUpCount - 1];
+  return e.load;
+};
+const effPeakReps = e => {
+  if (e.ascSetLoads?.length) return +e.ascSetReps?.[e.ascSetReps.length - 1] || 0;
+  if (e.pyrLoads?.length && e.pyrUpCount > 0) return +e.pyrReps?.[e.pyrUpCount - 1] || 0;
+  return effReps(e);
 };
 
 // Manually-built date string (e.g. "11 Aug 2026") — deliberately NOT using
@@ -115,7 +151,7 @@ function getBest1RM(sessions, exName) {
   sessions.forEach(s => {
     s.entries.forEach(e => {
       if (e.ex === exName && e.load > 0 && e.reps > 0 && !isOvrcIso(e.type)) {
-        const rm = est1RM(e.load, effReps(e));
+        const rm = est1RM(effPeakLoad(e), effPeakReps(e));
         if (rm > best1RM) best1RM = rm;
       }
     });
@@ -555,6 +591,8 @@ const isYieldIso = t => t === "Yielding Iso-Holds" || t === "Yielding Iso-GPP";
 const isComboIso = t => t === "Ovrc Iso-Strength+Hypertrophy";
 const isClusterSet = t => t === "Cluster Set";
 const isDropSet = t => t === "Drop Set";
+const isAscendingSet = t => t === "Ascending Set";
+const isPyramidSet = t => t === "Pyramid Set (continuous)";
 const isNegativeSet = t => t === "Negative";
 
 // Band strength → kg load ranges (increments of 1kg)
@@ -711,6 +749,68 @@ function calcDropSetLoads(mainLoad, basePct, dir, incAmt, turns, numDrops) {
   }
   return loads;
 }
+
+// Ascending Set ("Run the Rack") — the mirror image of a Drop Set: the MAIN
+// set is the STARTING (lightest) load, logged normally via the main
+// Load/Reps fields; it is NOT itself counted as "Up 1". Up 1 is the FIRST
+// increase after the starting set, Up 2 increases from Up 1, and so on —
+// reusing the exact same wave-percentage engine as Drop Set (calcDropPct),
+// just applied as a load INCREASE rather than a reduction. Unlike a drop
+// set, fatigue and load both climb together here, so this is a considerably
+// more demanding technique — each stage gets harder from two compounding
+// directions at once, not one offsetting the other. Returns an array of
+// exactly `numUps` loads (the increases only, main/starting load excluded).
+function calcAscSetLoads(mainLoad, basePct, dir, incAmt, turns, numUps) {
+  if (!mainLoad || numUps <= 0) return [];
+  const loads = [];
+  let load = mainLoad;
+  for (let i = 0; i < numUps; i++) {
+    const pct = calcDropPct(basePct, dir, incAmt, i + 1, turns) ?? 5;
+    load = load * (1 + pct / 100);
+    loads.push(Math.round(load / 2.5) * 2.5);
+  }
+  return loads;
+}
+
+// Suggests a STARTING load for an Ascending Set such that the FINAL (heaviest)
+// stage lands at or below a safe ceiling of Est 1RM (85% by default) — since
+// picking a starting load too close to 1RM makes the configured increases
+// mathematically push past what's actually liftable by the last stage.
+// Works backwards from the ceiling: computes the compounded multiplier the
+// wave % config produces by the final stage, then divides the ceiling load by
+// that multiplier to find a starting point that keeps the whole sequence
+// feasible. Also enforces a practical rep cap (10 by default) on the STARTING
+// stage — the pure ceiling formula alone can suggest a load light enough to
+// imply an unrealistically high rep count (e.g. 13+) for what's meant to be a
+// strength-focused technique, so whichever constraint calls for the HEAVIER
+// load wins. This means the final stage can end up slightly above the 85%
+// ceiling when the rep cap is the binding constraint — an intentional
+// trade-off in favor of a sensible starting rep count over a hard ceiling.
+// Rounded to the nearest 2.5kg, matching calcAscSetLoads.
+function calcAscSetSuggestedMainLoad(est1RM, basePct, dir, incAmt, turns, numUps, ceilingPct = 85, repCap = 10) {
+  if (!est1RM || numUps <= 0) return null;
+  let multiplier = 1;
+  for (let i = 0; i < numUps; i++) {
+    const pct = calcDropPct(basePct, dir, incAmt, i + 1, turns) ?? 5;
+    multiplier *= 1 + pct / 100;
+  }
+  const ceilingLoad = est1RM * (ceilingPct / 100) / multiplier;
+  const repCapLoad = est1RM / (1 + repCap / 30);
+  const suggested = Math.max(ceilingLoad, repCapLoad);
+  return Math.round(suggested / 2.5) * 2.5;
+}
+
+// Companion rep suggestion for the suggested starting load above — inverts
+// the same Epley formula used by est1RM() elsewhere (1RM = load×(1+reps/30))
+// to find how many reps at THAT specific load would produce the known Est
+// 1RM, rather than relying on a generic rep-range midpoint that isn't tied to
+// this particular load. Capped at the same repCap as the load suggestion
+// above, so rounding can never push the displayed rep count past it.
+function calcAscSetSuggestedMainReps(est1RM, suggestedLoad, repCap = 10) {
+  if (!est1RM || !suggestedLoad) return null;
+  const reps = 30 * (est1RM / suggestedLoad - 1);
+  return Math.max(1, Math.min(repCap, Math.round(reps)));
+}
 const bandRangeOptions = strength => {
   const r = BAND_RANGES[strength];
   if (!r) return [];
@@ -840,7 +940,7 @@ function SessionXTick({
 }
 const CATEGORIES = ["Strength", "Power", "Stability", "Mobility"];
 const PROG_TYPES = ["Activation Strength", "General Strength", "Hypertrophy", "Endurance Strength", "Max Strength", "Power", "Muscular Endurance", "Hybrid"];
-const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Negative", "Cluster Set", "Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Ovrc Iso-Endurance", "Ovrc Iso-Sustained", "Ovrc Iso-Strength+Hypertrophy", "Yielding Iso-Holds", "Yielding Iso-GPP"];
+const SET_TYPES = ["Normal", "Warm-up", "Top Set", "Back-off", "Drop Set", "Ascending Set", "Pyramid Set (continuous)", "Negative", "Cluster Set", "Ovrc Iso-Ballistic", "Ovrc Iso-Max", "Ovrc Iso-Endurance", "Ovrc Iso-Sustained", "Ovrc Iso-Strength+Hypertrophy", "Yielding Iso-Holds", "Yielding Iso-GPP"];
 const EQUIP_LIST = ["Barbell", "Dumbbell", "Cable machine", "Bodyweight", "Kettlebell", "Long band", "Short band", "Medicine ball", "Trap(Hex) bar"];
 const LAT_LIST = ["Bilateral", "Unilateral - Left", "Unilateral - Right", "Alternating", "Contralateral"];
 const RPE_DESC = {
@@ -3222,7 +3322,17 @@ function SessionDetailSheet({
       fontSize: 11,
       color: '#A855F7'
     }
-  }, "📉 ", e.load, "kg×", e.dropSetMainReps ?? "?", ", ", e.dropSetLoads.map((l, i) => `${l}kg×${e.dropSetReps?.[i] ?? "?"}`).join(", ")), isNegativeSet(e.type) && (e.eccSecs || e.conSecs) && /*#__PURE__*/React.createElement("div", {
+  }, "📉 ", e.load, "kg×", e.dropSetMainReps ?? "?", ", ", e.dropSetLoads.map((l, i) => `${l}kg×${e.dropSetReps?.[i] ?? "?"}`).join(", ")), e.ascSetLoads?.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#22C55E'
+    }
+  }, "📈 ", e.load, "kg×", e.ascSetMainReps ?? "?", ", ", e.ascSetLoads.map((l, i) => `${l}kg×${e.ascSetReps?.[i] ?? "?"}`).join(", ")), e.pyrLoads?.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#A855F7'
+    }
+  }, "🔺 ", e.load, "kg×", e.pyrMainReps ?? "?", ", ", e.pyrLoads.map((l, i) => `${l}kg×${e.pyrReps?.[i] ?? "?"}`).join(", ")), isNegativeSet(e.type) && (e.eccSecs || e.conSecs) && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: '#38BDF8'
@@ -5509,7 +5619,10 @@ function LogTab({
     clusterRepsArr: [],
     clusterCount: "",
     clusterRest: "",
-    dropSetCount: ""
+    dropSetCount: "",
+    ascSetCount: "",
+    pyrUpCount: "",
+    pyrDownCount: ""
   });
   const [showBand, setShowBand] = useState(false);
   const [editingInstr, setEditingInstr] = useState(false);
@@ -5572,7 +5685,10 @@ function LogTab({
       clusterRepsArr: [],
       clusterCount: "",
       clusterRest: "",
-      dropSetCount: ""
+      dropSetCount: "",
+      ascSetCount: "",
+      pyrUpCount: "",
+      pyrDownCount: ""
     });
     setShowBand(false);
     setTempoOverride({
@@ -5609,7 +5725,10 @@ function LogTab({
       clusterRepsArr: [],
       clusterCount: "",
       clusterRest: "",
-      dropSetCount: ""
+      dropSetCount: "",
+      ascSetCount: "",
+      pyrUpCount: "",
+      pyrDownCount: ""
     }));
     setShowBand(false);
     setTempoOverride({
@@ -5654,10 +5773,17 @@ function LogTab({
       clusterRepsArr: entry.clusterRepsArr?.length ? entry.clusterRepsArr.map(String) : entry.clusterReps != null && entry.clusterCount != null ? Array(entry.clusterCount).fill(String(entry.clusterReps)) : [],
       clusterCount: entry.clusterCount != null ? String(entry.clusterCount) : "",
       clusterRest: entry.clusterRest != null ? String(entry.clusterRest) : "",
-      dropSetCount: entry.dropSetLoads?.length ? String(entry.dropSetLoads.length) : ""
+      dropSetCount: entry.dropSetLoads?.length ? String(entry.dropSetLoads.length) : "",
+      ascSetCount: entry.ascSetLoads?.length ? String(entry.ascSetLoads.length) : "",
+      pyrUpCount: entry.pyrUpCount != null ? String(entry.pyrUpCount) : "",
+      pyrDownCount: entry.pyrLoads?.length && entry.pyrUpCount != null ? String(entry.pyrLoads.length - entry.pyrUpCount) : ""
     }));
     if (entry.dropSetReps?.length) setDropSetRepsArr(entry.dropSetReps.map(String));
     if (entry.dropSetMainReps != null) setDropSetMainReps(String(entry.dropSetMainReps));
+    if (entry.ascSetReps?.length) setAscSetRepsArr(entry.ascSetReps.map(String));
+    if (entry.ascSetMainReps != null) setAscSetMainReps(String(entry.ascSetMainReps));
+    if (entry.pyrReps?.length) setPyrRepsArr(entry.pyrReps.map(String));
+    if (entry.pyrMainReps != null) setPyrMainReps(String(entry.pyrMainReps));
     setShowBand(!!entry.bandStrength);
     const sessionDate = sessions.find(s => s.id === sessionId)?.date || today;
     setEditingEntryRef({
@@ -5896,6 +6022,117 @@ function LogTab({
     setDropSetRepsArr(Array(dropSetCountNum).fill(""));
     setDropSetMainReps("");
   }, [form.setNo, form.dropSetCount, activeEx]);
+
+  // Ascending Set ("Run the Rack") sequence — the mirror image of Drop Set's
+  // state machine, load INCREASING instead of decreasing. Unlike a drop set,
+  // there's no "offsetting" mechanism here — load and fatigue climb together,
+  // so this is a considerably more demanding technique, not just Drop Set's
+  // symmetrical opposite. Reps are entered AFTER each increase for the same
+  // reason as Drop Set (actual reps-to-fatigue can't be predicted), and the
+  // brief transition is for changing the load, not recovery. The main/
+  // starting set (form.load, form.reps) is the client's regular working set —
+  // it is NOT itself "Up 1"; Up 1 is the first increase after it.
+  const [ascSetPct, setAscSetPct] = useState("5"); // base % (Main set -> Up 1)
+  const [ascPctDir, setAscPctDir] = useState("+");
+  const [ascPctIncAmt, setAscPctIncAmt] = useState("0");
+  const [ascPctTurnsCfg, setAscPctTurnsCfg] = useState([]);
+  const [ascSetRepsArr, setAscSetRepsArr] = useState([]); // filled in AFTER each increase completes
+  const [ascSetMainReps, setAscSetMainReps] = useState(""); // snapshot of the starting set's reps, taken when the sequence starts
+  const [ascSetActive, setAscSetActive] = useState(false);
+  const [ascSetIdx, setAscSetIdx] = useState(0);
+  const [ascSetRemaining, setAscSetRemaining] = useState(0);
+  const [ascSetCompleted, setAscSetCompleted] = useState(false);
+  const ascSetCountNum = +form.ascSetCount || 0;
+  const ascSetLoads = calcAscSetLoads(+form.load || 0, +ascSetPct, ascPctDir, +ascPctIncAmt, ascPctTurnsCfg, ascSetCountNum);
+  // Reference-only suggestion for each increase's reps. Since load AND fatigue
+  // both climb here (no offsetting mechanism), reps should be expected to
+  // DECLINE stage to stage, not repeat — so unlike Drop Set's "suggest the
+  // same as before" heuristic, this just suggests slightly fewer than the
+  // previous stage's actual reps as a starting reference, still falling back
+  // recursively through earlier stages (ultimately the main set) if a nearer
+  // actual hasn't been entered yet.
+  const ascSetSuggestedReps = upIdx => {
+    if (upIdx === 0) {
+      const mainReps = +ascSetMainReps || +form.reps;
+      return mainReps > 0 ? Math.max(1, mainReps - 1) : null;
+    }
+    const prevActual = +ascSetRepsArr[upIdx - 1];
+    return prevActual > 0 ? Math.max(1, prevActual - 1) : ascSetSuggestedReps(upIdx - 1);
+  };
+  useEffect(() => {
+    setAscSetActive(false);
+    setAscSetIdx(0);
+    setAscSetRemaining(0);
+    setAscSetCompleted(false);
+    setAscSetRepsArr(Array(ascSetCountNum).fill(""));
+    setAscSetMainReps("");
+  }, [form.setNo, form.ascSetCount, activeEx]);
+
+  // Pyramid Set (continuous) — combines Ascending Set's climb with Drop Set's
+  // descent into ONE continuous sequence: starting load -> ascending stages
+  // (Up 1, Up 2, ...) -> a peak -> descending stages (Down 1, Down 2, ...),
+  // all with no rest, using the client's regular starting set as the base.
+  // Deliberately does NOT support the reverse order (descend then climb back
+  // up) — asking for a near-peak effort at the point of MAXIMUM accumulated
+  // fatigue is structurally backwards, not just harder, since the entire
+  // reason a climb is safely achievable is doing it while still relatively
+  // fresh. Ascending and descending each keep their OWN independent wave %
+  // config (separate base/trend/increment/turns), since 5%-ish ascending
+  // jumps and 20%-ish descending drops are different magnitudes for a reason
+  // — forcing one shared pattern across both halves wouldn't make sense.
+  const [pyrUpPct, setPyrUpPct] = useState("5");
+  const [pyrUpDir, setPyrUpDir] = useState("+");
+  const [pyrUpIncAmt, setPyrUpIncAmt] = useState("0");
+  const [pyrUpTurnsCfg, setPyrUpTurnsCfg] = useState([]);
+  const [pyrDownPct, setPyrDownPct] = useState("20");
+  const [pyrDownDir, setPyrDownDir] = useState("+");
+  const [pyrDownIncAmt, setPyrDownIncAmt] = useState("0");
+  const [pyrDownTurnsCfg, setPyrDownTurnsCfg] = useState([]);
+  const [pyrRepsArr, setPyrRepsArr] = useState([]); // covers BOTH up and down stages, one combined array
+  const [pyrMainReps, setPyrMainReps] = useState(""); // snapshot of the starting set's reps, taken when the sequence starts
+  const [pyrActive, setPyrActive] = useState(false);
+  const [pyrIdx, setPyrIdx] = useState(0);
+  const [pyrRemaining, setPyrRemaining] = useState(0);
+  const [pyrCompleted, setPyrCompleted] = useState(false);
+  const pyrUpCountNum = +form.pyrUpCount || 0;
+  const pyrDownCountNum = +form.pyrDownCount || 0;
+  const pyrUpLoads = calcAscSetLoads(+form.load || 0, +pyrUpPct, pyrUpDir, +pyrUpIncAmt, pyrUpTurnsCfg, pyrUpCountNum);
+  const pyrPeakLoad = pyrUpLoads.length ? pyrUpLoads[pyrUpLoads.length - 1] : +form.load || 0;
+  const pyrDownLoads = calcDropSetLoads(pyrPeakLoad, +pyrDownPct, pyrDownDir, +pyrDownIncAmt, pyrDownTurnsCfg, pyrDownCountNum);
+  const pyrAllLoads = [...pyrUpLoads, ...pyrDownLoads]; // combined stage sequence, main/starting set excluded
+
+  // Suggested reps per stage — ascending stages use the SAME "expect fewer
+  // than before" logic as a standalone Ascending Set (load AND fatigue climb
+  // together, no offsetting mechanism); descending stages switch to Drop
+  // Set's "suggest the same as the previous stage's actual" logic instead,
+  // since the load reduction there IS the offsetting mechanism, specifically
+  // meant to let a similar rep count be maintained despite fatigue.
+  const pyrSuggestedReps = idx => {
+    if (idx < pyrUpCountNum) {
+      if (idx === 0) {
+        const mainReps = +pyrMainReps || +form.reps;
+        return mainReps > 0 ? Math.max(1, mainReps - 1) : null;
+      }
+      const prevActual = +pyrRepsArr[idx - 1];
+      return prevActual > 0 ? Math.max(1, prevActual - 1) : pyrSuggestedReps(idx - 1);
+    }
+    const prevActual = +pyrRepsArr[idx - 1];
+    if (prevActual > 0) return prevActual;
+    return idx > 0 ? pyrSuggestedReps(idx - 1) : null;
+  };
+  useEffect(() => {
+    setPyrActive(false);
+    setPyrIdx(0);
+    setPyrRemaining(0);
+    setPyrCompleted(false);
+    setPyrRepsArr(Array(pyrUpCountNum + pyrDownCountNum).fill(""));
+    setPyrMainReps("");
+  }, [form.setNo, form.pyrUpCount, form.pyrDownCount, activeEx]);
+  useEffect(() => {
+    if (pyrRemaining <= 0) return;
+    const t = setTimeout(() => setPyrRemaining(r => r - 1), 1000);
+    return () => clearTimeout(t);
+  }, [pyrRemaining]);
 
   // Negative Set breakdown — deliberately a SEPARATE, dedicated eccentric/
   // concentric input from the general tempo override editor elsewhere on this
@@ -6251,6 +6488,20 @@ function LogTab({
     }, 1000);
     return () => clearTimeout(t);
   }, [dropSetRemaining]);
+  useEffect(() => {
+    if (ascSetRemaining <= 0) return;
+    const t = setTimeout(() => {
+      setAscSetRemaining(r => {
+        if (r <= 1) {
+          playClusterChime();
+          setAscSetCompleted(true);
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [ascSetRemaining]);
 
   // When arriving here via a pill tap (quick-switch), jump straight to whichever
   // exercise that client's rest timer belongs to, rather than leaving them on
@@ -6345,6 +6596,14 @@ function LogTab({
       dropSetLoads: isDropSet(form.type) && dropSetLoads.length > 0 ? dropSetLoads : null,
       dropSetReps: isDropSet(form.type) && dropSetLoads.length > 0 ? dropSetLoads.map((_, i) => +dropSetRepsArr[i] || 0) : null,
       dropSetMainReps: isDropSet(form.type) && dropSetLoads.length > 0 ? +dropSetMainReps || +form.reps || 0 : null,
+      ascSetLoads: isAscendingSet(form.type) && ascSetLoads.length > 0 ? ascSetLoads : null,
+      ascSetReps: isAscendingSet(form.type) && ascSetLoads.length > 0 ? ascSetLoads.map((_, i) => +ascSetRepsArr[i] || 0) : null,
+      ascSetMainReps: isAscendingSet(form.type) && ascSetLoads.length > 0 ? +ascSetMainReps || +form.reps || 0 : null,
+      pyrLoads: isPyramidSet(form.type) && pyrAllLoads.length > 0 ? pyrAllLoads : null,
+      pyrReps: isPyramidSet(form.type) && pyrAllLoads.length > 0 ? pyrAllLoads.map((_, i) => +pyrRepsArr[i] || 0) : null,
+      pyrMainReps: isPyramidSet(form.type) && pyrAllLoads.length > 0 ? +pyrMainReps || +form.reps || 0 : null,
+      pyrUpCount: isPyramidSet(form.type) && pyrAllLoads.length > 0 ? pyrUpCountNum : null,
+      // where in pyrLoads/pyrReps the descending stages begin
       comboRounds: isComboIso(form.type) ? +comboRounds || null : null,
       comboContractSecs: isComboIso(form.type) ? +comboContractSecs || null : null,
       comboRestSecs: isComboIso(form.type) ? +comboRestSecs || null : null,
@@ -6385,7 +6644,10 @@ function LogTab({
       clusterRepsArr: [],
       clusterCount: "",
       clusterRest: "",
-      dropSetCount: ""
+      dropSetCount: "",
+      ascSetCount: "",
+      pyrUpCount: "",
+      pyrDownCount: ""
     }));
     setShowBand(false);
     setSaved(true);
@@ -8814,7 +9076,1094 @@ function LogTab({
       marginTop: 8,
       fontWeight: 600
     }
-  }, form.load, "kg×", form.reps || "?", ", ", dropSetLoads.map((l, i) => `${l}kg×${dropSetRepsArr[i] || "?"}`).join(", "), " = ", /*#__PURE__*/React.createElement("strong", null, (+form.reps || 0) + dropSetRepsArr.reduce((s, v) => s + (+v || 0), 0), " total reps"))), isNegativeSet(form.type) && /*#__PURE__*/React.createElement("div", {
+  }, form.load, "kg×", form.reps || "?", ", ", dropSetLoads.map((l, i) => `${l}kg×${dropSetRepsArr[i] || "?"}`).join(", "), " = ", /*#__PURE__*/React.createElement("strong", null, (+form.reps || 0) + dropSetRepsArr.reduce((s, v) => s + (+v || 0), 0), " total reps"))), isAscendingSet(form.type) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#22C55E15",
+      borderRadius: 10,
+      padding: "12px 14px",
+      border: `1px solid #22C55E33`,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: '#22C55E',
+      fontWeight: 700,
+      letterSpacing: 1.5,
+      textTransform: "uppercase",
+      marginBottom: 10
+    }
+  }, "📈 Ascending Set breakdown"), (() => {
+    const cx = complexForEx(activeEx);
+    if (!cx) return null;
+    const idx = cx.exerciseNames.indexOf(activeEx);
+    const isLast = idx === cx.exerciseNames.length - 1;
+    const label = complexLabelNumbered(allComplexes, cx._colorIdx);
+    const color = complexColorFor(cx._colorIdx);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: color + "18",
+        border: `1px solid ${color}44`,
+        borderRadius: 8,
+        padding: "8px 10px",
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color,
+        fontWeight: 700
+      }
+    }, "🔗 Part of ", label, ": ", cx.exerciseNames.join(" → ")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.sub,
+        marginTop: 2
+      }
+    }, isLast ? "Logging this completes the round — rest timer starts, then cycles back to " + cx.exerciseNames[0] + "." : `Logging this will jump straight to ${cx.exerciseNames[idx + 1]} — no rest.`));
+  })(), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Number of increases"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "1",
+    placeholder: "3",
+    value: form.ascSetCount,
+    onChange: e => {
+      const ac = Math.max(0, +e.target.value || 0);
+      upd("ascSetCount", e.target.value);
+      setAscSetRepsArr(arr => {
+        const na = [...arr];
+        while (na.length < ac) na.push("");
+        na.length = ac;
+        return na;
+      });
+    },
+    style: ss
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Base Increase % (Main set → Up 1)"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: ascSetPct,
+    onChange: e => setAscSetPct(e.target.value),
+    style: ss
+  }, [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v, "%")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 70
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Trend"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: ascPctDir,
+    onChange: e => setAscPctDir(e.target.value),
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "+"
+  }, "+"), /*#__PURE__*/React.createElement("option", {
+    value: "-"
+  }, "−"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Increment per stage"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: ascPctIncAmt,
+    onChange: e => setAscPctIncAmt(e.target.value),
+    style: ss
+  }, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v === 0 ? "None (flat %)" : `${v}%`))))), +ascPctIncAmt > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, ascPctTurnsCfg.map((t, ti) => /*#__PURE__*/React.createElement("div", {
+    key: ti,
+    style: {
+      background: C.card,
+      borderRadius: 8,
+      padding: "10px",
+      marginBottom: 8,
+      border: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: '#22C55E',
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase"
+    }
+  }, "🌊 Turn ", ti + 1), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setAscPctTurnsCfg(rt => rt.filter((_, i) => i !== ti)),
+    style: {
+      background: "none",
+      border: "none",
+      color: C.warn,
+      cursor: "pointer",
+      fontSize: 12
+    }
+  }, "🗑 Remove")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "Switch trend after increase #"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.afterSet,
+    onChange: e => {
+      const nt = [...ascPctTurnsCfg];
+      nt[ti] = {
+        ...nt[ti],
+        afterSet: +e.target.value
+      };
+      setAscPctTurnsCfg(nt);
+    },
+    style: ss
+  }, TURN_OPTIONS.map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, "Up ", v)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 70
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "New trend"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.dir,
+    onChange: e => {
+      const nt = [...ascPctTurnsCfg];
+      nt[ti] = {
+        ...nt[ti],
+        dir: e.target.value
+      };
+      setAscPctTurnsCfg(nt);
+    },
+    style: ss
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "+"
+  }, "+"), /*#__PURE__*/React.createElement("option", {
+    value: "-"
+  }, "−"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: "New increment"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: t.amt,
+    onChange: e => {
+      const nt = [...ascPctTurnsCfg];
+      nt[ti] = {
+        ...nt[ti],
+        amt: +e.target.value
+      };
+      setAscPctTurnsCfg(nt);
+    },
+    style: ss
+  }, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => /*#__PURE__*/React.createElement("option", {
+    key: v,
+    value: v
+  }, v === 0 ? "None (flat)" : `${v}%`))))))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const lastUp = ascPctTurnsCfg.length ? ascPctTurnsCfg[ascPctTurnsCfg.length - 1].afterSet : 2;
+      setAscPctTurnsCfg(rt => [...rt, {
+        afterSet: Math.min(20, lastUp + 1),
+        dir: "+",
+        amt: 0
+      }]);
+    },
+    style: {
+      width: "100%",
+      background: "none",
+      border: `1px dashed ${'#22C55E'}55`,
+      borderRadius: 8,
+      padding: "8px",
+      cursor: "pointer",
+      color: '#22C55E',
+      fontSize: 12,
+      fontWeight: 700,
+      marginBottom: 8
+    }
+  }, "🌊 + Add trend change")), +ascPctIncAmt > 0 && ascSetCountNum >= 1 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#22C55E',
+      marginBottom: 8,
+      fontWeight: 600,
+      lineHeight: 1.6
+    }
+  }, "Preview: ", Array.from({
+    length: ascSetCountNum
+  }, (_, i) => `${i === 0 ? "Main" : "Up" + i}→Up${i + 1} ${calcDropPct(+ascSetPct, ascPctDir, +ascPctIncAmt, i + 1, ascPctTurnsCfg)}%`).join(" · ")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: C.muted,
+      marginBottom: 10,
+      lineHeight: 1.4
+    }
+  }, "Unlike a drop set, load AND fatigue both climb together here — there's no offsetting mechanism, so this is a considerably more demanding technique. Also known as \"Run the Rack.\""), ascSetCountNum >= 1 && (() => {
+    const est1RM = getBest1RM(sessions, activeEx);
+    const suggestedLoad = calcAscSetSuggestedMainLoad(est1RM, +ascSetPct, ascPctDir, +ascPctIncAmt, ascPctTurnsCfg, ascSetCountNum);
+    const suggestedReps = calcAscSetSuggestedMainReps(est1RM, suggestedLoad);
+    if (suggestedLoad == null) return null;
+    // Recompute the final stage's load at this suggested starting
+    // point, to tell the trainer whether the rep cap (10) or the
+    // 85% ceiling ended up being the binding constraint — and flag
+    // it plainly if the rep cap pushed the final stage over 85%.
+    const finalLoad = calcAscSetLoads(suggestedLoad, +ascSetPct, ascPctDir, +ascPctIncAmt, ascPctTurnsCfg, ascSetCountNum).slice(-1)[0];
+    const finalPct1RM = finalLoad != null && est1RM ? Math.round(finalLoad / est1RM * 100) : null;
+    const overCeiling = finalPct1RM != null && finalPct1RM > 85;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 8,
+        background: '#22C55E' + "12",
+        border: `1px solid #22C55E33`,
+        borderRadius: 8,
+        padding: "8px 10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: '#22C55E',
+        fontWeight: 700
+      }
+    }, "💡 Suggested start: ", suggestedLoad, "kg", suggestedReps != null ? ` × ${suggestedReps}` : ""), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.muted
+      }
+    }, overCeiling ? `Reps at the starting load are capped at 10 for a practical starting point — as a result, the final Up stage lands at ~${finalPct1RM}% of Est 1RM (${est1RM}kg), a bit above the usual 85% ceiling.` : `Keeps the final Up stage at or below 85% of Est 1RM (${est1RM}kg) — a heavier starting load risks the last stage landing at or past what's actually liftable.`)), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        upd("load", suggestedLoad);
+        if (suggestedReps != null) upd("reps", suggestedReps);
+      },
+      style: {
+        background: '#22C55E',
+        color: "#04170B",
+        border: "none",
+        borderRadius: 6,
+        padding: "5px 12px",
+        cursor: "pointer",
+        fontSize: 11,
+        fontWeight: 700,
+        flexShrink: 0,
+        marginLeft: 8
+      }
+    }, "Use"));
+  })(), ascSetLoads.length > 0 && (() => {
+    const mainSetRec = calcRecommendedLoad(sessions, activeEx);
+    const mainSetSuggestedReps = mainSetRec?.repRangeLo ? Math.round((mainSetRec.repRangeLo + mainSetRec.repRangeHi) / 2) : null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: '#22C55E',
+        fontWeight: 700,
+        width: 60,
+        flexShrink: 0
+      }
+    }, "Main set"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card2,
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        fontSize: 12,
+        color: C.text,
+        flex: 1
+      }
+    }, form.load || "—", "kg"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.muted,
+        width: 64,
+        textAlign: "center"
+      }
+    }, form.reps || "—", " reps"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        width: 38,
+        flexShrink: 0
+      }
+    }, mainSetSuggestedReps != null ? `~${mainSetSuggestedReps}r` : "")), /*#__PURE__*/React.createElement(Lbl, {
+      t: "Up loads (auto) & reps (fill in after each increase)"
+    }), ascSetLoads.map((load, ui) => /*#__PURE__*/React.createElement("div", {
+      key: ui,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        width: 44,
+        flexShrink: 0
+      }
+    }, "Up ", ui + 1), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card2,
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        fontSize: 12,
+        color: C.text,
+        flex: 1
+      }
+    }, load, "kg"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      placeholder: "reps",
+      value: ascSetRepsArr[ui] || "",
+      onChange: e => setAscSetRepsArr(arr => {
+        const na = [...arr];
+        na[ui] = e.target.value;
+        return na;
+      }),
+      style: {
+        ...ss,
+        width: 64,
+        textAlign: "center"
+      }
+    }), ascSetSuggestedReps(ui) != null && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        width: 38,
+        flexShrink: 0
+      }
+    }, "~", ascSetSuggestedReps(ui), "r"))));
+  })(), ascSetLoads.length >= 1 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTop: `1px solid #22C55E33`
+    }
+  }, !ascSetActive ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setAscSetActive(true);
+      setAscSetIdx(0);
+      setAscSetRemaining(0);
+      setAscSetCompleted(false);
+      setAscSetMainReps(form.reps || "");
+    },
+    style: {
+      width: "100%",
+      background: '#22C55E',
+      color: "#04170B",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "▶ Start Ascending Sequence") : /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.card,
+      border: `1px solid ${'#22C55E'}55`,
+      borderRadius: 10,
+      padding: "12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 8,
+      color: ascSetCompleted ? C.accent : '#22C55E'
+    }
+  }, "Up ", ascSetIdx + 1, " of ", ascSetLoads.length, " — ", ascSetLoads[ascSetIdx], "kg", ascSetCompleted ? " COMPLETED!" : ""), ascSetRemaining > 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Bebas Neue',cursive",
+      fontSize: 36,
+      color: '#22C55E',
+      letterSpacing: 1
+    }
+  }, ascSetRemaining, "s"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: C.muted,
+      marginBottom: 8
+    }
+  }, "Changing load to ", ascSetLoads[ascSetIdx + 1], "kg"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setAscSetRemaining(0);
+      setAscSetCompleted(true);
+    },
+    style: {
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      padding: "6px 14px",
+      cursor: "pointer",
+      color: C.sub,
+      fontSize: 11,
+      fontWeight: 700
+    }
+  }, "Skip")) : ascSetCompleted ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setAscSetIdx(i => i + 1);
+      setAscSetCompleted(false);
+    },
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "Continue to Up ", ascSetIdx + 2) : ascSetIdx < ascSetLoads.length - 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: `Reps completed at ${ascSetLoads[ascSetIdx]}kg`
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0",
+    autoFocus: true,
+    value: ascSetRepsArr[ascSetIdx] || "",
+    onChange: e => setAscSetRepsArr(arr => {
+      const na = [...arr];
+      na[ascSetIdx] = e.target.value;
+      return na;
+    }),
+    style: ss
+  }), ascSetSuggestedReps(ascSetIdx) != null && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: C.muted,
+      marginTop: 3
+    }
+  }, "~", ascSetSuggestedReps(ascSetIdx), " reps — expect fewer than the previous stage, since load and fatigue both increase together")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setAscSetRemaining(15),
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, "Complete Up ", ascSetIdx + 1, " — Change to ", ascSetLoads[ascSetIdx + 1], "kg")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement(Lbl, {
+    t: `Reps completed at ${ascSetLoads[ascSetIdx]}kg`
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0",
+    autoFocus: true,
+    value: ascSetRepsArr[ascSetIdx] || "",
+    onChange: e => setAscSetRepsArr(arr => {
+      const na = [...arr];
+      na[ascSetIdx] = e.target.value;
+      return na;
+    }),
+    style: ss
+  }), ascSetSuggestedReps(ascSetIdx) != null && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: C.muted,
+      marginTop: 3
+    }
+  }, "~", ascSetSuggestedReps(ascSetIdx), " reps — expect fewer than the previous stage, since load and fatigue both increase together")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      upd("reps", (+ascSetMainReps || +form.reps || 0) + ascSetRepsArr.reduce((s, v) => s + (+v || 0), 0));
+      const cx = complexForEx(activeEx);
+      if (cx) submit();else setAscSetActive(false);
+    },
+    style: {
+      width: "100%",
+      background: C.accent,
+      color: "#001A12",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      cursor: "pointer",
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, complexForEx(activeEx) ? `✓ Complete Final Up — Log & Continue` : `✓ Complete Final Up — Ready to Log Set`)))), (form.reps || ascSetRepsArr.some(v => v)) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: '#22C55E',
+      marginTop: 8,
+      fontWeight: 600
+    }
+  }, form.load, "kg×", form.reps || "?", ", ", ascSetLoads.map((l, i) => `${l}kg×${ascSetRepsArr[i] || "?"}`).join(", "), " = ", /*#__PURE__*/React.createElement("strong", null, (+form.reps || 0) + ascSetRepsArr.reduce((s, v) => s + (+v || 0), 0), " total reps"))), isPyramidSet(form.type) && (() => {
+    const est1RM = getBest1RM(sessions, activeEx);
+    const suggestedLoad = calcAscSetSuggestedMainLoad(est1RM, +pyrUpPct, pyrUpDir, +pyrUpIncAmt, pyrUpTurnsCfg, pyrUpCountNum);
+    const suggestedReps = calcAscSetSuggestedMainReps(est1RM, suggestedLoad);
+    const finalUpLoad = pyrUpLoads.length ? calcAscSetLoads(suggestedLoad || 0, +pyrUpPct, pyrUpDir, +pyrUpIncAmt, pyrUpTurnsCfg, pyrUpCountNum).slice(-1)[0] : null;
+    const finalPct1RM = finalUpLoad != null && est1RM ? Math.round(finalUpLoad / est1RM * 100) : null;
+    const overCeiling = finalPct1RM != null && finalPct1RM > 85;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: "#A855F715",
+        borderRadius: 10,
+        padding: "12px 14px",
+        border: `1px solid #A855F733`,
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: '#A855F7',
+        fontWeight: 700,
+        letterSpacing: 1.5,
+        textTransform: "uppercase",
+        marginBottom: 10
+      }
+    }, "🔺 Pyramid Set breakdown"), (() => {
+      const cx = complexForEx(activeEx);
+      if (!cx) return null;
+      const idx = cx.exerciseNames.indexOf(activeEx);
+      const isLast = idx === cx.exerciseNames.length - 1;
+      const label = complexLabelNumbered(allComplexes, cx._colorIdx);
+      const color = complexColorFor(cx._colorIdx);
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          background: color + "18",
+          border: `1px solid ${color}44`,
+          borderRadius: 8,
+          padding: "8px 10px",
+          marginBottom: 10
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color,
+          fontWeight: 700
+        }
+      }, "🔗 Part of ", label, ": ", cx.exerciseNames.join(" → ")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 9,
+          color: C.sub,
+          marginTop: 2
+        }
+      }, isLast ? "Logging this completes the round — rest timer starts, then cycles back to " + cx.exerciseNames[0] + "." : `Logging this will jump straight to ${cx.exerciseNames[idx + 1]} — no rest.`));
+    })(), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        marginBottom: 10,
+        lineHeight: 1.4
+      }
+    }, "Climbs to a peak, then descends — combining Ascending Set and Drop Set into one continuous sequence, using the fatigue-compensation mechanism of a drop to keep training productively once the peak has been reached."), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: '#A855F7',
+        fontWeight: 700,
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        marginBottom: 6
+      }
+    }, "▲ Ascending phase"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Number of increases"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      placeholder: "2",
+      value: form.pyrUpCount,
+      onChange: e => {
+        const uc = Math.max(0, +e.target.value || 0);
+        upd("pyrUpCount", e.target.value);
+        setPyrRepsArr(arr => {
+          const na = [...arr];
+          while (na.length < uc + pyrDownCountNum) na.push("");
+          return na;
+        });
+      },
+      style: ss
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Base Increase % (Main set → Up 1)"
+    }), /*#__PURE__*/React.createElement("select", {
+      value: pyrUpPct,
+      onChange: e => setPyrUpPct(e.target.value),
+      style: ss
+    }, [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20].map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v, "%")))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 70
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Trend"
+    }), /*#__PURE__*/React.createElement("select", {
+      value: pyrUpDir,
+      onChange: e => setPyrUpDir(e.target.value),
+      style: ss
+    }, /*#__PURE__*/React.createElement("option", {
+      value: "+"
+    }, "+"), /*#__PURE__*/React.createElement("option", {
+      value: "-"
+    }, "−"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Increment per stage"
+    }), /*#__PURE__*/React.createElement("select", {
+      value: pyrUpIncAmt,
+      onChange: e => setPyrUpIncAmt(e.target.value),
+      style: ss
+    }, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v === 0 ? "None (flat %)" : `${v}%`))))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: '#A855F7',
+        fontWeight: 700,
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        marginBottom: 6,
+        marginTop: 4
+      }
+    }, "▼ Descending phase (from the peak)"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Number of drops"
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      placeholder: "2",
+      value: form.pyrDownCount,
+      onChange: e => {
+        const dc = Math.max(0, +e.target.value || 0);
+        upd("pyrDownCount", e.target.value);
+        setPyrRepsArr(arr => {
+          const na = [...arr];
+          while (na.length < pyrUpCountNum + dc) na.push("");
+          return na;
+        });
+      },
+      style: ss
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Base Drop % (Peak → Down 1)"
+    }), /*#__PURE__*/React.createElement("select", {
+      value: pyrDownPct,
+      onChange: e => setPyrDownPct(e.target.value),
+      style: ss
+    }, [10, 15, 20, 25, 30, 35, 40, 45, 50].map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v, "%")))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 70
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Trend"
+    }), /*#__PURE__*/React.createElement("select", {
+      value: pyrDownDir,
+      onChange: e => setPyrDownDir(e.target.value),
+      style: ss
+    }, /*#__PURE__*/React.createElement("option", {
+      value: "+"
+    }, "+"), /*#__PURE__*/React.createElement("option", {
+      value: "-"
+    }, "−"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: "Increment per stage"
+    }), /*#__PURE__*/React.createElement("select", {
+      value: pyrDownIncAmt,
+      onChange: e => setPyrDownIncAmt(e.target.value),
+      style: ss
+    }, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => /*#__PURE__*/React.createElement("option", {
+      key: v,
+      value: v
+    }, v === 0 ? "None (flat %)" : `${v}%`))))), pyrUpCountNum >= 1 && suggestedLoad != null && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 8,
+        background: '#A855F7' + "12",
+        border: `1px solid #A855F733`,
+        borderRadius: 8,
+        padding: "8px 10px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: '#A855F7',
+        fontWeight: 700
+      }
+    }, "💡 Suggested start: ", suggestedLoad, "kg", suggestedReps != null ? ` × ${suggestedReps}` : ""), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.muted
+      }
+    }, overCeiling ? `Reps at the starting load are capped at 10 for a practical starting point — as a result, the peak stage lands at ~${finalPct1RM}% of Est 1RM (${est1RM}kg), a bit above the usual 85% ceiling.` : `Keeps the peak stage at or below 85% of Est 1RM (${est1RM}kg) — a heavier starting load risks the peak landing at or past what's actually liftable.`)), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        upd("load", suggestedLoad);
+        if (suggestedReps != null) upd("reps", suggestedReps);
+      },
+      style: {
+        background: '#A855F7',
+        color: "#fff",
+        border: "none",
+        borderRadius: 6,
+        padding: "5px 12px",
+        cursor: "pointer",
+        fontSize: 11,
+        fontWeight: 700,
+        flexShrink: 0,
+        marginLeft: 8
+      }
+    }, "Use")), pyrAllLoads.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: '#A855F7',
+        fontWeight: 700,
+        width: 60,
+        flexShrink: 0
+      }
+    }, "Main set"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card2,
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        fontSize: 12,
+        color: C.text,
+        flex: 1
+      }
+    }, form.load || "—", "kg"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.muted,
+        width: 64,
+        textAlign: "center"
+      }
+    }, form.reps || "—", " reps")), /*#__PURE__*/React.createElement(Lbl, {
+      t: "Stage loads (auto) & reps (fill in as you go)"
+    }), pyrAllLoads.map((load, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: i < pyrUpCountNum ? C.muted : '#A855F7',
+        width: 52,
+        flexShrink: 0
+      }
+    }, i < pyrUpCountNum ? `Up ${i + 1}` : `Down ${i - pyrUpCountNum + 1}`, i === pyrUpCountNum - 1 && pyrDownCountNum > 0 ? " ▲" : ""), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card2,
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 10px",
+        fontSize: 12,
+        color: C.text,
+        flex: 1
+      }
+    }, load, "kg"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      placeholder: "reps",
+      value: pyrRepsArr[i] || "",
+      onChange: e => setPyrRepsArr(arr => {
+        const na = [...arr];
+        na[i] = e.target.value;
+        return na;
+      }),
+      style: {
+        ...ss,
+        width: 64,
+        textAlign: "center"
+      }
+    }), pyrSuggestedReps(i) != null && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        width: 38,
+        flexShrink: 0
+      }
+    }, "~", pyrSuggestedReps(i), "r")))), pyrAllLoads.length >= 1 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 10,
+        paddingTop: 10,
+        borderTop: `1px solid #A855F733`
+      }
+    }, !pyrActive ? /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setPyrActive(true);
+        setPyrIdx(0);
+        setPyrRemaining(0);
+        setPyrCompleted(false);
+        setPyrMainReps(form.reps || "");
+      },
+      style: {
+        width: "100%",
+        background: '#A855F7',
+        color: "#fff",
+        border: "none",
+        borderRadius: 8,
+        padding: "10px",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "▶ Start Pyramid Sequence") : /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.card,
+        border: `1px solid ${'#A855F7'}55`,
+        borderRadius: 10,
+        padding: "12px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        marginBottom: 8,
+        color: pyrCompleted ? C.accent : '#A855F7'
+      }
+    }, pyrIdx < pyrUpCountNum ? `Up ${pyrIdx + 1}` : `Down ${pyrIdx - pyrUpCountNum + 1}`, " of ", pyrAllLoads.length, " — ", pyrAllLoads[pyrIdx], "kg", pyrCompleted ? " COMPLETED!" : ""), pyrRemaining > 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Bebas Neue',cursive",
+        fontSize: 36,
+        color: '#A855F7',
+        letterSpacing: 1
+      }
+    }, pyrRemaining, "s"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: C.muted,
+        marginBottom: 8
+      }
+    }, "Changing load to ", pyrAllLoads[pyrIdx + 1], "kg"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setPyrRemaining(0);
+        setPyrCompleted(true);
+      },
+      style: {
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        padding: "6px 14px",
+        cursor: "pointer",
+        color: C.sub,
+        fontSize: 11,
+        fontWeight: 700
+      }
+    }, "Skip")) : pyrCompleted ? /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        setPyrIdx(i => i + 1);
+        setPyrCompleted(false);
+      },
+      style: {
+        width: "100%",
+        background: C.accent,
+        color: "#001A12",
+        border: "none",
+        borderRadius: 8,
+        padding: "10px",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "Continue to ", pyrIdx + 1 < pyrUpCountNum ? `Up ${pyrIdx + 2}` : `Down ${pyrIdx + 2 - pyrUpCountNum}`) : pyrIdx < pyrAllLoads.length - 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: `Reps completed at ${pyrAllLoads[pyrIdx]}kg`
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      autoFocus: true,
+      value: pyrRepsArr[pyrIdx] || "",
+      onChange: e => setPyrRepsArr(arr => {
+        const na = [...arr];
+        na[pyrIdx] = e.target.value;
+        return na;
+      }),
+      style: ss
+    }), pyrSuggestedReps(pyrIdx) != null && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        marginTop: 3
+      }
+    }, "~", pyrSuggestedReps(pyrIdx), " reps")), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setPyrRemaining(15),
+      style: {
+        width: "100%",
+        background: C.accent,
+        color: "#001A12",
+        border: "none",
+        borderRadius: 8,
+        padding: "10px",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "Complete — Change to ", pyrAllLoads[pyrIdx + 1], "kg")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, /*#__PURE__*/React.createElement(Lbl, {
+      t: `Reps completed at ${pyrAllLoads[pyrIdx]}kg`
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      autoFocus: true,
+      value: pyrRepsArr[pyrIdx] || "",
+      onChange: e => setPyrRepsArr(arr => {
+        const na = [...arr];
+        na[pyrIdx] = e.target.value;
+        return na;
+      }),
+      style: ss
+    }), pyrSuggestedReps(pyrIdx) != null && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: C.muted,
+        marginTop: 3
+      }
+    }, "~", pyrSuggestedReps(pyrIdx), " reps")), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        upd("reps", (+pyrMainReps || +form.reps || 0) + pyrRepsArr.reduce((s, v) => s + (+v || 0), 0));
+        const cx = complexForEx(activeEx);
+        if (cx) submit();else setPyrActive(false);
+      },
+      style: {
+        width: "100%",
+        background: C.accent,
+        color: "#001A12",
+        border: "none",
+        borderRadius: 8,
+        padding: "10px",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, complexForEx(activeEx) ? `✓ Complete Final Stage — Log & Continue` : `✓ Complete Final Stage — Ready to Log Set`)))), (form.reps || pyrRepsArr.some(v => v)) && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: '#A855F7',
+        marginTop: 8,
+        fontWeight: 600
+      }
+    }, form.load, "kg×", form.reps || "?", ", ", pyrAllLoads.map((l, i) => `${l}kg×${pyrRepsArr[i] || "?"}`).join(", "), " = ", /*#__PURE__*/React.createElement("strong", null, (+form.reps || 0) + pyrRepsArr.reduce((s, v) => s + (+v || 0), 0), " total reps")));
+  })(), isNegativeSet(form.type) && /*#__PURE__*/React.createElement("div", {
     style: {
       background: "#38BDF815",
       borderRadius: 10,
@@ -11503,7 +12852,7 @@ function LogTab({
       style: {
         fontSize: 12
       }
-    }, e.clusterRepsArr?.length ? `Set ${e.set}: ${e.reps}(${e.clusterRepsArr.join("; ")})*${e.load}kg` : e.dropSetLoads?.length > 0 ? `Set ${e.set}: ${e.load}kg×${e.dropSetMainReps ?? "?"}, ${e.dropSetLoads.map((l, i) => `${l}kg×${e.dropSetReps?.[i] ?? "?"}`).join(", ")}` : isNegativeSet(e.type) && (e.eccSecs || e.conSecs) ? `Set ${e.set}: ${e.reps}×${e.load}kg (${e.eccSecs || "?"}s ecc / ${e.conSecs || "?"}s con)` : `Set ${e.set}: ${e.reps}×${e.load}kg`), /*#__PURE__*/React.createElement("div", {
+    }, e.clusterRepsArr?.length ? `Set ${e.set}: ${e.reps}(${e.clusterRepsArr.join("; ")})*${e.load}kg` : e.dropSetLoads?.length > 0 ? `Set ${e.set}: ${e.load}kg×${e.dropSetMainReps ?? "?"}, ${e.dropSetLoads.map((l, i) => `${l}kg×${e.dropSetReps?.[i] ?? "?"}`).join(", ")}` : e.ascSetLoads?.length > 0 ? `Set ${e.set}: ${e.load}kg×${e.ascSetMainReps ?? "?"}, ${e.ascSetLoads.map((l, i) => `${l}kg×${e.ascSetReps?.[i] ?? "?"}`).join(", ")}` : e.pyrLoads?.length > 0 ? `Set ${e.set}: ${e.load}kg×${e.pyrMainReps ?? "?"}, ${e.pyrLoads.map((l, i) => `${l}kg×${e.pyrReps?.[i] ?? "?"}`).join(", ")}` : isNegativeSet(e.type) && (e.eccSecs || e.conSecs) ? `Set ${e.set}: ${e.reps}×${e.load}kg (${e.eccSecs || "?"}s ecc / ${e.conSecs || "?"}s con)` : `Set ${e.set}: ${e.reps}×${e.load}kg`), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 6,
@@ -11647,7 +12996,17 @@ function LogTab({
           fontSize: 12,
           color: '#A855F7'
         }
-      }, " · 📉 ", e.load, "kg×", e.dropSetMainReps ?? "?", ", ", e.dropSetLoads.map((l, i) => `${l}kg×${e.dropSetReps?.[i] ?? "?"}`).join(", ")), isNegativeSet(e.type) && (e.eccSecs || e.conSecs) && /*#__PURE__*/React.createElement("span", {
+      }, " · 📉 ", e.load, "kg×", e.dropSetMainReps ?? "?", ", ", e.dropSetLoads.map((l, i) => `${l}kg×${e.dropSetReps?.[i] ?? "?"}`).join(", ")), e.ascSetLoads?.length > 0 && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: '#22C55E'
+        }
+      }, " · 📈 ", e.load, "kg×", e.ascSetMainReps ?? "?", ", ", e.ascSetLoads.map((l, i) => `${l}kg×${e.ascSetReps?.[i] ?? "?"}`).join(", ")), e.pyrLoads?.length > 0 && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: '#A855F7'
+        }
+      }, " · 🔺 ", e.load, "kg×", e.pyrMainReps ?? "?", ", ", e.pyrLoads.map((l, i) => `${l}kg×${e.pyrReps?.[i] ?? "?"}`).join(", ")), isNegativeSet(e.type) && (e.eccSecs || e.conSecs) && /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 12,
           color: '#38BDF8'
@@ -11708,7 +13067,7 @@ function LogTab({
           fontSize: 10,
           color: C.sub
         }
-      }, "~", est1RM(e.load, effReps(e)), " 1RM")) : /*#__PURE__*/React.createElement("div", {
+      }, "~", est1RM(effPeakLoad(e), effPeakReps(e)), " 1RM")) : /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 11,
           color: C.warn,
@@ -11781,9 +13140,9 @@ function ProgressTab({
     return sessions.map(s => {
       const ee = s.entries.filter(e => e.ex === sel);
       if (!ee.length) return null;
-      const maxLoad = Math.max(...ee.map(e => e.load));
-      const top = ee.find(e => e.load === maxLoad);
-      const oneRM = est1RM(maxLoad, effReps(top));
+      const top = ee.reduce((best, e) => effPeakLoad(e) > effPeakLoad(best) ? e : best, ee[0]);
+      const maxLoad = effPeakLoad(top);
+      const oneRM = est1RM(maxLoad, effPeakReps(top));
       const vel = top.velocity || estVelocity(maxLoad, oneRM);
       const power = top.power || calcPower(maxLoad, vel);
       // Max reps across all sets this session for this exercise
@@ -13077,9 +14436,9 @@ function ReportTab({
       exercises.forEach(ex => {
         const ee = s.entries.filter(e => e.ex === ex.name);
         if (!ee.length) return;
-        const maxLoad = Math.max(...ee.map(e => e.load));
-        const top = ee.find(e => e.load === maxLoad) || ee[0];
-        const oneRM = est1RM(maxLoad, effReps(top));
+        const top = ee.reduce((best, e) => effPeakLoad(e) > effPeakLoad(best) ? e : best, ee[0]);
+        const maxLoad = effPeakLoad(top);
+        const oneRM = est1RM(maxLoad, effPeakReps(top));
         const vel = top.velocity || estVelocity(maxLoad, oneRM);
         row[`load_${ex.name}`] = maxLoad;
         row[`onerm_${ex.name}`] = oneRM;
@@ -14315,6 +15674,29 @@ function App() {
     });
   }, []);
 
+  // Backfill "Ascending Set" — inserted right after "Drop Set" (its mirror-
+  // image sibling), otherwise appended.
+  useEffect(() => {
+    setCustomSetTypes(sts => {
+      if (sts.includes("Ascending Set")) return sts;
+      const idx = sts.indexOf("Drop Set");
+      if (idx === -1) return [...sts, "Ascending Set"];
+      return [...sts.slice(0, idx + 1), "Ascending Set", ...sts.slice(idx + 1)];
+    });
+  }, []);
+
+  // Backfill "Pyramid Set (continuous)" — combining Ascending Set's climb
+  // with Drop Set's descent into one continuous sequence — inserted right
+  // after "Ascending Set" (both its component techniques), otherwise appended.
+  useEffect(() => {
+    setCustomSetTypes(sts => {
+      if (sts.includes("Pyramid Set (continuous)")) return sts;
+      const idx = sts.indexOf("Ascending Set");
+      if (idx === -1) return [...sts, "Pyramid Set (continuous)"];
+      return [...sts.slice(0, idx + 1), "Pyramid Set (continuous)", ...sts.slice(idx + 1)];
+    });
+  }, []);
+
   // Backfill "Ovrc Iso-Strength+Hypertrophy" — the two-phase combo protocol —
   // inserted right after "Ovrc Iso-Sustained" (last of the Overcoming family),
   // otherwise appended.
@@ -14739,6 +16121,13 @@ function App() {
     dropSetLoads,
     dropSetReps,
     dropSetMainReps,
+    ascSetLoads,
+    ascSetReps,
+    ascSetMainReps,
+    pyrLoads,
+    pyrReps,
+    pyrMainReps,
+    pyrUpCount,
     comboRounds,
     comboContractSecs,
     comboRestSecs,
@@ -14780,6 +16169,13 @@ function App() {
       dropSetLoads,
       dropSetReps,
       dropSetMainReps,
+      ascSetLoads,
+      ascSetReps,
+      ascSetMainReps,
+      pyrLoads,
+      pyrReps,
+      pyrMainReps,
+      pyrUpCount,
       comboRounds,
       comboContractSecs,
       comboRestSecs,
@@ -14926,7 +16322,7 @@ function App() {
       fontWeight: 700,
       letterSpacing: 1
     }
-  }, "v67.14.0")), /*#__PURE__*/React.createElement("button", {
+  }, "v67.18.0")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDataSync(true),
     style: {
       background: "none",
